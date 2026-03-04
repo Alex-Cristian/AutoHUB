@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Autentificare — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-sm-10 col-md-6 col-lg-5">
+      <div class="rounded-xl p-4 p-md-5" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <div class="text-center mb-4">
+          <a href="{% url 'core:home' %}" class="text-decoration-none">
+            <h3 class="fw-bold text-white">
+              <i class="bi bi-tools me-1 text-red"></i>Auto<span class="text-red">Hub</span>
+            </h3>
+          </a>
+          <p class="text-muted-custom">Bun venit înapoi!</p>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label">Nume utilizator</label>
+            {{ form.username }}
+            {% if form.username.errors %}
+            <div class="text-danger small mt-1">{{ form.username.errors|join:" " }}</div>
+            {% endif %}
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Parolă</label>
+            {{ form.password }}
+            {% if form.password.errors %}
+            <div class="text-danger small mt-1">{{ form.password.errors|join:" " }}</div>
+            {% endif %}
+          </div>
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          {% endif %}
+          <button type="submit" class="btn btn-primary w-100 btn-lg">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Autentificare
+          </button>
+        </form>
+
+        <hr style="border-color:var(--ah-border);margin:1.5rem 0;">
+        <p class="text-center text-muted-custom small mb-0">
+          Nu ai cont?
+          <a href="{% url 'accounts:register' %}" class="text-red text-decoration-none fw-bold">
+            Înregistrează-te gratuit
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

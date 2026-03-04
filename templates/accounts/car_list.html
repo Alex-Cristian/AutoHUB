@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block title %}Mașinile mele — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="section-title mb-1"><i class="bi bi-car-front me-2 text-red"></i>Mașinile mele</h2>
+      <p class="text-muted-custom mb-0">Salvează-ți mașinile o dată și le alegi rapid la programare.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'accounts:car_create' %}">
+      <i class="bi bi-plus-lg me-1"></i>Adaugă mașină
+    </a>
+  </div>
+
+  {% if cars %}
+  <div class="row g-3">
+    {% for car in cars %}
+    <div class="col-md-6 col-lg-4">
+      <div class="p-3 rounded-3 h-100" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <p class="fw-bold mb-1" style="font-size:1.05rem;">
+              {{ car.make }} {{ car.model }}{% if car.year %} <span class="text-muted-custom">{{ car.year }}</span>{% endif %}
+            </p>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <span class="badge" style="background:var(--ah-dark4);border:1px solid var(--ah-border);">
+                <i class="bi bi-upc-scan me-1"></i>{{ car.plate_number }}
+              </span>
+              {% if car.fuel %}
+              <span class="badge" style="background:var(--ah-dark4);border:1px solid var(--ah-border);color:#ccc;">
+                <i class="bi bi-fuel-pump me-1"></i>{{ car.fuel|capfirst }}
+              </span>
+              {% endif %}
+            </div>
+            {% if car.vin %}
+            <p class="text-muted-custom small mt-2 mb-0">
+              <i class="bi bi-hash me-1"></i>VIN: {{ car.vin }}
+            </p>
+            {% endif %}
+          </div>
+          <div class="text-muted-custom"><i class="bi bi-car-front" style="font-size:1.6rem;"></i></div>
+        </div>
+
+        <hr style="border-color:var(--ah-border);" class="my-3">
+
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-secondary btn-sm flex-grow-1" href="{% url 'accounts:car_update' car.id %}">
+            <i class="bi bi-pencil-square me-1"></i>Editează
+          </a>
+          <a class="btn btn-outline-danger btn-sm" href="{% url 'accounts:car_delete' car.id %}">
+            <i class="bi bi-trash"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="p-4 rounded-3" style="background:var(--ah-dark2);border:1px dashed var(--ah-border);">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div style="font-size:2.2rem;">🚗</div>
+      <div class="flex-grow-1">
+        <p class="fw-bold mb-1">Încă nu ai nicio mașină salvată.</p>
+        <p class="text-muted-custom mb-0">Adaugă una acum și la programări o alegi dintr-un click.</p>
+      </div>
+      <a class="btn btn-primary" href="{% url 'accounts:car_create' %}">
+        <i class="bi bi-plus-lg me-1"></i>Adaugă prima mașină
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="mt-4">
+    <a class="text-decoration-none text-red" href="{% url 'accounts:profile' %}">
+      <i class="bi bi-arrow-left me-1"></i>Înapoi la profil
+    </a>
+  </div>
+</div>
+{% endblock %}

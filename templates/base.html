@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ro" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}AutoHub — Marketplace Service Auto{% endblock %}</title>
+  <meta name="description" content="{% block meta_desc %}Găsește cel mai bun service auto din orașul tău. Programează online rapid și simplu.{% endblock %}">
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --ah-red: #e63946;
+      --ah-red-dark: #c1121f;
+      --ah-orange: #f4a261;
+      --ah-dark: #0d0d0d;
+      --ah-dark2: #161616;
+      --ah-dark3: #1e1e1e;
+      --ah-dark4: #2a2a2a;
+      --ah-muted: #888;
+      --ah-border: #333;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Barlow', sans-serif;
+      background-color: var(--ah-dark);
+      color: #e8e8e8;
+      min-height: 100vh;
+    }
+
+    h1, h2, h3, h4, h5, h6,
+    .display-1, .display-2, .display-3, .display-4, .display-5 {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    /* ---- NAVBAR ---- */
+    .navbar-autohub {
+      background: rgba(13,13,13,0.97);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--ah-border);
+      padding: 0.6rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 1050;
+    }
+
+    .navbar-brand {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #fff !important;
+    }
+
+    .navbar-brand span.accent { color: var(--ah-red); }
+
+    .navbar-autohub .nav-link {
+      color: #ccc !important;
+      font-weight: 500;
+      font-size: 0.92rem;
+      padding: 0.4rem 0.8rem !important;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+    }
+
+    .navbar-autohub .nav-link:hover,
+    .navbar-autohub .nav-link.active {
+      color: #fff !important;
+      background: var(--ah-dark4);
+    }
+
+    .btn-nav-cta {
+      background: var(--ah-red);
+      color: #fff !important;
+      font-weight: 600;
+      border-radius: 8px;
+      padding: 0.4rem 1rem !important;
+      font-size: 0.9rem;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-nav-cta:hover {
+      background: var(--ah-red-dark);
+      transform: translateY(-1px);
+    }
+
+    /* SEARCH in navbar */
+    .navbar-search {
+      max-width: 340px;
+      flex: 1;
+    }
+
+    .navbar-search input {
+      background: var(--ah-dark3);
+      border: 1px solid var(--ah-border);
+      color: #fff;
+      border-radius: 8px 0 0 8px;
+      font-size: 0.9rem;
+    }
+
+    .navbar-search input::placeholder { color: var(--ah-muted); }
+    .navbar-search input:focus {
+      background: var(--ah-dark4);
+      box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.35);
+      border-color: var(--ah-red);
+    }
+
+    .navbar-search .btn-search {
+      background: var(--ah-red);
+      border: none;
+      border-radius: 0 8px 8px 0;
+      color: #fff;
+      padding: 0.45rem 0.8rem;
+    }
+
+    /* ---- CARDS ---- */
+    .service-card {
+      background: var(--ah-dark2);
+      border: 1px solid var(--ah-border);
+      border-radius: 12px;
+      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+      overflow: hidden;
+    }
+
+    .service-card:hover {
+      border-color: var(--ah-red);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 32px rgba(230,57,70,0.15);
+    }
+
+    .service-card .card-img-placeholder {
+      height: 140px;
+      background: linear-gradient(135deg, var(--ah-dark3) 0%, var(--ah-dark4) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+    }
+
+    /* ---- CATEGORY CARDS ---- */
+    .cat-card {
+      background: var(--ah-dark2);
+      border: 1px solid var(--ah-border);
+      border-radius: 16px;
+      padding: 2rem 1rem;
+      text-align: center;
+      text-decoration: none;
+      color: #e8e8e8;
+      display: block;
+      transition: all 0.25s;
+    }
+
+    .cat-card:hover {
+      border-color: var(--ah-red);
+      background: var(--ah-dark3);
+      color: #fff;
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(230,57,70,0.18);
+    }
+
+    .cat-card .cat-icon {
+      font-size: 2.8rem;
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .cat-card .cat-name {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .cat-card .cat-count {
+      font-size: 0.8rem;
+      color: var(--ah-muted);
+      margin-top: 0.2rem;
+    }
+
+    /* ---- RATING STARS ---- */
+    .stars { color: #f4a261; letter-spacing: -1px; }
+    .stars-empty { color: #444; }
+
+    /* ---- BADGES ---- */
+    .badge-featured {
+      background: linear-gradient(90deg, var(--ah-red), var(--ah-orange));
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    /* ---- FORMS ---- */
+    .form-control, .form-select {
+      background: var(--ah-dark3) !important;
+      border: 1px solid var(--ah-border) !important;
+      color: #e8e8e8 !important;
+      border-radius: 8px;
+    }
+
+    .form-control:focus, .form-select:focus {
+      box-shadow: 0 0 0 2px rgba(230,57,70,0.3) !important;
+      border-color: var(--ah-red) !important;
+    }
+
+    .form-label { color: #bbb; font-weight: 500; font-size: 0.9rem; }
+
+    /* ---- BUTTONS ---- */
+    .btn-primary {
+      background: var(--ah-red) !important;
+      border-color: var(--ah-red) !important;
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background: var(--ah-red-dark) !important;
+      border-color: var(--ah-red-dark) !important;
+    }
+
+    .btn-outline-primary {
+      border-color: var(--ah-red) !important;
+      color: var(--ah-red) !important;
+    }
+
+    .btn-outline-primary:hover {
+      background: var(--ah-red) !important;
+      color: #fff !important;
+    }
+
+    /* ---- SECTION HEADERS ---- */
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--ah-red);
+      margin-bottom: 0.4rem;
+    }
+
+    .section-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 800;
+    }
+
+    /* ---- SIDEBAR FILTERS ---- */
+    .filter-sidebar {
+      background: var(--ah-dark2);
+      border: 1px solid var(--ah-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: sticky;
+      top: 80px;
+    }
+
+    .filter-sidebar .filter-group { margin-bottom: 1.5rem; }
+    .filter-sidebar .filter-title {
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ah-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    /* ---- MAP PLACEHOLDER ---- */
+    .map-placeholder {
+      background: var(--ah-dark2);
+      border: 1px solid var(--ah-border);
+      border-radius: 12px;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--ah-muted);
+      text-align: center;
+    }
+
+    /* ---- FOOTER ---- */
+    footer {
+      background: var(--ah-dark2);
+      border-top: 1px solid var(--ah-border);
+      padding: 3rem 0 1.5rem;
+      margin-top: 5rem;
+    }
+
+    footer .footer-brand {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+
+    footer a { color: #888; text-decoration: none; font-size: 0.9rem; }
+    footer a:hover { color: var(--ah-red); }
+
+    /* ---- ALERTS ---- */
+    .alert {
+      border-radius: 10px;
+      border: none;
+      font-size: 0.95rem;
+    }
+
+    /* ---- MISC ---- */
+    .divider-red {
+      width: 48px;
+      height: 3px;
+      background: var(--ah-red);
+      border-radius: 2px;
+      margin: 0.5rem 0 1.5rem;
+    }
+
+    .text-red { color: var(--ah-red) !important; }
+    .text-orange { color: var(--ah-orange) !important; }
+    .text-muted-custom { color: var(--ah-muted) !important; }
+
+    .bg-dark2 { background: var(--ah-dark2); }
+    .bg-dark3 { background: var(--ah-dark3); }
+
+    .rounded-xl { border-radius: 16px !important; }
+
+    /* Scroll bar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--ah-dark); }
+    ::-webkit-scrollbar-thumb { background: var(--ah-dark4); border-radius: 4px; }
+  </style>
+
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar navbar-autohub navbar-expand-lg">
+  <div class="container">
+    <!-- BRAND -->
+    <a class="navbar-brand me-3" href="{% url 'core:home' %}">
+      <i class="bi bi-tools me-1 text-red"></i>Auto<span class="accent">Hub</span>
+    </a>
+
+    <!-- SEARCH (desktop) -->
+    <form class="navbar-search input-group d-none d-lg-flex me-3"
+          action="{% url 'services:list' %}" method="get">
+      <input type="text" name="q" class="form-control"
+             placeholder="Caută service, oraș, serviciu..."
+             value="{{ request.GET.q }}">
+      <button class="btn btn-search" type="submit">
+        <i class="bi bi-search"></i>
+      </button>
+    </form>
+
+    <button class="navbar-toggler border-0" type="button"
+            data-bs-toggle="collapse" data-bs-target="#navMain">
+      <i class="bi bi-list text-white fs-4"></i>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navMain">
+      <ul class="navbar-nav me-auto ms-lg-2">
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'categories' %}active{% endif %}"
+             href="{% url 'services:categories' %}">
+            <i class="bi bi-grid-3x3-gap me-1"></i>Categorii
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'list' %}active{% endif %}"
+             href="{% url 'services:list' %}">
+            <i class="bi bi-search me-1"></i>Service-uri
+          </a>
+        </li>
+        {% if nav_categories %}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+            Servicii
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark"
+              style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+            {% for cat in nav_categories %}
+            <li>
+              <a class="dropdown-item" href="{{ cat.get_absolute_url }}">
+                {{ cat.icon }} {{ cat.name }}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </li>
+        {% endif %}
+      </ul>
+
+      <!-- Search mobile -->
+      <form class="d-lg-none mb-2 mt-2 input-group"
+            action="{% url 'services:list' %}" method="get">
+        <input type="text" name="q" class="form-control"
+               placeholder="Caută service..." value="{{ request.GET.q }}">
+        <button class="btn btn-search" type="submit">
+          <i class="bi bi-search"></i>
+        </button>
+      </form>
+
+      <!-- Auth links -->
+      <ul class="navbar-nav align-items-center gap-1">
+        {% if user.is_authenticated %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'bookings:my_bookings' %}">
+            <i class="bi bi-calendar-check me-1"></i>Programările mele
+          </a>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle d-flex align-items-center gap-1"
+             href="#" data-bs-toggle="dropdown">
+            <span class="rounded-circle bg-danger d-flex align-items-center justify-content-center"
+                  style="width:28px;height:28px;font-size:0.85rem;font-weight:700;">
+              {{ user.username|first|upper }}
+            </span>
+            <span class="d-none d-lg-inline">{{ user.username }}</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end"
+              style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+            <li>
+              <a class="dropdown-item" href="{% url 'accounts:profile' %}">
+                <i class="bi bi-person me-2"></i>Profilul meu
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="{% url 'accounts:cars' %}">
+                <i class="bi bi-car-front me-2"></i>Mașinile mele
+              </a>
+            </li>
+            {% if user.is_staff %}
+            <li>
+              <a class="dropdown-item" href="/admin/">
+                <i class="bi bi-shield-check me-2"></i>Admin
+              </a>
+            </li>
+            {% endif %}
+            <li><hr class="dropdown-divider border-secondary"></li>
+            <li>
+              <a class="dropdown-item text-danger" href="{% url 'accounts:logout' %}">
+                <i class="bi bi-box-arrow-right me-2"></i>Deconectare
+              </a>
+            </li>
+          </ul>
+        </li>
+        {% else %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'accounts:login' %}">Autentificare</a>
+        </li>
+        <li class="nav-item">
+          <a class="btn btn-nav-cta" href="{% url 'accounts:register' %}">
+            Înregistrare
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== MESSAGES ===== -->
+{% if messages %}
+<div class="container mt-3">
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" role="alert">
+    {{ msg }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- ===== MAIN CONTENT ===== -->
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="container">
+    <div class="row g-4 mb-4">
+      <div class="col-lg-4">
+        <div class="footer-brand mb-2">
+          <i class="bi bi-tools me-1 text-red"></i>Auto<span class="text-red">Hub</span>
+        </div>
+        <p class="text-muted-custom small">
+          Cel mai mare marketplace de service-uri auto din România.
+          Găsește, compară și programează online.
+        </p>
+      </div>
+      <div class="col-lg-2 col-6">
+        <p class="text-white fw-bold small text-uppercase mb-3">Explorare</p>
+        <ul class="list-unstyled">
+          <li><a href="{% url 'services:categories' %}">Categorii</a></li>
+          <li><a href="{% url 'services:list' %}">Toate service-urile</a></li>
+          <li><a href="{% url 'core:about' %}">Despre noi</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-2 col-6">
+        <p class="text-white fw-bold small text-uppercase mb-3">Cont</p>
+        <ul class="list-unstyled">
+          {% if user.is_authenticated %}
+          <li><a href="{% url 'accounts:profile' %}">Profilul meu</a></li>
+          <li><a href="{% url 'accounts:cars' %}">Mașinile mele</a></li>
+          <li><a href="{% url 'bookings:my_bookings' %}">Programările mele</a></li>
+          {% else %}
+          <li><a href="{% url 'accounts:login' %}">Autentificare</a></li>
+          <li><a href="{% url 'accounts:register' %}">Înregistrare</a></li>
+          {% endif %}
+        </ul>
+      </div>
+      <div class="col-lg-4">
+        <p class="text-white fw-bold small text-uppercase mb-3">Categorii populare</p>
+        <div class="d-flex flex-wrap gap-2">
+          {% for cat in nav_categories %}
+          <a href="{{ cat.get_absolute_url }}"
+             class="badge text-decoration-none"
+             style="background:var(--ah-dark4);color:#ccc;border:1px solid var(--ah-border);padding:5px 10px;border-radius:20px;">
+            {{ cat.icon }} {{ cat.name }}
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <hr style="border-color:var(--ah-border)">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <p class="text-muted-custom small mb-0">
+        © 2024 AutoHub. Toate drepturile rezervate.
+      </p>
+      <p class="text-muted-custom small mb-0">
+        Construit cu ❤️ în România
+      </p>
+    </div>
+  </div>
+</footer>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>
