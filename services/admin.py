@@ -28,13 +28,13 @@ class ServiceCenterAdmin(admin.ModelAdmin):
     list_display = (
         'name', 'category', 'city_display', 'phone',
         'avg_rating_display', 'review_count_display',
-        'is_active', 'is_featured', 'created_at'
+        'verification_status', 'is_active', 'is_featured', 'created_at'
     )
-    list_filter = ('category', 'city', 'is_active', 'is_featured', 'created_at')
+    list_filter = ('category', 'city', 'verification_status', 'is_active', 'is_featured', 'created_at')
     search_fields = ('name', 'address', 'phone', 'email', 'description')
     list_editable = ('is_active', 'is_featured')
     prepopulated_fields = {'slug': ('name',)}
-    readonly_fields = ('created_at', 'avg_rating_display', 'review_count_display')
+    readonly_fields = ('created_at', 'avg_rating_display', 'review_count_display', 'verified_at')
     inlines = [ServiceItemInline]
     fieldsets = (
         ('Informații Principale', {
@@ -42,6 +42,13 @@ class ServiceCenterAdmin(admin.ModelAdmin):
         }),
         ('Contact & Locație', {
             'fields': ('address', 'city', 'phone', 'email', 'website', 'schedule', 'latitude', 'longitude')
+        }),
+        ('Date legale (opțional)', {
+            'fields': ('legal_name', 'headquarters', 'fiscal_code', 'trade_register_no', 'legal_document'),
+            'classes': ('collapse',)
+        }),
+        ('Verificare (intern)', {
+            'fields': ('verification_status', 'verification_note', 'verified_at'),
         }),
         ('Setări', {
             'fields': ('is_active', 'is_featured', 'created_at')

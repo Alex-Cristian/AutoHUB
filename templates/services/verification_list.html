@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Verificare servicii — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h3 m-0">Verificare servicii (staff)</h1>
+    <a class="btn btn-outline-secondary" href="{% url 'services:dashboard' %}">Înapoi la dashboard</a>
+  </div>
+
+  {% if pending_centers %}
+    <div class="card">
+      <div class="card-body">
+        <p class="text-muted mb-3">
+          Aici apar doar servicii care au completat date legale și au încărcat documente (status: <b>în așteptare</b>).
+        </p>
+
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Oraș</th>
+                <th>Proprietar</th>
+                <th>CIF</th>
+                <th>Creat</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in pending_centers %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ c.name }}</div>
+                    <div class="small text-muted">{{ c.legal_name|default:"—" }}</div>
+                  </td>
+                  <td>{{ c.get_city_display }}</td>
+                  <td>
+                    {{ c.owner.get_full_name|default:c.owner.username }}
+                    <div class="small text-muted">{{ c.owner.email }}</div>
+                  </td>
+                  <td>{{ c.fiscal_code|default:"—" }}</td>
+                  <td class="small text-muted">{{ c.created_at|date:"d.m.Y H:i" }}</td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-primary" href="{% url 'services:verification_detail' c.pk %}">
+                      Deschide
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-success">
+      🎉 N-ai nimic de verificat acum.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -86,8 +86,15 @@
         {% else %}
           <div class="text-muted-custom">Nicio programare în așteptare. 🧘</div>
         {% endif %}
-      </div>
+      
+      {% if user.is_staff %}
+        <a class="btn btn-outline-warning" href="{% url 'services:verification_list' %}">
+          <i class="bi bi-shield-check me-1"></i>Verificare servicii
+        </a>
+      {% endif %}
+
     </div>
+  </div>
 
     <div class="col-lg-4">
       <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">

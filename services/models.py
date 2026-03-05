@@ -72,6 +72,30 @@ class ServiceCenter(models.Model):
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
+
+    # --- Date legale (opțional) ---
+    legal_name = models.CharField(max_length=255, blank=True, verbose_name='Denumire legală (opțional)')
+    headquarters = models.CharField(max_length=300, blank=True, verbose_name='Sediu social (opțional)')
+    fiscal_code = models.CharField(max_length=50, blank=True, verbose_name='Cod fiscal / CIF (opțional)')
+    trade_register_no = models.CharField(max_length=50, blank=True, verbose_name='Nr. Registrul Comerțului (opțional)')
+    legal_document = models.FileField(
+        upload_to='legal_docs/', blank=True, null=True,
+        verbose_name='Document legal (opțional)'
+    )
+    
+    VERIFICATION_CHOICES = [
+        ('not_required', 'Nu necesită verificare'),
+        ('pending', 'În așteptare verificare'),
+        ('verified', 'Verificat'),
+        ('rejected', 'Respins'),
+    ]
+    verification_status = models.CharField(
+        max_length=20, choices=VERIFICATION_CHOICES, default='not_required',
+        verbose_name='Status verificare'
+    )
+    verification_note = models.TextField(blank=True, verbose_name='Notă verificare (intern)')
+    verified_at = models.DateTimeField(null=True, blank=True, verbose_name='Verificat la')
+
     is_active = models.BooleanField(default=True, verbose_name='Activ')
     is_featured = models.BooleanField(default=False, verbose_name='Recomandat')
     created_at = models.DateTimeField(auto_now_add=True)
