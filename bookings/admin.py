@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Booking
+from .models import Booking, BookingNotification
 
 
 @admin.register(Booking)
@@ -83,3 +83,11 @@ class BookingAdmin(admin.ModelAdmin):
     def mark_cancelled(self, request, queryset):
         updated = queryset.update(status='cancelled')
         self.message_user(request, f'{updated} programări marcate ca Anulate.')
+
+
+@admin.register(BookingNotification)
+class BookingNotificationAdmin(admin.ModelAdmin):
+    list_display = ('id', 'recipient', 'kind', 'title', 'is_read', 'created_at')
+    list_filter = ('kind', 'is_read', 'created_at')
+    search_fields = ('title', 'message', 'recipient__username', 'recipient__email')
+    readonly_fields = ('created_at',)

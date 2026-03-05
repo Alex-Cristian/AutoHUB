@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Înregistrare service — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+          <h1 class="mb-1">Înregistrare service</h1>
+          <p class="text-muted-custom mb-0">Creează profilul service-ului ca să primești programări și notificări.</p>
+        </div>
+        <a href="{% url 'services:list' %}" class="btn btn-outline-light rounded-xl">
+          <i class="bi bi-arrow-left me-1"></i>Înapoi
+        </a>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-lg-7">
+          <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+            <h4 class="mb-3"><i class="bi bi-building me-2 text-red"></i>Date service</h4>
+            <form method="post">
+              {% csrf_token %}
+              <div class="row g-3">
+                {% for field in form %}
+                <div class="col-12">
+                  <label class="form-label">{{ field.label }}</label>
+                  {{ field }}
+                  {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                  {% for err in field.errors %}
+                    <div class="text-danger small">{{ err }}</div>
+                  {% endfor %}
+                </div>
+                {% endfor %}
+              </div>
+              <div class="d-flex gap-2 mt-4">
+                <button class="btn btn-nav-cta" type="submit">
+                  <i class="bi bi-check2-circle me-1"></i>Înregistrează service
+                </button>
+                <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}">
+                  Mergi la dashboard
+                </a>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+            <h5 class="mb-3"><i class="bi bi-bell me-2 text-orange"></i>Ce primești</h5>
+            <ul class="small text-muted-custom">
+              <li>Notificări instant pentru fiecare programare nouă</li>
+              <li>Buton de <b>Acceptă</b> / <b>Respinge</b> direct din dashboard</li>
+              <li>Istoric programări și statusuri</li>
+            </ul>
+
+            {% if existing_centers %}
+              <hr class="border-secondary">
+              <h6 class="text-white mb-2">Service-urile tale</h6>
+              <div class="d-grid gap-2">
+                {% for c in existing_centers %}
+                  <a class="btn btn-outline-light text-start" href="{% url 'services:detail' c.slug %}">
+                    <div class="fw-semibold">{{ c.name }}</div>
+                    <div class="small text-muted-custom">{{ c.get_city_display }} • {{ c.category.name }}</div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Make Django form inputs match site */
+  input, select, textarea {
+    background: var(--ah-dark3) !important;
+    border: 1px solid var(--ah-border) !important;
+    color: #fff !important;
+    border-radius: 10px !important;
+    padding: 0.6rem 0.8rem !important;
+  }
+  input:focus, select:focus, textarea:focus {
+    box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.35) !important;
+    border-color: var(--ah-red) !important;
+  }
+</style>
+{% endblock %}
