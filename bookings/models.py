@@ -117,3 +117,38 @@ class Booking(models.Model):
             'cancelled': '❌',
         }
         return icons.get(self.status, '❓')
+<<<<<<< HEAD
+=======
+
+
+class BookingNotification(models.Model):
+    """Simple in-app notifications for booking events."""
+
+    KIND_BOOKING_NEW = 'booking_new'
+    KIND_STATUS_UPDATE = 'status_update'
+
+    KIND_CHOICES = [
+        (KIND_BOOKING_NEW, 'Programare nouă'),
+        (KIND_STATUS_UPDATE, 'Actualizare status'),
+    ]
+
+    recipient = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='booking_notifications'
+    )
+    booking = models.ForeignKey(
+        Booking, on_delete=models.CASCADE, related_name='notifications'
+    )
+    kind = models.CharField(max_length=30, choices=KIND_CHOICES)
+    title = models.CharField(max_length=200)
+    message = models.TextField(blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Notificare programare'
+        verbose_name_plural = 'Notificări programări'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.recipient.username}: {self.title}" 
+>>>>>>> origin/main

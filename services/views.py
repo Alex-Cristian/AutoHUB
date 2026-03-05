@@ -3,6 +3,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Avg, Count, Min, Max, Q
 from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite
+<<<<<<< HEAD
+=======
+from .forms import ServiceCenterRegisterForm
+
+from bookings.models import Booking, BookingNotification
+>>>>>>> origin/main
 
 
 def category_list(request):
@@ -137,3 +143,134 @@ def toggle_favorite(request, slug):
     else:
         messages.success(request, f'"{center.name}" a fost adăugat la favorite!')
     return redirect(request.META.get('HTTP_REFERER', center.get_absolute_url()))
+<<<<<<< HEAD
+=======
+
+
+@login_required
+def service_register(request):
+    """Register a new service center owned by the current user."""
+    if request.method == 'POST':
+        form = ServiceCenterRegisterForm(request.POST)
+        if form.is_valid():
+            center = form.save(commit=False)
+            center.owner = request.user
+            center.is_active = True
+            center.save()
+            messages.success(request, '✅ Service-ul a fost înregistrat. Acum poți gestiona programările din dashboard.')
+            return redirect('services:dashboard')
+    else:
+        form = ServiceCenterRegisterForm()
+
+    return render(request, 'services/service_register.html', {
+        'form': form,
+        'existing_centers': ServiceCenter.objects.filter(owner=request.user).order_by('-created_at'),
+    })
+
+
+def _require_service_owner(request):
+    centers = ServiceCenter.objects.filter(owner=request.user)
+    if not centers.exists() and not request.user.is_staff:
+        messages.info(request, 'Contul tău nu are încă un service înregistrat. Înregistrează unul ca să primești programări.')
+        return None
+    return centers
+
+
+@login_required
+def service_dashboard(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+
+    # Bookings for all owned centers
+    bookings_qs = Booking.objects.filter(center__in=centers).select_related(
+        'center', 'service_item', 'user'
+    ).order_by('-created_at')
+
+    pending = bookings_qs.filter(status=Booking.STATUS_PENDING)
+    active = bookings_qs.exclude(status=Booking.STATUS_CANCELLED)[:50]
+
+    unread_count = BookingNotification.objects.filter(recipient=request.user, is_read=False).count()
+    latest_notifications = BookingNotification.objects.filter(recipient=request.user)[:6]
+
+    return render(request, 'services/service_dashboard.html', {
+        'centers': centers,
+        'pending_bookings': pending,
+        'bookings': active,
+        'unread_count': unread_count,
+        'latest_notifications': latest_notifications,
+    })
+
+
+@login_required
+def booking_accept(request, pk):
+    booking = get_object_or_404(Booking, pk=pk)
+    if not (request.user.is_staff or booking.center.owner_id == request.user.id):
+        return redirect('core:home')
+
+    if request.method == 'POST':
+        if booking.status != Booking.STATUS_PENDING:
+            messages.info(request, 'Această programare nu mai este în așteptare.')
+            return redirect('services:dashboard')
+
+        booking.status = Booking.STATUS_CONFIRMED
+        booking.save(update_fields=['status', 'updated_at'])
+
+        # Notify client (in-app if user exists)
+        if booking.user:
+            BookingNotification.objects.create(
+                recipient=booking.user,
+                booking=booking,
+                kind=BookingNotification.KIND_STATUS_UPDATE,
+                title=f"Programarea #{booking.pk} a fost acceptată ✅",
+                message=f"Service-ul {booking.center.name} ți-a confirmat programarea pentru {booking.booking_date} la {booking.booking_time}.",
+            )
+        messages.success(request, f'✅ Ai acceptat programarea #{booking.pk}.')
+    return redirect('services:dashboard')
+
+
+@login_required
+def booking_reject(request, pk):
+    booking = get_object_or_404(Booking, pk=pk)
+    if not (request.user.is_staff or booking.center.owner_id == request.user.id):
+        return redirect('core:home')
+
+    if request.method == 'POST':
+        if booking.status != Booking.STATUS_PENDING:
+            messages.info(request, 'Această programare nu mai este în așteptare.')
+            return redirect('services:dashboard')
+
+        booking.status = Booking.STATUS_CANCELLED
+        booking.save(update_fields=['status', 'updated_at'])
+
+        if booking.user:
+            BookingNotification.objects.create(
+                recipient=booking.user,
+                booking=booking,
+                kind=BookingNotification.KIND_STATUS_UPDATE,
+                title=f"Programarea #{booking.pk} a fost respinsă ❌",
+                message=f"Din păcate, {booking.center.name} nu poate onora programarea pentru {booking.booking_date} la {booking.booking_time}.",
+            )
+        messages.warning(request, f'❌ Ai respins programarea #{booking.pk}.')
+    return redirect('services:dashboard')
+
+
+@login_required
+def service_notifications(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+
+    notifs = BookingNotification.objects.filter(recipient=request.user)
+    return render(request, 'services/service_notifications.html', {
+        'notifications': notifs,
+    })
+
+
+@login_required
+def notification_mark_read(request, pk):
+    notif = get_object_or_404(BookingNotification, pk=pk, recipient=request.user)
+    notif.is_read = True
+    notif.save(update_fields=['is_read'])
+    return redirect(request.META.get('HTTP_REFERER', 'services:notifications'))
+>>>>>>> origin/main

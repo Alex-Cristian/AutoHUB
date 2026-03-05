@@ -408,6 +408,25 @@
       <!-- Auth links -->
       <ul class="navbar-nav align-items-center gap-1">
         {% if user.is_authenticated %}
+<<<<<<< HEAD
+=======
+        {% if has_service_center %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'services:dashboard' %}">
+            <i class="bi bi-speedometer2 me-1"></i>Dashboard service
+            {% if service_unread_notifications %}
+              <span class="badge bg-danger ms-1">{{ service_unread_notifications }}</span>
+            {% endif %}
+          </a>
+        </li>
+        {% else %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'services:register_service' %}">
+            <i class="bi bi-building-add me-1"></i>Înregistrează service
+          </a>
+        </li>
+        {% endif %}
+>>>>>>> origin/main
         <li class="nav-item">
           <a class="nav-link" href="{% url 'bookings:my_bookings' %}">
             <i class="bi bi-calendar-check me-1"></i>Programările mele
@@ -454,6 +473,14 @@
           <a class="nav-link" href="{% url 'accounts:login' %}">Autentificare</a>
         </li>
         <li class="nav-item">
+<<<<<<< HEAD
+=======
+          <a class="nav-link" href="{% url 'services:register_service' %}">
+            <i class="bi bi-building-add me-1"></i>Înregistrare service
+          </a>
+        </li>
+        <li class="nav-item">
+>>>>>>> origin/main
           <a class="btn btn-nav-cta" href="{% url 'accounts:register' %}">
             Înregistrare
           </a>

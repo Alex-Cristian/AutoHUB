@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {% extends "base.html" %}
 
 {% block title %}
@@ -6,10 +7,19 @@
 
 {% block content %}
 <div class="container-fluid py-4" style="max-width: 1400px">
+=======
+{% extends 'base.html' %}
+{% block title %}Service-uri Auto{% if selected_city %} în {{ selected_city }}{% endif %} — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" style="max-width:1400px;">
+
+>>>>>>> origin/main
   <!-- Breadcrumb + header -->
   <div class="container-fluid mb-4">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
+<<<<<<< HEAD
         <li class="breadcrumb-item">
           <a href="{% url 'core:home' %}" class="text-red text-decoration-none">Acasă</a>
         </li>
@@ -17,15 +27,27 @@
       </ol>
     </nav>
 
+=======
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}" class="text-red text-decoration-none">Acasă</a></li>
+        <li class="breadcrumb-item active text-muted-custom">Service-uri</li>
+      </ol>
+    </nav>
+>>>>>>> origin/main
     <div class="d-flex justify-content-between align-items-end flex-wrap gap-2">
       <div>
         <h1 class="section-title mb-1">Service-uri auto</h1>
         <p class="text-muted-custom small mb-0">
           <strong class="text-white">{{ total_count }}</strong> rezultate găsite
+<<<<<<< HEAD
           {% if search_q %} pentru „<em>{{ search_q }}</em>”{% endif %}
         </p>
       </div>
 
+=======
+          {% if search_q %} pentru „<em>{{ search_q }}</em>"{% endif %}
+        </p>
+      </div>
+>>>>>>> origin/main
       <!-- Sort -->
       <form method="get" id="sortForm" class="d-flex align-items-center gap-2">
         {% if search_q %}<input type="hidden" name="q" value="{{ search_q }}">{% endif %}
@@ -34,6 +56,7 @@
         {% if selected_min_rating %}<input type="hidden" name="min_rating" value="{{ selected_min_rating }}">{% endif %}
         {% if selected_price_min %}<input type="hidden" name="price_min" value="{{ selected_price_min }}">{% endif %}
         {% if selected_price_max %}<input type="hidden" name="price_max" value="{{ selected_price_max }}">{% endif %}
+<<<<<<< HEAD
 
         <label class="text-muted-custom small mb-0">Sortare:</label>
         <select
@@ -47,6 +70,16 @@
           <option value="price_asc" {% if selected_sort == "price_asc" %}selected{% endif %}>💰 Preț crescător</option>
           <option value="price_desc" {% if selected_sort == "price_desc" %}selected{% endif %}>💰 Preț descrescător</option>
           <option value="name" {% if selected_sort == "name" %}selected{% endif %}>🔤 Nume</option>
+=======
+        <label class="text-muted-custom small mb-0">Sortare:</label>
+        <select name="sort" class="form-select form-select-sm" style="width:auto;"
+                onchange="document.getElementById('sortForm').submit()">
+          <option value="rating" {% if selected_sort == 'rating' %}selected{% endif %}>⭐ Rating</option>
+          <option value="reviews" {% if selected_sort == 'reviews' %}selected{% endif %}>💬 Nr. recenzii</option>
+          <option value="price_asc" {% if selected_sort == 'price_asc' %}selected{% endif %}>💰 Preț crescător</option>
+          <option value="price_desc" {% if selected_sort == 'price_desc' %}selected{% endif %}>💰 Preț descrescător</option>
+          <option value="name" {% if selected_sort == 'name' %}selected{% endif %}>🔤 Nume</option>
+>>>>>>> origin/main
         </select>
       </form>
     </div>
@@ -58,19 +91,30 @@
       <div class="filter-sidebar">
         <form method="get" id="filterForm">
           {% if search_q %}<input type="hidden" name="q" value="{{ search_q }}">{% endif %}
+<<<<<<< HEAD
           <input type="hidden" name="sort" value="{{ selected_sort|default:'rating' }}">
+=======
+          <input type="hidden" name="sort" value="{{ selected_sort }}">
+>>>>>>> origin/main
 
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h6 class="fw-bold mb-0">
               <i class="bi bi-funnel me-1 text-red"></i>Filtre
             </h6>
+<<<<<<< HEAD
             <a href="{% url 'services:list' %}" class="small text-red text-decoration-none">Resetează</a>
+=======
+            <a href="{% url 'services:list' %}" class="small text-red text-decoration-none">
+              Resetează
+            </a>
+>>>>>>> origin/main
           </div>
 
           <!-- Categorie -->
           <div class="filter-group">
             <p class="filter-title">Categorie</p>
             {% for cat in categories %}
+<<<<<<< HEAD
               <div class="form-check mb-1">
                 <input
                   class="form-check-input"
@@ -98,11 +142,24 @@
               >
               <label class="form-check-label small" for="cat_all">Toate</label>
             </div>
+=======
+            <div class="form-check mb-1">
+              <input class="form-check-input" type="radio" name="category"
+                     id="cat_{{ cat.slug }}" value="{{ cat.slug }}"
+                     {% if selected_category == cat.slug %}checked{% endif %}
+                     onchange="document.getElementById('filterForm').submit()">
+              <label class="form-check-label small" for="cat_{{ cat.slug }}">
+                {{ cat.icon }} {{ cat.name }}
+              </label>
+            </div>
+            {% endfor %}
+>>>>>>> origin/main
           </div>
 
           <!-- Oraș -->
           <div class="filter-group">
             <p class="filter-title">Oraș</p>
+<<<<<<< HEAD
             <select
               name="city"
               class="form-select form-select-sm"
@@ -111,6 +168,15 @@
               <option value="" {% if not selected_city %}selected{% endif %}>Toate</option>
               {% for val, label in cities %}
                 <option value="{{ val }}" {% if selected_city == val %}selected{% endif %}>{{ label }}</option>
+=======
+            <select name="city" class="form-select form-select-sm"
+                    onchange="document.getElementById('filterForm').submit()">
+              <option value="">Toate</option>
+              {% for val, label in cities %}
+              <option value="{{ val }}" {% if selected_city == val %}selected{% endif %}>
+                {{ label }}
+              </option>
+>>>>>>> origin/main
               {% endfor %}
             </select>
           </div>
@@ -119,6 +185,7 @@
           <div class="filter-group">
             <p class="filter-title">Rating minim</p>
             {% for r in "54321" %}
+<<<<<<< HEAD
               <div class="form-check mb-1">
                 <input
                   class="form-check-input"
@@ -146,6 +213,20 @@
               >
               <label class="form-check-label small" for="r0">Orice rating</label>
             </div>
+=======
+            <div class="form-check mb-1">
+              <input class="form-check-input" type="radio" name="min_rating"
+                     id="r{{ r }}" value="{{ r }}"
+                     {% if selected_min_rating == r %}checked{% endif %}
+                     onchange="document.getElementById('filterForm').submit()">
+              <label class="form-check-label small" for="r{{ r }}">
+                <span class="stars">{% for i in r|ljust:1 %}{% endfor %}
+                  {{ r }}★ și peste
+                </span>
+              </label>
+            </div>
+            {% endfor %}
+>>>>>>> origin/main
           </div>
 
           <!-- Interval preț -->
@@ -153,6 +234,7 @@
             <p class="filter-title">Interval preț (RON)</p>
             <div class="row g-1 mb-2">
               <div class="col-6">
+<<<<<<< HEAD
                 <input
                   type="number"
                   name="price_min"
@@ -174,6 +256,19 @@
               </div>
             </div>
             <button type="submit" class="btn btn-primary btn-sm w-100">Aplică</button>
+=======
+                <input type="number" name="price_min" class="form-control form-control-sm"
+                       placeholder="Min" value="{{ selected_price_min }}" min="0">
+              </div>
+              <div class="col-6">
+                <input type="number" name="price_max" class="form-control form-control-sm"
+                       placeholder="Max" value="{{ selected_price_max }}" min="0">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+              Aplică
+            </button>
+>>>>>>> origin/main
           </div>
         </form>
       </div>
@@ -184,6 +279,7 @@
       {% if centers %}
         <div class="row g-3">
           {% for center in centers %}
+<<<<<<< HEAD
             <div class="col-12">
               <div class="service-card d-flex" style="min-height: 160px">
                 <div class="card-img-placeholder flex-shrink-0" style="width:120px;min-height:120px;border-radius:12px 0 0 12px;">
@@ -255,11 +351,104 @@
                 </div>
               </div>
             </div>
+=======
+          <div class="col-12">
+            <div class="service-card d-flex" style="min-height:160px;">
+              <!-- Img placeholder -->
+              <div class="card-img-placeholder flex-shrink-0"
+                   style="width:120px;height:auto;min-height:120px;border-radius:12px 0 0 12px;">
+                <span style="font-size:2.5rem;">{{ center.category.icon }}</span>
+              </div>
+
+              <!-- Content -->
+              <div class="p-3 flex-grow-1 d-flex flex-column justify-content-between">
+                <div>
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                      <h6 class="fw-bold mb-1">
+                        <a href="{{ center.get_absolute_url }}"
+                           class="text-white text-decoration-none hover-red">
+                          {{ center.name }}
+                        </a>
+                        {% if center.is_featured %}
+                        <span class="badge-featured ms-2">⭐ Top</span>
+                        {% endif %}
+                      </h6>
+                      <p class="text-muted-custom small mb-0">
+                        <i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}
+                        <span class="mx-2">·</span>
+                        <i class="bi bi-tag me-1"></i>{{ center.category.name }}
+                      </p>
+                    </div>
+                    <!-- Favorite -->
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'services:toggle_favorite' center.slug %}"
+                       class="text-decoration-none flex-shrink-0"
+                       title="Adaugă la favorite">
+                      <i class="bi bi-heart{% if user.is_authenticated and user in center.favorites.all %}-fill text-red{% endif %} fs-5"></i>
+                    </a>
+                    {% endif %}
+                  </div>
+
+                  <p class="text-muted-custom small mt-2 mb-0"
+                     style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+                    {{ center.description }}
+                  </p>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                  <div class="d-flex align-items-center gap-3">
+                    <!-- Rating -->
+                    <div class="d-flex align-items-center gap-1">
+                      {% with r=center.avg_rating %}
+                      <span class="stars" style="font-size:0.9rem;">
+                        {% if r >= 1 %}★{% else %}<span class="stars-empty">☆</span>{% endif %}
+                        {% if r >= 2 %}★{% else %}<span class="stars-empty">☆</span>{% endif %}
+                        {% if r >= 3 %}★{% else %}<span class="stars-empty">☆</span>{% endif %}
+                        {% if r >= 4 %}★{% else %}<span class="stars-empty">☆</span>{% endif %}
+                        {% if r >= 5 %}★{% else %}<span class="stars-empty">☆</span>{% endif %}
+                      </span>
+                      <span class="small text-orange fw-bold">{{ r|default:"—" }}</span>
+                      <span class="small text-muted-custom">({{ center.review_count }} recenzii)</span>
+                      {% endwith %}
+                    </div>
+                    <!-- Price -->
+                    {% if center.min_price %}
+                    <span class="small">
+                      <i class="bi bi-currency-euro text-red me-1"></i>
+                      <span class="text-orange fw-bold">
+                        de la {{ center.min_price|floatformat:0 }} RON
+                      </span>
+                    </span>
+                    {% else %}
+                    <span class="small text-muted-custom">La cerere</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="d-flex gap-2">
+                    <a href="{% url 'bookings:create' center.slug %}"
+                       class="btn btn-primary btn-sm">
+                      <i class="bi bi-calendar-plus me-1"></i>Programează
+                    </a>
+                    <a href="{{ center.get_absolute_url }}"
+                       class="btn btn-outline-secondary btn-sm">
+                      Detalii
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+>>>>>>> origin/main
           {% endfor %}
         </div>
       {% else %}
         <div class="text-center py-5">
+<<<<<<< HEAD
           <div style="font-size:4rem;opacity:0.3">🔍</div>
+=======
+          <div style="font-size:4rem;opacity:0.3;">🔍</div>
+>>>>>>> origin/main
           <h4 class="fw-bold mt-3">Niciun rezultat</h4>
           <p class="text-muted-custom">Încearcă să modifici filtrele sau caută alt termen.</p>
           <a href="{% url 'services:list' %}" class="btn btn-primary">Resetează filtrele</a>
@@ -267,6 +456,7 @@
       {% endif %}
     </div>
 
+<<<<<<< HEAD
     <!-- ======= HARTA LEAFLET ======= -->
     <div class="col-lg-3 d-none d-lg-block">
       <div class="mb-2 d-flex gap-2 align-items-center">
@@ -316,11 +506,45 @@
               </p>
             </div>
           </a>
+=======
+    <!-- ======= HARTA PLACEHOLDER ======= -->
+    <div class="col-lg-3 d-none d-lg-block">
+      <div class="map-placeholder mb-3" style="min-height:320px;">
+        <div style="font-size:3rem;opacity:0.3;">🗺️</div>
+        <p class="fw-bold mt-2 mb-1">Harta va fi disponibilă</p>
+        <p class="small" style="max-width:180px;">
+          Integrare Google Maps / OpenStreetMap urmează în curând.
+        </p>
+      </div>
+
+      <!-- Top 5 results -->
+      {% if top5 %}
+      <div class="p-3 rounded-xl" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <p class="filter-title mb-3">
+          <i class="bi bi-trophy text-orange me-1"></i>Top {{ top5|length }} rezultate
+        </p>
+        {% for c in top5 %}
+        <a href="{{ c.get_absolute_url }}"
+           class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none mb-1"
+           style="transition:background 0.15s;"
+           onmouseover="this.style.background='var(--ah-dark4)'"
+           onmouseout="this.style.background='transparent'">
+          <span class="fw-bold text-red" style="min-width:20px;">{{ forloop.counter }}</span>
+          <div class="flex-grow-1 overflow-hidden">
+            <p class="mb-0 small fw-bold text-white text-truncate">{{ c.name }}</p>
+            <p class="mb-0 x-small text-muted-custom" style="font-size:0.75rem;">
+              {{ c.get_city_display }} ·
+              <span class="text-orange">{{ c.avg_rating|default:"—" }}★</span>
+            </p>
+          </div>
+        </a>
+>>>>>>> origin/main
         {% endfor %}
       </div>
       {% endif %}
     </div>
   </div>
+<<<<<<< HEAD
 </div>
 {% endblock content %}
 
@@ -559,3 +783,8 @@
   }
 </script>
 {% endblock extra_js %}
+=======
+
+</div>
+{% endblock %}
+>>>>>>> origin/main
