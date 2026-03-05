@@ -1,11 +1,6 @@
 from services.models import ServiceCategory
 
 
-<<<<<<< HEAD
-def global_context(request):
-    return {
-        'nav_categories': ServiceCategory.objects.order_by('order')[:6],
-=======
 def _service_nav(request):
     """Small helpers for navbar (service dashboard + notification badge)."""
     if not getattr(request, 'user', None) or not request.user.is_authenticated:
@@ -36,5 +31,4 @@ def global_context(request):
     return {
         'nav_categories': ServiceCategory.objects.order_by('order')[:6],
         **_service_nav(request),
->>>>>>> origin/main
     }
