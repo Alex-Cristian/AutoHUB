@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Profilul meu — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row g-4">
+    <!-- Sidebar profil -->
+    <div class="col-lg-3">
+      <div class="rounded-xl p-4 text-center" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold mb-3"
+             style="width:72px;height:72px;background:var(--ah-red);font-size:2rem;">
+          {{ user.username|first|upper }}
+        </div>
+        <h5 class="fw-bold">{{ user.get_full_name|default:user.username }}</h5>
+        <p class="text-muted-custom small">{{ user.email }}</p>
+        <p class="text-muted-custom small">
+          Membru din {{ user.date_joined|date:"M Y" }}
+        </p>
+        <hr style="border-color:var(--ah-border);">
+        <div class="d-flex justify-content-around text-center">
+          <div>
+            <p class="fw-bold text-orange mb-0">{{ bookings.count }}</p>
+            <p class="text-muted-custom small mb-0">Programări</p>
+          </div>
+          <div>
+            <p class="fw-bold text-orange mb-0">{{ favorites.count }}</p>
+            <p class="text-muted-custom small mb-0">Favorite</p>
+          </div>
+        </div>
+        <a href="{% url 'accounts:logout' %}" class="btn btn-outline-danger btn-sm w-100 mt-3">
+          <i class="bi bi-box-arrow-right me-1"></i>Deconectare
+        </a>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="col-lg-9">
+
+      <!-- Mașinile mele -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <h4 class="fw-bold mb-0">
+            <i class="bi bi-car-front me-2 text-red"></i>Mașinile mele
+          </h4>
+          <div class="d-flex gap-2">
+            <a href="{% url 'accounts:cars' %}" class="btn btn-outline-secondary btn-sm">
+              Vezi toate ({{ cars.count }})
+            </a>
+            <a href="{% url 'accounts:car_create' %}?next={% url 'accounts:profile' %}" class="btn btn-primary btn-sm">
+              <i class="bi bi-plus-lg me-1"></i>Adaugă
+            </a>
+          </div>
+        </div>
+
+        {% if cars %}
+        <div class="row g-2">
+          {% for c in cars|slice:":3" %}
+          <div class="col-md-4">
+            <div class="p-3 rounded-3" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+              <p class="fw-bold small mb-1">{{ c.make }} {{ c.model }}{% if c.year %} {{ c.year }}{% endif %}</p>
+              <p class="text-muted-custom small mb-2"><i class="bi bi-upc-scan me-1"></i>{{ c.plate_number }}</p>
+              <a class="btn btn-outline-secondary btn-sm w-100" href="{% url 'accounts:car_update' c.id %}?next={% url 'accounts:profile' %}">
+                <i class="bi bi-pencil-square me-1"></i>Editează
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-3 rounded-3" style="background:var(--ah-dark2);border:1px dashed var(--ah-border);">
+          <p class="text-muted-custom mb-2">Nu ai mașini salvate încă. Îți va fi mult mai ușor la programări 🙂</p>
+          <a class="btn btn-primary btn-sm" href="{% url 'accounts:car_create' %}?next={% url 'accounts:profile' %}">
+            <i class="bi bi-plus-lg me-1"></i>Adaugă prima mașină
+          </a>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Programări recente -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="fw-bold mb-0">
+            <i class="bi bi-calendar-check me-2 text-red"></i>Programările mele
+          </h4>
+          <a href="{% url 'bookings:my_bookings' %}" class="btn btn-outline-secondary btn-sm">
+            Toate ({{ bookings.count }})
+          </a>
+        </div>
+        {% if bookings %}
+        <div class="row g-2">
+          {% for b in bookings|slice:":4" %}
+          <div class="col-12">
+            <div class="p-3 rounded-3 d-flex justify-content-between align-items-center gap-3 flex-wrap"
+                 style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+              <div>
+                <p class="fw-bold small mb-0">{{ b.center.name }}</p>
+                <p class="text-muted-custom small mb-0">
+                  {{ b.booking_date|date:"d M Y" }} · {{ b.car_brand }} {{ b.car_model }}
+                </p>
+              </div>
+              <span class="badge bg-{{ b.get_status_badge }}">
+                {{ b.get_status_icon }} {{ b.get_status_display }}
+              </span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted-custom">Nu ai programări înregistrate.
+          <a href="{% url 'services:list' %}" class="text-red text-decoration-none">Caută un service →</a>
+        </p>
+        {% endif %}
+      </div>
+
+      <!-- Favorite -->
+      <div>
+        <h4 class="fw-bold mb-3">
+          <i class="bi bi-heart me-2 text-red"></i>Service-uri favorite
+        </h4>
+        {% if favorites %}
+        <div class="row g-2">
+          {% for fav in favorites %}
+          <div class="col-md-6">
+            <div class="p-3 rounded-3 d-flex align-items-center gap-3"
+                 style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+              <span style="font-size:1.8rem;">{{ fav.center.category.icon }}</span>
+              <div class="flex-grow-1 overflow-hidden">
+                <p class="fw-bold small mb-0 text-truncate">{{ fav.center.name }}</p>
+                <p class="text-muted-custom small mb-0">{{ fav.center.get_city_display }}</p>
+              </div>
+              <div class="d-flex gap-1">
+                <a href="{{ fav.center.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <a href="{% url 'services:toggle_favorite' fav.center.slug %}"
+                   class="btn btn-outline-danger btn-sm">
+                  <i class="bi bi-heart-fill"></i>
+                </a>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted-custom">Nu ai service-uri favorite.
+          <a href="{% url 'services:list' %}" class="text-red text-decoration-none">Explorează →</a>
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
