@@ -3,12 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Avg, Count, Min, Max, Q
 from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite
-<<<<<<< HEAD
-=======
 from .forms import ServiceCenterRegisterForm
 
 from bookings.models import Booking, BookingNotification
->>>>>>> origin/main
 
 
 def category_list(request):
@@ -143,8 +140,6 @@ def toggle_favorite(request, slug):
     else:
         messages.success(request, f'"{center.name}" a fost adăugat la favorite!')
     return redirect(request.META.get('HTTP_REFERER', center.get_absolute_url()))
-<<<<<<< HEAD
-=======
 
 
 @login_required
@@ -273,4 +268,3 @@ def notification_mark_read(request, pk):
     notif.is_read = True
     notif.save(update_fields=['is_read'])
     return redirect(request.META.get('HTTP_REFERER', 'services:notifications'))
->>>>>>> origin/main

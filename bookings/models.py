@@ -117,8 +117,6 @@ class Booking(models.Model):
             'cancelled': '❌',
         }
         return icons.get(self.status, '❓')
-<<<<<<< HEAD
-=======
 
 
 class BookingNotification(models.Model):
@@ -151,4 +149,3 @@ class BookingNotification(models.Model):
 
     def __str__(self):
         return f"{self.recipient.username}: {self.title}" 
->>>>>>> origin/main
