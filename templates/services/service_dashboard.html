@@ -9,6 +9,9 @@
       <p class="text-muted-custom mb-0">Gestionează programările și notificările pentru service-urile tale.</p>
     </div>
     <div class="d-flex gap-2">
+      <a class="btn btn-outline-light" href="{% url 'invoices:clients' %}">
+        <i class="bi bi-receipt me-1"></i>Facturi
+      </a>
       <a class="btn btn-outline-light" href="{% url 'services:notifications' %}">
         <i class="bi bi-bell me-1"></i>Notificări
         {% if unread_count %}
