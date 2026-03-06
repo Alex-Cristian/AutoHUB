@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% block title %}Creează factură{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="mb-1">Creează factură</h1>
+      <p class="text-muted-custom mb-0">
+        {% if booking %}
+          Pentru programarea <span class="text-white fw-semibold">#{{ booking.pk }}</span> • {{ booking.client_name }}
+        {% else %}
+          Factură manuală
+        {% endif %}
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-light" href="{% url 'invoices:clients' %}"><i class="bi bi-people me-1"></i>Clienți</a>
+      <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+    </div>
+  </div>
+
+  <form method="post" class="row g-4">
+    {% csrf_token %}
+
+    <div class="col-lg-5">
+      <div class="p-4 bg-dark2 border rounded-xl h-100" style="border-color:var(--ah-border) !important;">
+        <h4 class="mb-3"><i class="bi bi-building me-2 text-red"></i>Date firmă (auto)</h4>
+        <div class="small text-muted-custom mb-3">Se preiau automat din service-ul tău.</div>
+
+        <div class="mb-2"><span class="text-muted-custom">Firmă:</span> <span class="text-white fw-semibold">{{ center.legal_name|default:center.name }}</span></div>
+        <div class="mb-2"><span class="text-muted-custom">Adresă:</span> <span class="text-white">{{ center.headquarters|default:center.address }}</span></div>
+        <div class="mb-2"><span class="text-muted-custom">CIF:</span> <span class="text-white">{{ center.fiscal_code|default:"—" }}</span></div>
+        <div class="mb-2"><span class="text-muted-custom">Nr. RC:</span> <span class="text-white">{{ center.trade_register_no|default:"—" }}</span></div>
+        <div class="mb-2"><span class="text-muted-custom">Telefon:</span> <span class="text-white">{{ center.phone }}</span></div>
+        <div class="mb-0"><span class="text-muted-custom">Email:</span> <span class="text-white">{{ center.email|default:"—" }}</span></div>
+
+        <hr class="border-secondary my-4">
+
+        <h4 class="mb-3"><i class="bi bi-person-badge me-2 text-orange"></i>Date client</h4>
+
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Nume</label>
+            {{ form.client_name }}
+            {% if form.client_name.errors %}<div class="text-danger small">{{ form.client_name.errors }}</div>{% endif %}
+          </div>
+          <div class="col-12">
+            <label class="form-label">Email</label>
+            {{ form.client_email }}
+          </div>
+          <div class="col-12">
+            <label class="form-label">Telefon</label>
+            {{ form.client_phone }}
+          </div>
+          <div class="col-12">
+            <label class="form-label">Adresă (opțional)</label>
+            {{ form.client_address }}
+          </div>
+          <div class="col-12">
+            <label class="form-label">CIF client (opțional)</label>
+            {{ form.client_fiscal_code }}
+          </div>
+        </div>
+
+        <hr class="border-secondary my-4">
+
+        <h5 class="mb-3"><i class="bi bi-calendar3 me-2"></i>Date factură</h5>
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label">Emitere</label>
+            {{ form.issue_date }}
+          </div>
+          <div class="col-6">
+            <label class="form-label">Scadență</label>
+            {{ form.due_date }}
+          </div>
+          <div class="col-12">
+            <label class="form-label">Note (opțional)</label>
+            {{ form.notes }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h4 class="mb-0"><i class="bi bi-list-ul me-2 text-red"></i>Detalii factură</h4>
+          <button type="button" class="btn btn-sm btn-outline-light" id="add-line">
+            <i class="bi bi-plus-lg me-1"></i>Adaugă linie
+          </button>
+        </div>
+
+        {{ formset.management_form }}
+
+        <div class="table-responsive">
+          <table class="table table-dark align-middle mb-0" id="lines-table">
+            <thead>
+              <tr>
+                <th>Descriere</th>
+                <th style="width:140px;">Cantitate</th>
+                <th style="width:160px;">Preț unitar (RON)</th>
+                <th style="width:80px;" class="text-center">Șterge</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in formset.forms %}
+                <tr class="line-row">
+                  <td>
+                    {{ f.description }}
+                    {% if f.description.errors %}<div class="text-danger small">{{ f.description.errors }}</div>{% endif %}
+                  </td>
+                  <td>{{ f.quantity }}</td>
+                  <td>{{ f.unit_price }}</td>
+                  <td class="text-center">{{ f.DELETE }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <hr class="border-secondary my-4">
+
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
+          <button class="btn btn-outline-light" type="submit" name="action" value="save">
+            <i class="bi bi-save2 me-1"></i>Salvează draft
+          </button>
+          <button class="btn btn-success" type="submit" name="action" value="finalize">
+            <i class="bi bi-check2-circle me-1"></i>Finalizează & Print
+          </button>
+        </div>
+
+        <div class="small text-muted-custom mt-3">
+          După finalizare îți apare butonul de print și factura primește număr automat (secvențial pe service).
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  (function() {
+    const addBtn = document.getElementById('add-line');
+    const tbody = document.querySelector('#lines-table tbody');
+    const totalForms = document.getElementById('id_lines-TOTAL_FORMS') || document.querySelector('input[name="lines-TOTAL_FORMS"]');
+
+    // Compat: Django folosește prefixul implicit "invoiceline_set" doar dacă nu setăm. Noi avem inlineformset, prefix default e "lines"? Nu.
+    // Ca să fim safe, detectăm prefixul din management_form.
+    const mgmt = document.querySelector('input[name$="-TOTAL_FORMS"]');
+    const prefix = mgmt ? mgmt.name.replace('-TOTAL_FORMS','') : 'invoiceline_set';
+
+    function getMgmt(name) {
+      return document.querySelector(`input[name="${prefix}-${name}"]`);
+    }
+
+    function currentTotal() {
+      return parseInt(getMgmt('TOTAL_FORMS').value, 10);
+    }
+
+    function setTotal(n) {
+      getMgmt('TOTAL_FORMS').value = String(n);
+    }
+
+    function newRow(index) {
+      const tr = document.createElement('tr');
+      tr.className = 'line-row';
+      tr.innerHTML = `
+        <td><input type="text" name="${prefix}-${index}-description" class="form-control" placeholder="Ex: Manoperă / piese" /></td>
+        <td><input type="number" step="0.01" name="${prefix}-${index}-quantity" class="form-control" value="1" /></td>
+        <td><input type="number" step="0.01" name="${prefix}-${index}-unit_price" class="form-control" value="0" /></td>
+        <td class="text-center"><input type="checkbox" name="${prefix}-${index}-DELETE" /></td>
+        <input type="hidden" name="${prefix}-${index}-id" />
+      `;
+      return tr;
+    }
+
+    if (addBtn) {
+      addBtn.addEventListener('click', function() {
+        const idx = currentTotal();
+        tbody.appendChild(newRow(idx));
+        setTotal(idx + 1);
+      });
+    }
+  })();
+</script>
+{% endblock %}

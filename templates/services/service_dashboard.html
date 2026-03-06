@@ -9,6 +9,9 @@
       <p class="text-muted-custom mb-0">Gestionează programările și notificările pentru service-urile tale.</p>
     </div>
     <div class="d-flex gap-2">
+      <a class="btn btn-outline-light" href="{% url 'invoices:clients' %}">
+        <i class="bi bi-receipt me-1"></i>Facturi
+      </a>
       <a class="btn btn-outline-light" href="{% url 'services:notifications' %}">
         <i class="bi bi-bell me-1"></i>Notificări
         {% if unread_count %}
@@ -86,8 +89,15 @@
         {% else %}
           <div class="text-muted-custom">Nicio programare în așteptare. 🧘</div>
         {% endif %}
-      </div>
+      
+      {% if user.is_staff %}
+        <a class="btn btn-outline-warning" href="{% url 'services:verification_list' %}">
+          <i class="bi bi-shield-check me-1"></i>Verificare servicii
+        </a>
+      {% endif %}
+
     </div>
+  </div>
 
     <div class="col-lg-4">
       <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">

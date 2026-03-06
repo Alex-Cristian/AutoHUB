@@ -9,5 +9,6 @@ urlpatterns = [
     path('accounts/', include('accounts.urls', namespace='accounts')),
     path('services/', include('services.urls', namespace='services')),
     path('bookings/', include('bookings.urls', namespace='bookings')),
+    path('facturi/', include('invoices.urls', namespace='invoices')),
     path('api/', include('services.api_urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
