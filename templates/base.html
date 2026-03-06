@@ -50,7 +50,7 @@
       padding: 0.6rem 0;
       position: sticky;
       top: 0;
-      z-index: 1050;
+      z-index: 1030; /* mai mic decat drawer (1050) si overlay (1040) */
     }
 
     .navbar-brand {
@@ -135,6 +135,22 @@
       border-color: var(--ah-red);
       transform: translateY(-3px);
       box-shadow: 0 8px 32px rgba(230,57,70,0.15);
+    }
+
+    /* Service card ca link <a> */
+    a.service-card {
+      display: flex;
+      color: inherit;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    a.service-card:hover {
+      border-color: var(--ah-red);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 32px rgba(230,57,70,0.15);
+      color: inherit;
+      text-decoration: none;
     }
 
     .service-card .card-img-placeholder {
@@ -260,6 +276,8 @@
       padding: 1.5rem;
       position: sticky;
       top: 80px;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
     }
 
     .filter-sidebar .filter-group { margin-bottom: 1.5rem; }
@@ -385,7 +403,7 @@
               style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
             {% for cat in nav_categories %}
             <li>
-              <a class="dropdown-item" href="{{ cat.get_absolute_url }}">
+              <a class="dropdown-item" href="{% url 'services:list' %}?category={{ cat.slug }}">
                 {{ cat.icon }} {{ cat.name }}
               </a>
             </li>
@@ -540,7 +558,7 @@
         <p class="text-white fw-bold small text-uppercase mb-3">Categorii populare</p>
         <div class="d-flex flex-wrap gap-2">
           {% for cat in nav_categories %}
-          <a href="{{ cat.get_absolute_url }}"
+          <a href="{% url 'services:list' %}?category={{ cat.slug }}"
              class="badge text-decoration-none"
              style="background:var(--ah-dark4);color:#ccc;border:1px solid var(--ah-border);padding:5px 10px;border-radius:20px;">
             {{ cat.icon }} {{ cat.name }}

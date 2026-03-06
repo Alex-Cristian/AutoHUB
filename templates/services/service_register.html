@@ -1,6 +1,24 @@
 {% extends 'base.html' %}
 {% block title %}Înregistrare service — AutoHub{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  #mapPreview {
+    height: 200px;
+    border-radius: 10px;
+    border: 1px solid var(--ah-border);
+    display: none;
+    margin-top: 10px;
+  }
+  #geocodeStatus {
+    font-size: 0.82rem;
+    margin-top: 6px;
+    min-height: 20px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-5">
   <div class="row justify-content-center">
@@ -8,7 +26,7 @@
       <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
           <h1 class="mb-1">Înregistrare service</h1>
-          <p class="text-muted-custom mb-0">Alege mai multe categorii, setează poza de card și pornește profilul service-ului.</p>
+          <p class="text-muted-custom mb-0">Alege mai multe categorii, setează poza de card și pornești profilul service-ului.</p>
         </div>
         <a href="{% url 'services:list' %}" class="btn btn-outline-light rounded-xl">
           <i class="bi bi-arrow-left me-1"></i>Înapoi
@@ -23,16 +41,42 @@
               {% csrf_token %}
               <div class="row g-3">
                 {% for field in form %}
-                <div class="col-12" id="wrap_{{ field.name }}">
-                  <label class="form-label">{{ field.label }}</label>
-                  {{ field }}
-                  {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                  {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
-                </div>
+                  {% if field.name == 'address' %}
+                  <div class="col-12" id="wrap_{{ field.name }}">
+                    <label class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+
+                    <!-- Status geocoding -->
+                    <div id="geocodeStatus" class="text-muted-custom">
+                      <i class="bi bi-info-circle me-1"></i>
+                      Coordonatele GPS vor fi detectate automat după adresă și oraș.
+                    </div>
+
+                    <!-- Miniharta preview -->
+                    <div id="mapPreview"></div>
+                  </div>
+
+                  {% elif field.name == 'latitude' or field.name == 'longitude' %}
+                    {# campuri hidden — randate dar nu afisate #}
+                    {{ field }}
+
+                  {% else %}
+                  <div class="col-12" id="wrap_{{ field.name }}">
+                    <label class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                  </div>
+                  {% endif %}
                 {% endfor %}
               </div>
+
               <div class="d-flex gap-2 mt-4">
-                <button class="btn btn-nav-cta" type="submit"><i class="bi bi-check2-circle me-1"></i>Înregistrează service</button>
+                <button class="btn btn-nav-cta" type="submit">
+                  <i class="bi bi-check2-circle me-1"></i>Înregistrează service
+                </button>
                 <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}">Mergi la dashboard</a>
               </div>
             </form>
@@ -46,6 +90,7 @@
               <li>Alegi mai multe categorii sau direct <b>Toate categoriile</b></li>
               <li>Încarci o imagine specială pentru cardul service-ului</li>
               <li>Din profil adaugi ulterior garaje și galerie foto</li>
+              <li class="mt-1"><i class="bi bi-geo-alt text-red me-1"></i>Locația GPS e <b>detectată automat</b> după adresă</li>
             </ul>
 
             {% if existing_centers %}
@@ -79,22 +124,130 @@
     box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.35) !important;
     border-color: var(--ah-red) !important;
   }
-  #id_categories, #profile-id_categories {display:grid;grid-template-columns:1fr 1fr;gap:.5rem 1rem;}
-  #id_categories label, #profile-id_categories label {display:flex;align-items:center;gap:.45rem;color:#fff;}
+  #id_categories, #profile-id_categories { display:grid; grid-template-columns:1fr 1fr; gap:.5rem 1rem; }
+  #id_categories label, #profile-id_categories label { display:flex; align-items:center; gap:.45rem; color:#fff; }
 </style>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
+  // ===== Ascunde legal_document initial =====
   const legalIds = ['id_legal_name', 'id_headquarters', 'id_fiscal_code', 'id_trade_register_no'];
   const docWrap = document.getElementById('wrap_legal_document');
   function shouldShowDoc() {
-    return legalIds.some(id => {
-      const el = document.getElementById(id);
-      return el && (el.value || '').trim().length > 0;
-    });
+    return legalIds.some(id => { const el = document.getElementById(id); return el && (el.value || '').trim().length > 0; });
   }
   function refresh() { if (docWrap) docWrap.style.display = shouldShowDoc() ? '' : 'none'; }
   legalIds.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', refresh); });
   refresh();
+
+  // ===== GEOCODING PREVIEW =====
+  let previewMap = null;
+  let previewMarker = null;
+  let geocodeTimer = null;
+
+  const addrInput = document.getElementById('id_address');
+  const citySelect = document.getElementById('id_city');
+  const latInput   = document.getElementById('id_latitude');
+  const lngInput   = document.getElementById('id_longitude');
+  const statusEl   = document.getElementById('geocodeStatus');
+  const mapEl      = document.getElementById('mapPreview');
+
+  function getCityText() {
+    if (!citySelect) return '';
+    const opt = citySelect.options[citySelect.selectedIndex];
+    return opt ? opt.text : '';
+  }
+
+  function initPreviewMap(lat, lng) {
+    mapEl.style.display = 'block';
+    if (!previewMap) {
+      previewMap = L.map('mapPreview', { zoomControl: true, scrollWheelZoom: false })
+        .setView([lat, lng], 15);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
+      }).addTo(previewMap);
+    } else {
+      previewMap.setView([lat, lng], 15);
+    }
+
+    if (previewMarker) previewMap.removeLayer(previewMarker);
+    previewMarker = L.marker([lat, lng], {
+      icon: L.divIcon({
+        html: `<div style="background:#e63946;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.5);border:2px solid white;">📍</div>`,
+        className: '', iconSize: [32,32], iconAnchor: [16,32]
+      })
+    }).addTo(previewMap).bindPopup('<strong>Locația service-ului</strong>').openPopup();
+
+    // Fix Leaflet render in hidden container
+    setTimeout(() => { if (previewMap) previewMap.invalidateSize(); }, 100);
+  }
+
+  async function geocodeaza() {
+    const address = (addrInput ? addrInput.value : '').trim();
+    const city = getCityText();
+
+    if (!address || !city || city === '---------') {
+      statusEl.innerHTML = '<i class="bi bi-info-circle me-1"></i>Coordonatele GPS vor fi detectate automat după adresă și oraș.';
+      statusEl.className = 'text-muted-custom';
+      return;
+    }
+
+    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Se detectează locația...';
+    statusEl.className = 'text-muted-custom';
+
+    try {
+      const query = `${address}, ${city}, Romania`;
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'ro' } }
+      );
+      const results = await resp.json();
+
+      if (results && results.length > 0) {
+        const lat = parseFloat(results[0].lat);
+        const lng = parseFloat(results[0].lon);
+
+        // Salvam in campurile hidden
+        if (latInput) latInput.value = lat;
+        if (lngInput) lngInput.value = lng;
+
+        statusEl.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Locație găsită: <strong>${results[0].display_name.split(',').slice(0,2).join(',')}</strong>`;
+        statusEl.className = 'text-success';
+
+        initPreviewMap(lat, lng);
+      } else {
+        if (latInput) latInput.value = '';
+        if (lngInput) lngInput.value = '';
+        statusEl.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Adresa nu a putut fi localizată. Verifică adresa introdusă.';
+        statusEl.className = 'text-warning';
+        mapEl.style.display = 'none';
+      }
+    } catch (e) {
+      statusEl.innerHTML = '<i class="bi bi-x-circle text-danger me-1"></i>Eroare la detectarea locației.';
+      statusEl.className = 'text-danger';
+    }
+  }
+
+  // Declanseaza geocoding dupa ce utilizatorul termina de scris (debounce 800ms)
+  function scheduleGeocode() {
+    clearTimeout(geocodeTimer);
+    geocodeTimer = setTimeout(geocodeaza, 800);
+  }
+
+  if (addrInput) addrInput.addEventListener('input', scheduleGeocode);
+  if (citySelect) citySelect.addEventListener('change', scheduleGeocode);
+
+  // Daca avem deja lat/lng salvate (editare), afisam harta
+  window.addEventListener('DOMContentLoaded', () => {
+    const existingLat = latInput ? parseFloat(latInput.value) : null;
+    const existingLng = lngInput ? parseFloat(lngInput.value) : null;
+    if (existingLat && existingLng && !isNaN(existingLat) && !isNaN(existingLng)) {
+      statusEl.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Locație salvată.`;
+      statusEl.className = 'text-success';
+      initPreviewMap(existingLat, existingLng);
+    }
+  });
 })();
 </script>
 {% endblock %}

@@ -75,8 +75,8 @@ class ServiceCenter(models.Model):
         max_length=200, default='Lun-Vin: 08:00-18:00',
         verbose_name='Program lucru'
     )
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    latitude = models.DecimalField(max_digits=11, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=11, decimal_places=7, null=True, blank=True)
     card_image = models.ImageField(
         upload_to='service_cards/', blank=True, null=True,
         verbose_name='Poză card service'

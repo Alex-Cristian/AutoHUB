@@ -1,209 +1,323 @@
 {% extends "base.html" %}
-{% block title %}Service-uri Auto – AutoHub{% endblock %}
-{% block content %}
-<div class="container-fluid py-4" style="max-width: 1400px">
 
-  <!-- Breadcrumb -->
-  <div class="container-fluid mb-3">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item">
-          <a href="{% url 'core:home' %}" class="text-red text-decoration-none">Acasă</a>
-        </li>
-        <li class="breadcrumb-item active text-muted-custom">Service-uri</li>
-      </ol>
-    </nav>
+{% block title %}
+  Service-uri Auto{% if selected_city %} în {{ selected_city }}{% endif %} – AutoHub
+{% endblock title %}
+
+{% block extra_css %}
+<style>
+  /* ===== OVERLAY ===== */
+  #filterOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 1040;
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #filterOverlay.open { opacity: 1; }
+
+  /* ===== PANOU LATERAL ===== */
+  #filterDrawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 300px;
+    max-width: 90vw;
+    background: var(--ah-dark2);
+    border-right: 1px solid var(--ah-border);
+    z-index: 1050;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #filterDrawer.open { transform: translateX(0); }
+
+  /* Header panou */
+  #filterDrawer .drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.2rem 1.5rem;
+    border-bottom: 1px solid var(--ah-border);
+    flex-shrink: 0;
+  }
+
+  /* Continut scrollabil */
+  #filterDrawer .drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.2rem 1.5rem;
+  }
+
+  /* Scrollbar subtil */
+  #filterDrawer .drawer-body::-webkit-scrollbar { width: 4px; }
+  #filterDrawer .drawer-body::-webkit-scrollbar-thumb { background: var(--ah-dark4); border-radius: 2px; }
+
+  /* Footer cu butoane */
+  #filterDrawer .drawer-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--ah-border);
+    flex-shrink: 0;
+  }
+
+  /* Buton deschide filtre */
+  #btnOpenFiltre {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Badge filtre active */
+  #badgeFiltre {
+    display: none;
+    background: var(--ah-red);
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  #badgeFiltre.visible { display: inline-flex; }
+
+  .filter-group-drawer { margin-bottom: 1.5rem; }
+  .filter-title-drawer {
+    font-weight: 700;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ah-muted);
+    margin-bottom: 0.6rem;
+  }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+
+<!-- ===== OVERLAY ===== -->
+<div id="filterOverlay" onclick="inchideFiltre()"></div>
+
+<!-- ===== PANOU LATERAL FILTRE ===== -->
+<div id="filterDrawer">
+  <div class="drawer-header">
+    <h6 class="fw-bold mb-0"><i class="bi bi-funnel me-2 text-red"></i>Filtre</h6>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="inchideFiltre()">
+      <i class="bi bi-x-lg"></i>
+    </button>
   </div>
 
-  <!-- Header + sort -->
-  <div class="container-fluid mb-4">
-    <div class="d-flex justify-content-between align-items-end flex-wrap gap-2">
+  <div class="drawer-body">
+    <form method="get" id="filterForm">
+      {% if search_q %}<input type="hidden" name="q" value="{{ search_q }}">{% endif %}
+      <input type="hidden" name="sort" value="{{ selected_sort|default:'rating' }}">
+      <input type="hidden" name="category" id="hiddenCategory" value="{{ selected_category }}">
+      <input type="hidden" name="min_rating" id="hiddenRating" value="{{ selected_min_rating }}">
 
-      <div>
-        <h1 class="section-title mb-1">Service-uri auto</h1>
-        <p class="text-muted-custom small mb-0">
-          <strong class="text-white">{{ total_count }}</strong> rezultate găsite
-          {% if search_q %} pentru „<em>{{ search_q }}</em>”{% endif %}
-        </p>
+      <!-- APROAPE DE MINE -->
+      <div class="filter-group-drawer">
+        <button type="button" id="btnSortDist" onclick="toggleSortDist()"
+                class="btn btn-sm w-100 btn-outline-secondary">
+          <i class="bi bi-geo-alt me-1"></i>Aproape de mine
+        </button>
+        <div id="kmButtons" style="display:none; margin-top:8px;">
+          <div class="d-flex gap-1">
+            <button type="button" onclick="setRaza(10)"  id="km10"  class="btn btn-sm btn-outline-secondary flex-grow-1">10km</button>
+            <button type="button" onclick="setRaza(50)"  id="km50"  class="btn btn-sm btn-outline-secondary flex-grow-1">50km</button>
+            <button type="button" onclick="setRaza(100)" id="km100" class="btn btn-sm btn-outline-secondary flex-grow-1">100km</button>
+          </div>
+        </div>
       </div>
 
-      <form method="get" id="sortForm" class="d-flex align-items-center gap-2">
-        {% if search_q %}<input type="hidden" name="q" value="{{ search_q }}">{% endif %}
-        {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
-        {% if selected_city %}<input type="hidden" name="city" value="{{ selected_city }}">{% endif %}
-
-        <label class="text-muted-custom small mb-0">Sortare:</label>
-
-        <select name="sort" class="form-select form-select-sm" style="width:auto"
-                onchange="document.getElementById('sortForm').submit()">
+      <!-- SORTARE -->
+      <div class="filter-group-drawer">
+        <p class="filter-title-drawer">Sortare</p>
+        <select name="sort" class="form-select form-select-sm"
+                onchange="document.getElementById('filterForm').submit()">
           <option value="rating" {% if selected_sort == "rating" or not selected_sort %}selected{% endif %}>⭐ Rating</option>
           <option value="reviews" {% if selected_sort == "reviews" %}selected{% endif %}>💬 Nr. recenzii</option>
           <option value="price_asc" {% if selected_sort == "price_asc" %}selected{% endif %}>💰 Preț crescător</option>
           <option value="price_desc" {% if selected_sort == "price_desc" %}selected{% endif %}>💰 Preț descrescător</option>
           <option value="name" {% if selected_sort == "name" %}selected{% endif %}>🔤 Nume</option>
         </select>
-      </form>
+      </div>
 
+      <!-- CATEGORII -->
+      <div class="filter-group-drawer">
+        <p class="filter-title-drawer">Categorie</p>
+        <div class="d-flex flex-column gap-1">
+          <button type="button" onclick="selectCategorie('', this)"
+                  class="btn btn-sm text-start {% if not selected_category %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  style="border-radius:8px;">🔍 Toate</button>
+          {% for cat in categories %}
+          <button type="button" onclick="selectCategorie('{{ cat.slug }}', this)"
+                  data-slug="{{ cat.slug }}"
+                  class="btn btn-sm text-start {% if selected_category == cat.slug %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  style="border-radius:8px;">{{ cat.icon }} {{ cat.name }}</button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- ORAS -->
+      <div class="filter-group-drawer">
+        <p class="filter-title-drawer">Oraș</p>
+        <select name="city" class="form-select form-select-sm"
+                onchange="document.getElementById('filterForm').submit()">
+          <option value="" {% if not selected_city %}selected{% endif %}>Toate</option>
+          {% for val, label in cities %}
+            <option value="{{ val }}" {% if selected_city == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- RATING MINIM -->
+      <div class="filter-group-drawer">
+        <p class="filter-title-drawer">Rating minim</p>
+        <div class="d-flex flex-column gap-1">
+          {% for r in "54321" %}
+          <button type="button" onclick="selectRating('{{ r }}', this)"
+                  data-rating="{{ r }}"
+                  class="btn btn-sm text-start {% if selected_min_rating|stringformat:'s' == r %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  style="border-radius:8px;">{{ r }}★ și peste</button>
+          {% endfor %}
+          <button type="button" onclick="selectRating('', this)"
+                  class="btn btn-sm text-start {% if not selected_min_rating %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  style="border-radius:8px;">Orice rating</button>
+        </div>
+      </div>
+
+      <!-- PRET -->
+      <div class="filter-group-drawer">
+        <p class="filter-title-drawer">Preț (RON)</p>
+        <div class="row g-1 mb-2">
+          <div class="col-6">
+            <input type="number" name="price_min" class="form-control form-control-sm"
+                   placeholder="Min" value="{{ selected_price_min }}" min="0">
+          </div>
+          <div class="col-6">
+            <input type="number" name="price_max" class="form-control form-control-sm"
+                   placeholder="Max" value="{{ selected_price_max }}" min="0">
+          </div>
+        </div>
+      </div>
+
+    </form>
+  </div>
+
+  <div class="drawer-footer d-flex gap-2">
+    <button type="submit" form="filterForm" class="btn btn-primary btn-sm flex-grow-1">
+      <i class="bi bi-check2 me-1"></i>Aplică filtrele
+    </button>
+    <a href="{% url 'services:list' %}" class="btn btn-outline-secondary btn-sm"
+       onclick="localStorage.removeItem('sort_dist_activ');localStorage.removeItem('dist_radius')">
+      Resetează
+    </a>
+  </div>
+</div>
+
+<!-- ===== PAGINA PRINCIPALA ===== -->
+<div class="container-fluid py-4" style="max-width: 1400px">
+
+  <div class="container-fluid mb-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}" class="text-red text-decoration-none">Acasă</a></li>
+        <li class="breadcrumb-item active text-muted-custom">Service-uri</li>
+      </ol>
+    </nav>
+
+    <!-- HEADER + BUTON FILTRE -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+      <div>
+        <h1 class="section-title mb-1">Service-uri auto</h1>
+        <p class="text-muted-custom small mb-0">
+          <strong class="text-white">{{ total_count }}</strong> rezultate găsite
+          {% if search_q %} pentru „<em>{{ search_q }}</em>"{% endif %}
+        </p>
+      </div>
+
+      <div class="d-flex gap-2 align-items-center">
+        <!-- Filtre active summary -->
+        <div id="filtreActiveSummary" class="d-flex flex-wrap gap-1" style="display:none!important;">
+          {% if selected_category %}
+            <span class="badge" style="background:var(--ah-dark4);border:1px solid var(--ah-border);color:#ccc;">
+              {{ selected_category }}
+              <a href="?{% if selected_sort %}sort={{ selected_sort }}&{% endif %}{% if selected_city %}city={{ selected_city }}&{% endif %}" class="text-muted ms-1 text-decoration-none">×</a>
+            </span>
+          {% endif %}
+          {% if selected_city %}
+            <span class="badge" style="background:var(--ah-dark4);border:1px solid var(--ah-border);color:#ccc;">
+              {{ selected_city }}
+            </span>
+          {% endif %}
+        </div>
+
+        <!-- BUTON DESCHIDE FILTRE -->
+        <button type="button" id="btnOpenFiltre" class="btn btn-outline-secondary btn-sm" onclick="deschideFiltre()">
+          <i class="bi bi-sliders me-1"></i>Filtre
+          <span id="badgeFiltre">0</span>
+        </button>
+
+        <!-- Sortare rapida -->
+        <select name="sort" class="form-select form-select-sm" style="width:auto"
+                onchange="window.location='?sort='+this.value+'{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_city %}&city={{ selected_city }}{% endif %}'">
+          <option value="rating" {% if selected_sort == "rating" or not selected_sort %}selected{% endif %}>⭐ Rating</option>
+          <option value="reviews" {% if selected_sort == "reviews" %}selected{% endif %}>💬 Recenzii</option>
+          <option value="price_asc" {% if selected_sort == "price_asc" %}selected{% endif %}>💰 Preț ↑</option>
+          <option value="price_desc" {% if selected_sort == "price_desc" %}selected{% endif %}>💰 Preț ↓</option>
+          <option value="name" {% if selected_sort == "name" %}selected{% endif %}>🔤 Nume</option>
+        </select>
+      </div>
     </div>
   </div>
 
   <div class="row g-3">
 
-    <!-- ======= SIDEBAR ======= -->
-    <div class="col-lg-2 col-md-3">
-      <div class="filter-sidebar">
-
-        <form method="get" id="filterForm">
-          {% if search_q %}<input type="hidden" name="q" value="{{ search_q }}">{% endif %}
-          <input type="hidden" name="sort" value="{{ selected_sort|default:'rating' }}">
-          <input type="hidden" name="category" id="hiddenCategory" value="{{ selected_category }}">
-          <input type="hidden" name="min_rating" id="hiddenRating" value="{{ selected_min_rating }}">
-
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h6 class="fw-bold mb-0">
-              <i class="bi bi-funnel me-1 text-red"></i>Filtre
-            </h6>
-            <a href="{% url 'services:list' %}" class="small text-red text-decoration-none" onclick="localStorage.removeItem('sort_dist_activ')">Resetează</a>
-          </div>
-
-          <!-- BUTON APROAPE DE MINE -->
-          <div class="filter-group">
-            <button type="button" id="btnSortDist"
-                    onclick="toggleSortDist()"
-                    class="btn btn-sm w-100 btn-outline-secondary">
-              <i class="bi bi-geo-alt me-1"></i>Aproape de mine
-            </button>
-          </div>
-
-          <!-- SORTARE -->
-          <div class="filter-group">
-            <p class="filter-title">Sortare</p>
-            <select name="sort" class="form-select form-select-sm"
-                    onchange="document.getElementById('filterForm').submit()">
-              <option value="rating" {% if selected_sort == "rating" or not selected_sort %}selected{% endif %}>⭐ Rating</option>
-              <option value="reviews" {% if selected_sort == "reviews" %}selected{% endif %}>💬 Nr. recenzii</option>
-              <option value="price_asc" {% if selected_sort == "price_asc" %}selected{% endif %}>💰 Preț crescător</option>
-              <option value="price_desc" {% if selected_sort == "price_desc" %}selected{% endif %}>💰 Preț descrescător</option>
-              <option value="name" {% if selected_sort == "name" %}selected{% endif %}>🔤 Nume</option>
-            </select>
-          </div>
-
-          <!-- CATEGORII CA BUTOANE -->
-          <div class="filter-group">
-            <p class="filter-title">Categorie</p>
-            <div class="d-flex flex-column gap-1">
-              <button type="button"
-                      onclick="selectCategorie('', this)"
-                      class="btn btn-sm text-start {% if not selected_category %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-                      style="border-radius:8px;">
-                🔍 Toate
-              </button>
-              {% for cat in categories %}
-              <button type="button"
-                      onclick="selectCategorie('{{ cat.slug }}', this)"
-                      data-slug="{{ cat.slug }}"
-                      class="btn btn-sm text-start {% if selected_category == cat.slug %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-                      style="border-radius:8px;">
-                {{ cat.icon }} {{ cat.name }}
-              </button>
-              {% endfor %}
-            </div>
-          </div>
-
-          <!-- FILTRE AVANSATE -->
-          <div class="filter-group">
-            <button type="button"
-                    class="btn btn-sm btn-outline-secondary w-100 d-flex justify-content-between align-items-center"
-                    onclick="toggleFiltreAvansate()"
-                    id="btnFiltreAvansate">
-              <span><i class="bi bi-sliders me-1"></i>Filtre avansate</span>
-              <i class="bi bi-chevron-down" id="iconFiltreAvansate"></i>
-            </button>
-
-            <div id="filtreAvansate" style="display:none; margin-top:10px;">
-
-              <!-- Oraș -->
-              <div class="mb-3">
-                <p class="filter-title mb-1">Oraș</p>
-                <select name="city" class="form-select form-select-sm"
-                        onchange="document.getElementById('filterForm').submit()">
-                  <option value="" {% if not selected_city %}selected{% endif %}>Toate</option>
-                  {% for val, label in cities %}
-                    <option value="{{ val }}" {% if selected_city == val %}selected{% endif %}>{{ label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <!-- Rating minim -->
-              <div class="mb-3">
-                <p class="filter-title mb-1">Rating minim</p>
-                <div class="d-flex flex-column gap-1">
-                  {% for r in "54321" %}
-                  <button type="button"
-                          onclick="selectRating('{{ r }}', this)"
-                          data-rating="{{ r }}"
-                          class="btn btn-sm text-start {% if selected_min_rating|stringformat:'s' == r %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-                          style="border-radius:8px;">
-                    {{ r }}★ și peste
-                  </button>
-                  {% endfor %}
-                  <button type="button"
-                          onclick="selectRating('', this)"
-                          class="btn btn-sm text-start {% if not selected_min_rating %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-                          style="border-radius:8px;">
-                    Orice rating
-                  </button>
-                </div>
-              </div>
-
-              <!-- Interval preț -->
-              <div class="mb-2">
-                <p class="filter-title mb-1">Preț (RON)</p>
-                <div class="row g-1 mb-2">
-                  <div class="col-6">
-                    <input type="number" name="price_min" class="form-control form-control-sm"
-                           placeholder="Min" value="{{ selected_price_min }}" min="0">
-                  </div>
-                  <div class="col-6">
-                    <input type="number" name="price_max" class="form-control form-control-sm"
-                           placeholder="Max" value="{{ selected_price_max }}" min="0">
-                  </div>
-                </div>
-                <button type="submit" class="btn btn-primary btn-sm w-100">Aplică</button>
-              </div>
-
-            </div>
-          </div>
-
-        </form>
-      </div>
-    </div>
-
-    <div class="col-lg-10 col-md-9">
+    <!-- ======= LISTA SERVICE-URI ======= -->
+    <div class="col-lg-9 col-md-12">
       {% if centers %}
         <div class="row g-3" id="servicesContainer">
           {% for center in centers %}
             <div class="col-12"
                  data-lat="{{ center.latitude|default:0|stringformat:'f' }}"
-                 data-lng="{{ center.longitude|default:0|stringformat:'f' }}">
-              <div class="service-card d-flex" style="min-height: 160px">
+                 data-lng="{{ center.longitude|default:0|stringformat:'f' }}"
+                 data-slug="{{ center.slug }}">
+              <a href="{{ center.get_absolute_url }}" class="service-card d-flex text-decoration-none" style="min-height:160px;">
                 <div class="card-img-placeholder flex-shrink-0" style="width:120px;min-height:120px;border-radius:12px 0 0 12px;">
                   <span style="font-size:2.5rem">{{ center.category.icon }}</span>
                 </div>
+
                 <div class="p-3 flex-grow-1 d-flex flex-column justify-content-between">
                   <div>
                     <div class="d-flex justify-content-between align-items-start gap-2">
                       <div>
-                        <h6 class="fw-bold mb-1"><a href="{{ center.get_absolute_url }}" class="text-white text-decoration-none hover-red">{{ center.name }}</a>{% if center.is_featured %}<span class="badge-featured ms-2">⭐ Top</span>{% endif %}</h6>
-                        <p class="text-muted-custom small mb-1"><i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}</p>
-                        <div class="d-flex flex-wrap gap-2">{% for cat in center.display_categories %}<span class="badge bg-secondary-subtle text-white border" style="border-color:var(--ah-border) !important;">{{ cat.icon }} {{ cat.name }}</span>{% endfor %}</div>
+                        <h6 class="fw-bold mb-1 text-white">
+                          {{ center.name }}
+                          {% if center.is_featured %}<span class="badge-featured ms-2">⭐ Top</span>{% endif %}
+                        </h6>
+                        <p class="text-muted-custom small mb-0">
+                          <i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}
+                          <span class="mx-2">·</span>
+                          <i class="bi bi-tag me-1"></i>{{ center.category.name }}
+                          <span id="dist_{{ center.slug }}"
+                                data-lat="{{ center.latitude|default:0|stringformat:'f' }}"
+                                data-lng="{{ center.longitude|default:0|stringformat:'f' }}"
+                                class="ms-2 text-muted-custom" style="font-size:0.78rem;"></span>
+                        </p>
                       </div>
                       {% if user.is_authenticated %}
-                        <a href="{% url 'services:toggle_favorite' center.slug %}"
-                           class="text-decoration-none flex-shrink-0"
-                           title="Adaugă la favorite">
+                        <span class="flex-shrink-0"
+                              onclick="event.preventDefault(); window.location='{% url 'services:toggle_favorite' center.slug %}'">
                           <i class="bi bi-heart{% if user in center.favorites.all %}-fill text-red{% endif %} fs-5"></i>
-                        </a>
+                        </span>
                       {% endif %}
                     </div>
 
@@ -212,14 +326,13 @@
                       {{ center.description }}
                     </p>
                   </div>
+
                   <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
                     <div class="d-flex align-items-center gap-3">
-                      <div class="d-flex align-items-center gap-1">
-                        {% with r=center.avg_rating|default:0 %}
-                          <span class="small text-orange fw-bold">{{ r|floatformat:1 }}</span>
-                          <span class="small text-muted-custom">({{ center.review_count }} recenzii)</span>
-                        {% endwith %}
-                      </div>
+                      {% with r=center.avg_rating|default:0 %}
+                        <span class="small text-orange fw-bold">{{ r|floatformat:1 }}</span>
+                        <span class="small text-muted-custom">({{ center.review_count }} recenzii)</span>
+                      {% endwith %}
                       {% if center.min_price %}
                         <span class="small">
                           <i class="bi bi-currency-euro text-red me-1"></i>
@@ -231,19 +344,75 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                      <a href="{% url 'bookings:create' center.slug %}" class="btn btn-primary btn-sm">
+                      <span onclick="event.preventDefault(); window.location='{% url 'bookings:create' center.slug %}'"
+                            class="btn btn-primary btn-sm">
                         <i class="bi bi-calendar-plus me-1"></i>Programează
-                      </a>
-                      <a href="{{ center.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">Detalii</a>
+                      </span>
+                      <span class="btn btn-outline-secondary btn-sm">Detalii</span>
                     </div>
                   </div>
                 </div>
-              </div>
+              </a>
             </div>
           {% endfor %}
         </div>
       {% else %}
-        <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border)">Niciun service găsit.</div>
+        <div class="text-center py-5">
+          <div style="font-size:4rem;opacity:0.3">🔍</div>
+          <h4 class="fw-bold mt-3">Niciun rezultat</h4>
+          <p class="text-muted-custom">Încearcă să modifici filtrele sau caută alt termen.</p>
+          <a href="{% url 'services:list' %}" class="btn btn-primary">Resetează filtrele</a>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- ======= HARTA LEAFLET ======= -->
+    <div class="col-lg-3 d-none d-lg-block">
+      <div class="mb-2 d-flex gap-2 align-items-center">
+        <button id="btnLocatie" class="btn btn-sm btn-outline-primary w-100" type="button" onclick="detecteazaLocatia()">
+          <i class="bi bi-geo-alt-fill me-1"></i>Locația mea
+        </button>
+        <button id="btnResetMap" class="btn btn-sm btn-outline-secondary" type="button" onclick="resetHarta()"
+          title="Resetează harta" style="display:none">
+          <i class="bi bi-x"></i>
+        </button>
+      </div>
+
+      <div id="locatieStatus" class="small text-muted-custom mb-2" style="display:none"></div>
+
+      <div id="map" style="height:300px;border-radius:12px;border:1px solid var(--ah-border);overflow:hidden;background:var(--ah-dark3);">
+        <div class="d-flex align-items-center justify-content-center h-100 text-muted-custom flex-column">
+          <div style="font-size:2rem;opacity:0.3">🗺️</div>
+          <p class="small mt-2 mb-0">Apasă "Locația mea"</p>
+          <p class="small">pentru a vedea harta</p>
+        </div>
+      </div>
+
+      <div id="nearbyList" class="mt-3" style="display:none">
+        <p class="filter-title mb-2"><i class="bi bi-geo-alt text-red me-1"></i>Cele mai apropiate</p>
+        <div id="nearbyItems"></div>
+      </div>
+
+      {% if top5 %}
+      <div id="top5List" class="mt-3">
+        <p class="filter-title mb-2"><i class="bi bi-trophy text-orange me-1"></i>Top {{ top5|length }}</p>
+        {% for c in top5 %}
+          <a href="{{ c.get_absolute_url }}"
+             class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none mb-1"
+             style="transition:background 0.15s"
+             onmouseover="this.style.background='var(--ah-dark4)'"
+             onmouseout="this.style.background='transparent'">
+            <span class="fw-bold text-red" style="min-width:20px">{{ forloop.counter }}</span>
+            <div class="flex-grow-1 overflow-hidden">
+              <p class="mb-0 small fw-bold text-white text-truncate">{{ c.name }}</p>
+              <p class="mb-0 text-muted-custom" style="font-size:0.75rem">
+                {{ c.get_city_display }}
+                {% if c.avg_rating %}· <span class="text-orange">{{ c.avg_rating|floatformat:1 }}★</span>{% endif %}
+              </p>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
       {% endif %}
     </div>
 
@@ -256,136 +425,183 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  let map = null;
-  let userMarker = null;
-  let serviceMarkers = [];
-  let mapInitialized = false;
+  let map = null, userMarker = null, serviceMarkers = [], mapInitialized = false;
+  let razaActiva = parseInt(localStorage.getItem("dist_radius") || "0");
+
+  // ===== DRAWER =====
+  function deschideFiltre() {
+    const overlay = document.getElementById('filterOverlay');
+    const drawer = document.getElementById('filterDrawer');
+    overlay.style.display = 'block';
+    requestAnimationFrame(() => {
+      overlay.classList.add('open');
+      drawer.classList.add('open');
+    });
+    document.body.style.overflow = 'hidden';
+  }
+
+  function inchideFiltre() {
+    const overlay = document.getElementById('filterOverlay');
+    const drawer = document.getElementById('filterDrawer');
+    overlay.classList.remove('open');
+    drawer.classList.remove('open');
+    setTimeout(() => { overlay.style.display = 'none'; }, 300);
+    document.body.style.overflow = '';
+  }
+
+  // Inchide cu ESC
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') inchideFiltre(); });
+
+  // ===== BADGE FILTRE ACTIVE =====
+  function updateBadgeFiltre() {
+    let count = 0;
+    if ("{{ selected_category|default:'' }}".trim()) count++;
+    if ("{{ selected_city|default:'' }}".trim()) count++;
+    if ("{{ selected_min_rating|default:'' }}".trim()) count++;
+    if ("{{ selected_price_min|default:'' }}".trim()) count++;
+    if ("{{ selected_price_max|default:'' }}".trim()) count++;
+    const badge = document.getElementById('badgeFiltre');
+    if (count > 0) {
+      badge.textContent = count;
+      badge.classList.add('visible');
+    } else {
+      badge.classList.remove('visible');
+    }
+  }
 
   // ===== LOCALSTORAGE =====
-  function salveazaLocatia(lat, lng) {
-    localStorage.setItem("user_loc", JSON.stringify({ lat, lng }));
-  }
+  function salveazaLocatia(lat, lng) { localStorage.setItem("user_loc", JSON.stringify({ lat, lng })); }
   function getLocatieSalvata() {
-    const saved = localStorage.getItem("user_loc");
-    return saved ? JSON.parse(saved) : null;
-  }
-
-  // ===== TOGGLE BUTON APROAPE DE MINE =====
-  // Click 1 = activ (rosu), Click 2 = dezactiveaza
-  function toggleSortDist() {
-    const activ = localStorage.getItem("sort_dist_activ") === "true";
-    if (activ) {
-      // dezactiveaza
-      localStorage.removeItem("sort_dist_activ");
-      const btn = document.getElementById('btnSortDist');
-      btn.classList.remove('btn-primary');
-      btn.classList.add('btn-outline-secondary');
-      btn.innerHTML = '<i class="bi bi-geo-alt me-1"></i>Aproape de mine';
-      // re-incarcam pagina fara sortare dupa distanta
-      document.getElementById('filterForm').submit();
-    } else {
-      // activeaza
-      const loc = getLocatieSalvata();
-      if (!loc) {
-        detecteazaLocatia(true);
-      } else {
-        aplicaSortareDupaDistanta(loc.lat, loc.lng);
-      }
-    }
-  }
-
-  // ===== SELECTIE CATEGORIE cu deselectare =====
-  function selectCategorie(slug, btn) {
-    const currentVal = document.getElementById('hiddenCategory').value;
-    if (slug !== '' && currentVal === slug) {
-      document.getElementById('hiddenCategory').value = '';
-    } else {
-      document.getElementById('hiddenCategory').value = slug;
-    }
-    document.getElementById('filterForm').submit();
-  }
-
-  // ===== SELECTIE RATING cu deselectare =====
-  function selectRating(val, btn) {
-    const currentVal = document.getElementById('hiddenRating').value;
-    if (val !== '' && currentVal === val) {
-      document.getElementById('hiddenRating').value = '';
-    } else {
-      document.getElementById('hiddenRating').value = val;
-    }
-    document.getElementById('filterForm').submit();
-  }
-
-  // ===== TOGGLE FILTRE AVANSATE =====
-  function toggleFiltreAvansate() {
-    const panel = document.getElementById('filtreAvansate');
-    const icon = document.getElementById('iconFiltreAvansate');
-    const isOpen = panel.style.display !== 'none';
-    panel.style.display = isOpen ? 'none' : 'block';
-    icon.className = isOpen ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+    const s = localStorage.getItem("user_loc");
+    return s ? JSON.parse(s) : null;
   }
 
   // ===== HAVERSINE =====
   function haversine(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const toRad = x => x * Math.PI / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    const R = 6371, toRad = x => x * Math.PI / 180;
+    const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
-  // ===== SORTARE DUPA DISTANTA =====
+  function afiseazaDistanteCarduri(userLat, userLng) {
+    document.querySelectorAll('[id^="dist_"]').forEach(el => {
+      const lat = parseFloat(el.dataset.lat), lng = parseFloat(el.dataset.lng);
+      if (!lat || !lng) return;
+      const dist = haversine(userLat, userLng, lat, lng);
+      el.innerHTML = `· <i class="bi bi-geo-alt text-red"></i> <strong>${dist.toFixed(1)} km</strong> · ~${Math.round((dist/40)*60)} min`;
+    });
+  }
+
+  function filtreazaDupaRaza(userLat, userLng, raza) {
+    document.querySelectorAll('#servicesContainer .col-12[data-lat]').forEach(card => {
+      const lat = parseFloat(card.dataset.lat), lng = parseFloat(card.dataset.lng);
+      if (!lat || !lng) { card.style.display = raza > 0 ? 'none' : ''; return; }
+      card.style.display = (raza === 0 || haversine(userLat, userLng, lat, lng) <= raza) ? '' : 'none';
+    });
+  }
+
+  function setRaza(km) {
+    const loc = getLocatieSalvata();
+    if (!loc) return;
+    if (razaActiva === km) {
+      razaActiva = 0;
+      localStorage.setItem("dist_radius", "0");
+      filtreazaDupaRaza(loc.lat, loc.lng, 0);
+      actualizezaButoaneKm(0);
+      return;
+    }
+    razaActiva = km;
+    localStorage.setItem("dist_radius", String(km));
+    filtreazaDupaRaza(loc.lat, loc.lng, km);
+    actualizezaButoaneKm(km);
+  }
+
+  function actualizezaButoaneKm(km) {
+    [10, 50, 100].forEach(v => {
+      const btn = document.getElementById(`km${v}`);
+      if (!btn) return;
+      btn.classList.toggle('btn-primary', km === v);
+      btn.classList.toggle('btn-outline-secondary', km !== v);
+    });
+  }
+
+  function toggleSortDist() {
+    const activ = localStorage.getItem("sort_dist_activ") === "true";
+    if (activ) {
+      localStorage.removeItem("sort_dist_activ");
+      localStorage.removeItem("dist_radius");
+      razaActiva = 0;
+      const btn = document.getElementById('btnSortDist');
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-outline-secondary');
+      btn.innerHTML = '<i class="bi bi-geo-alt me-1"></i>Aproape de mine';
+      document.getElementById('kmButtons').style.display = 'none';
+      document.querySelectorAll('#servicesContainer .col-12[data-lat]').forEach(c => c.style.display = '');
+    } else {
+      const loc = getLocatieSalvata();
+      if (!loc) { detecteazaLocatia(true); return; }
+      aplicaSortareDupaDistanta(loc.lat, loc.lng);
+    }
+  }
+
   function aplicaSortareDupaDistanta(userLat, userLng) {
     const container = document.getElementById('servicesContainer');
     if (!container) return;
     const cards = Array.from(container.querySelectorAll('.col-12[data-lat]'));
     cards.sort((a, b) => {
-      const aLat = parseFloat(a.dataset.lat);
-      const aLng = parseFloat(a.dataset.lng);
-      const bLat = parseFloat(b.dataset.lat);
-      const bLng = parseFloat(b.dataset.lng);
+      const aLat = parseFloat(a.dataset.lat), aLng = parseFloat(a.dataset.lng);
+      const bLat = parseFloat(b.dataset.lat), bLng = parseFloat(b.dataset.lng);
       if (!aLat || !aLng) return 1;
       if (!bLat || !bLng) return -1;
       return haversine(userLat, userLng, aLat, aLng) - haversine(userLat, userLng, bLat, bLng);
     });
     cards.forEach(card => container.appendChild(card));
-
-    // Marcam ca activ in localStorage
     localStorage.setItem("sort_dist_activ", "true");
-
-    // Actualizam butonul
     const btn = document.getElementById('btnSortDist');
     btn.classList.remove('btn-outline-secondary');
     btn.classList.add('btn-primary');
     btn.innerHTML = '<i class="bi bi-geo-alt-fill me-1"></i>Aproape de mine ✓';
+    document.getElementById('kmButtons').style.display = 'block';
+    afiseazaDistanteCarduri(userLat, userLng);
+    if (razaActiva > 0) {
+      filtreazaDupaRaza(userLat, userLng, razaActiva);
+      actualizezaButoaneKm(razaActiva);
+    }
   }
 
-  // ===== SERVICES din Django =====
+  function selectCategorie(slug) {
+    const cur = document.getElementById('hiddenCategory').value;
+    document.getElementById('hiddenCategory').value = (slug !== '' && cur === slug) ? '' : slug;
+    document.getElementById('filterForm').submit();
+  }
+
+  function selectRating(val) {
+    const cur = document.getElementById('hiddenRating').value;
+    document.getElementById('hiddenRating').value = (val !== '' && cur === val) ? '' : val;
+    document.getElementById('filterForm').submit();
+  }
+
+  // ===== HARTA =====
   const SERVICES = [
-    {% for c in centers %}
-      {% if c.latitude and c.longitude %}
-      {
-        name: "{{ c.name|escapejs }}",
-        city: "{{ c.get_city_display|escapejs }}",
-        address: "{{ c.address|escapejs }}",
-        category: "{{ c.category.name|escapejs }}",
-        icon: "{{ c.category.icon|escapejs }}",
-        rating: {% if c.avg_rating %}{{ c.avg_rating|floatformat:1|cut:"," }}{% else %}0{% endif %},
-        lat: {{ c.latitude|stringformat:'f' }},
-        lng: {{ c.longitude|stringformat:'f' }},
-        url: "{{ c.get_absolute_url }}",
-        booking_url: "{% url 'bookings:create' c.slug %}",
-        price: "{% if c.min_price %}de la {{ c.min_price|floatformat:0 }} RON{% else %}La cerere{% endif %}"
-      },
-      {% endif %}
-    {% endfor %}
+    {% for c in centers %}{% if c.latitude and c.longitude %}{
+      name: "{{ c.name|escapejs }}",
+      city: "{{ c.get_city_display|escapejs }}",
+      category: "{{ c.category.name|escapejs }}",
+      icon: "{{ c.category.icon|escapejs }}",
+      rating: {% if c.avg_rating %}{{ c.avg_rating|floatformat:1|cut:"," }}{% else %}0{% endif %},
+      lat: {{ c.latitude|stringformat:'f' }},
+      lng: {{ c.longitude|stringformat:'f' }},
+      url: "{{ c.get_absolute_url }}",
+      booking_url: "{% url 'bookings:create' c.slug %}",
+      price: "{% if c.min_price %}de la {{ c.min_price|floatformat:0 }} RON{% else %}La cerere{% endif %}"
+    },{% endif %}{% endfor %}
   ];
 
-  function initMap(centerLat, centerLng, zoom) {
-    if (mapInitialized) { map.setView([centerLat, centerLng], zoom); return; }
+  function initMap(lat, lng, zoom) {
+    if (mapInitialized) { map.setView([lat, lng], zoom); return; }
     document.getElementById('map').innerHTML = '';
-    map = L.map('map', { zoomControl: true }).setView([centerLat, centerLng], zoom);
+    map = L.map('map', { zoomControl: true }).setView([lat, lng], zoom);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
     }).addTo(map);
@@ -399,99 +615,68 @@
     services.forEach(s => {
       if (typeof s.lat !== "number" || typeof s.lng !== "number") return;
       const icon = L.divIcon({
-        html: `<div style="background:var(--ah-red,#e63946);color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.5);border:2px solid white;">${s.icon}</div>`,
-        className: '', iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32]
+        html: `<div style="background:#e63946;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.5);border:2px solid white;">${s.icon}</div>`,
+        className: '', iconSize:[32,32], iconAnchor:[16,32], popupAnchor:[0,-32]
       });
-      const distText = (s.distance_km !== undefined && s.distance_km !== null)
-        ? `<br><i class="bi bi-geo-alt"></i> <strong>${s.distance_km} km</strong> distanță` : '';
-      const marker = L.marker([s.lat, s.lng], { icon }).addTo(map).bindPopup(`
-        <div style="min-width:200px;font-family:Barlow,sans-serif;">
-          <strong style="font-size:1rem;">${s.icon} ${s.name}</strong><br>
+      const distText = s.distance_km ? `<br>📍 <strong>${s.distance_km} km</strong>` : '';
+      const m = L.marker([s.lat, s.lng], { icon }).addTo(map).bindPopup(`
+        <div style="min-width:200px;font-family:sans-serif;">
+          <strong>${s.icon} ${s.name}</strong><br>
           <span style="color:#888;font-size:0.8rem;">${s.city} · ${s.category}</span><br>
-          <span style="color:#f4a261;">★ ${s.rating || '—'}</span>
-          <span style="font-size:0.8rem;color:#aaa;"> · ${s.price}</span>
+          <span style="color:#f4a261;">★ ${s.rating||'—'}</span> · <span style="font-size:0.8rem;">${s.price}</span>
           ${distText}
           <div style="margin-top:8px;display:flex;gap:6px;">
             <a href="${s.booking_url}" style="background:#e63946;color:white;padding:4px 10px;border-radius:6px;text-decoration:none;font-size:0.8rem;">📅 Programează</a>
             <a href="${s.url}" style="background:#333;color:white;padding:4px 10px;border-radius:6px;text-decoration:none;font-size:0.8rem;">👁 Detalii</a>
           </div>
         </div>`);
-      serviceMarkers.push(marker);
+      serviceMarkers.push(m);
     });
   }
 
-  function detecteazaLocatia(sortDupaDetectare) {
+  function detecteazaLocatia(sortDupa) {
     const btn = document.getElementById('btnLocatie');
     const status = document.getElementById('locatieStatus');
-    if (!navigator.geolocation) {
-      status.style.display = 'block';
-      status.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Browserul nu suportă GPS.';
-      return;
-    }
+    if (!navigator.geolocation) { status.style.display='block'; status.innerHTML='Browserul nu suportă GPS.'; return; }
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Se detectează...';
-    status.style.display = 'none';
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const accuracy = Math.round(pos.coords.accuracy);
-
-        salveazaLocatia(lat, lng);
-
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-geo-alt-fill me-1"></i>Locația mea';
-        document.getElementById('btnResetMap').style.display = 'inline-block';
-        status.style.display = 'block';
-        status.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (±${accuracy}m)`;
-
-        initMap(lat, lng, 12);
-
-        if (userMarker) map.removeLayer(userMarker);
-        userMarker = L.marker([lat, lng], {
-          icon: L.divIcon({
-            html: `<div style="background:#4cc9f0;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 12px rgba(76,201,240,0.6);border:3px solid white;">📍</div>`,
-            className: '', iconSize: [36, 36], iconAnchor: [18, 36]
-          })
-        }).addTo(map).bindPopup('<strong>Locația ta</strong>').openPopup();
-
-        L.circle([lat, lng], {
-          radius: 25000, color: '#e63946', fillColor: '#e63946',
-          fillOpacity: 0.05, weight: 1, dashArray: '5,5'
-        }).addTo(map);
-
-        if (sortDupaDetectare) aplicaSortareDupaDistanta(lat, lng);
-
-        try {
-          const resp = await fetch(`/api/services/nearby/?lat=${lat}&lng=${lng}&radius=50&limit=20`);
-          const data = await resp.json();
-          if (data.results && data.results.length > 0) {
-            addServiceMarkers(data.results);
-            showNearbyList(data.results);
-            const top5 = document.getElementById('top5List');
-            if (top5) top5.style.display = 'none';
-          } else {
-            addServiceMarkers(SERVICES);
-            status.innerHTML += ' · <span class="text-warning">Niciun service în 50km</span>';
-          }
-        } catch (e) { addServiceMarkers(SERVICES); }
-      },
-      (err) => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-geo-alt-fill me-1"></i>Locația mea';
-        status.style.display = 'block';
-        const msgs = {
-          1: 'Accesul la locație a fost refuzat.',
-          2: 'Locația nu poate fi determinată.',
-          3: 'Timeout — încearcă din nou.'
-        };
-        status.innerHTML = `<i class="bi bi-x-circle text-danger me-1"></i>${msgs[err.code] || 'Eroare necunoscută.'}`;
-        initMap(45.9432, 24.9668, 7);
-        addServiceMarkers(SERVICES);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    );
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const lat = pos.coords.latitude, lng = pos.coords.longitude;
+      salveazaLocatia(lat, lng);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-geo-alt-fill me-1"></i>Locația mea';
+      document.getElementById('btnResetMap').style.display = 'inline-block';
+      status.style.display = 'block';
+      status.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (±${Math.round(pos.coords.accuracy)}m)`;
+      initMap(lat, lng, 12);
+      if (userMarker) map.removeLayer(userMarker);
+      userMarker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          html: `<div style="background:#4cc9f0;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 12px rgba(76,201,240,0.6);border:3px solid white;">📍</div>`,
+          className:'', iconSize:[36,36], iconAnchor:[18,36]
+        })
+      }).addTo(map).bindPopup('<strong>Locația ta</strong>').openPopup();
+      L.circle([lat, lng], { radius:25000, color:'#e63946', fillColor:'#e63946', fillOpacity:0.05, weight:1, dashArray:'5,5' }).addTo(map);
+      if (sortDupa) aplicaSortareDupaDistanta(lat, lng);
+      try {
+        const resp = await fetch(`/api/services/nearby/?lat=${lat}&lng=${lng}&radius=50&limit=20`);
+        const data = await resp.json();
+        if (data.results?.length > 0) {
+          addServiceMarkers(data.results);
+          showNearbyList(data.results);
+          const t5 = document.getElementById('top5List');
+          if (t5) t5.style.display = 'none';
+        } else { addServiceMarkers(SERVICES); }
+      } catch { addServiceMarkers(SERVICES); }
+    }, err => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-geo-alt-fill me-1"></i>Locația mea';
+      status.style.display = 'block';
+      const msgs = {1:'Accesul la locație refuzat.',2:'Locația nu poate fi determinată.',3:'Timeout.'};
+      status.innerHTML = `<i class="bi bi-x-circle text-danger me-1"></i>${msgs[err.code]||'Eroare.'}`;
+      initMap(45.9432, 24.9668, 7);
+      addServiceMarkers(SERVICES);
+    }, { enableHighAccuracy:true, timeout:10000, maximumAge:60000 });
   }
 
   function showNearbyList(results) {
@@ -499,13 +684,13 @@
     const items = document.getElementById('nearbyItems');
     list.style.display = 'block';
     items.innerHTML = '';
-    results.slice(0, 6).forEach((s, i) => {
+    results.slice(0,6).forEach((s,i) => {
       items.innerHTML += `
         <a href="${s.url}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none mb-1"
            style="transition:background 0.15s;color:inherit;"
            onmouseover="this.style.background='var(--ah-dark4)'"
            onmouseout="this.style.background='transparent'">
-          <span class="fw-bold text-red" style="min-width:20px;">${i + 1}</span>
+          <span class="fw-bold text-red" style="min-width:20px;">${i+1}</span>
           <div class="flex-grow-1 overflow-hidden">
             <p class="mb-0 small fw-bold text-white text-truncate">${s.icon} ${s.name}</p>
             <p class="mb-0 text-muted-custom" style="font-size:0.72rem;">
@@ -518,11 +703,15 @@
 
   function resetHarta() {
     localStorage.removeItem("sort_dist_activ");
+    localStorage.removeItem("dist_radius");
+    razaActiva = 0;
     document.getElementById('btnResetMap').style.display = 'none';
     document.getElementById('locatieStatus').style.display = 'none';
     document.getElementById('nearbyList').style.display = 'none';
-    const top5 = document.getElementById('top5List');
-    if (top5) top5.style.display = 'block';
+    document.getElementById('kmButtons').style.display = 'none';
+    document.querySelectorAll('#servicesContainer .col-12[data-lat]').forEach(c => c.style.display = '');
+    const t5 = document.getElementById('top5List');
+    if (t5) t5.style.display = 'block';
     if (map) { map.remove(); map = null; mapInitialized = false; }
     document.getElementById('map').innerHTML = `
       <div class="d-flex align-items-center justify-content-center h-100 text-muted-custom flex-column">
@@ -530,47 +719,42 @@
         <p class="small mt-2 mb-0">Apasă "Locația mea"</p>
         <p class="small">pentru a vedea harta</p>
       </div>`;
-    // Resetam si butonul Aproape de mine
     const btn = document.getElementById('btnSortDist');
     btn.classList.remove('btn-primary');
     btn.classList.add('btn-outline-secondary');
     btn.innerHTML = '<i class="bi bi-geo-alt me-1"></i>Aproape de mine';
+    document.querySelectorAll('[id^="dist_"]').forEach(el => el.innerHTML = '');
   }
 
   // ===== LA INCARCARE =====
   window.addEventListener('DOMContentLoaded', () => {
+    updateBadgeFiltre();
 
     const loc = getLocatieSalvata();
-
-    // Restauram harta daca avem locatie salvata
     if (loc) {
-      const status = document.getElementById('locatieStatus');
-      status.style.display = 'block';
-      status.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (din memorie)`;
+      document.getElementById('locatieStatus').style.display = 'block';
+      document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (din memorie)`;
       document.getElementById('btnResetMap').style.display = 'inline-block';
       initMap(loc.lat, loc.lng, 12);
       userMarker = L.marker([loc.lat, loc.lng], {
         icon: L.divIcon({
           html: `<div style="background:#4cc9f0;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 12px rgba(76,201,240,0.6);border:3px solid white;">📍</div>`,
-          className: '', iconSize: [36, 36], iconAnchor: [18, 36]
+          className:'', iconSize:[36,36], iconAnchor:[18,36]
         })
       }).addTo(map).bindPopup('<strong>Locația ta</strong>');
       addServiceMarkers(SERVICES);
+      afiseazaDistanteCarduri(loc.lat, loc.lng);
     }
 
-    // Restauram butonul "Aproape de mine" daca era activ
     if (localStorage.getItem("sort_dist_activ") === "true" && loc) {
       aplicaSortareDupaDistanta(loc.lat, loc.lng);
     }
 
-    // Deschidem filtrele avansate automat daca sunt active
-    const hasCity = "{{ selected_city|default:'' }}".trim();
-    const hasRating = "{{ selected_min_rating|default:'' }}".trim();
-    const hasPriceMin = "{{ selected_price_min|default:'' }}".trim();
-    const hasPriceMax = "{{ selected_price_max|default:'' }}".trim();
-    if (hasCity || hasRating || hasPriceMin || hasPriceMax) {
-      document.getElementById('filtreAvansate').style.display = 'block';
-      document.getElementById('iconFiltreAvansate').className = 'bi bi-chevron-up';
+    razaActiva = parseInt(localStorage.getItem("dist_radius") || "0");
+    if (razaActiva > 0 && loc) {
+      document.getElementById('kmButtons').style.display = 'block';
+      filtreazaDupaRaza(loc.lat, loc.lng, razaActiva);
+      actualizezaButoaneKm(razaActiva);
     }
   });
 </script>

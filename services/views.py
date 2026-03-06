@@ -146,6 +146,12 @@ def service_register_public(request):
             else:
                 messages.success(request, '✅ Contul și service-ul au fost create. Bine ai venit în dashboard!')
             return redirect('services:dashboard')
+        else:
+            # ===== DEBUG TEMPORAR =====
+            print("=" * 60)
+            print("FORM PUBLIC ERRORS:", form.errors)
+            print("POST DATA:", request.POST)
+            print("=" * 60)
     else:
         form = ServiceCenterPublicRegisterForm()
     return render(request, 'services/service_register_public.html', {'form': form})
@@ -156,16 +162,20 @@ def service_register(request):
     if request.method == 'POST':
         form = ServiceCenterRegisterForm(request.POST, request.FILES)
         if form.is_valid():
-            center = form.save(commit=False)
+            center = form.save(commit=True)
             center.owner = request.user
-            center.save()
-            form.instance = center
-            form.save_m2m()
+            center.save(update_fields=['owner'])
             if center.verification_status == 'pending':
                 messages.info(request, '✅ Service-ul a fost înregistrat, dar este în așteptare pentru verificare (date legale completate).')
             else:
                 messages.success(request, '✅ Service-ul a fost înregistrat. Acum poți gestiona programările din dashboard.')
             return redirect('services:dashboard')
+        else:
+            # ===== DEBUG TEMPORAR =====
+            print("=" * 60)
+            print("FORM REGISTER ERRORS:", form.errors)
+            print("POST DATA:", request.POST)
+            print("=" * 60)
     else:
         form = ServiceCenterRegisterForm()
 

@@ -1,9 +1,31 @@
+import requests
+
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
 from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage
+
+
+def geocodeaza_adresa(address, city_display):
+    """
+    Apeleaza Nominatim (OpenStreetMap, gratuit) si returneaza (lat, lng) sau (None, None).
+    """
+    try:
+        query = f"{address}, {city_display}, Romania"
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": query, "format": "json", "limit": 1},
+            headers={"User-Agent": "AutoHub/1.0"},
+            timeout=5,
+        )
+        results = resp.json()
+        if results:
+            return results[0]["lat"], results[0]["lon"]
+    except Exception:
+        pass
+    return None, None
 
 
 class ServiceCenterRegisterForm(forms.ModelForm):
@@ -37,11 +59,18 @@ class ServiceCenterRegisterForm(forms.ModelForm):
             'fiscal_code',
             'trade_register_no',
             'legal_document',
+            'latitude',
+            'longitude',
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Service Auto X'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
-            'address': forms.TextInput(attrs={'class': 'form-control'}),
+            'address': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ex: Str. Mihai Eminescu 10',
+                'id': 'id_address',
+                'autocomplete': 'off',
+            }),
             'city': forms.Select(attrs={'class': 'form-select'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
@@ -53,6 +82,9 @@ class ServiceCenterRegisterForm(forms.ModelForm):
             'fiscal_code': forms.TextInput(attrs={'class': 'form-control'}),
             'trade_register_no': forms.TextInput(attrs={'class': 'form-control'}),
             'legal_document': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            # Ascunse — completate automat prin geocoding
+            'latitude': forms.HiddenInput(),
+            'longitude': forms.HiddenInput(),
         }
 
     def __init__(self, *args, **kwargs):
@@ -72,6 +104,20 @@ class ServiceCenterRegisterForm(forms.ModelForm):
             (cleaned.get('trade_register_no') or '').strip(),
         ])
 
+    def clean_latitude(self):
+        val = self.cleaned_data.get('latitude')
+        if val is not None:
+            from decimal import Decimal, ROUND_HALF_UP
+            return Decimal(str(val)).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+        return val
+
+    def clean_longitude(self):
+        val = self.cleaned_data.get('longitude')
+        if val is not None:
+            from decimal import Decimal, ROUND_HALF_UP
+            return Decimal(str(val)).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+        return val
+
     def clean(self):
         cleaned = super().clean()
         any_legal = self._any_legal_data(cleaned)
@@ -86,7 +132,7 @@ class ServiceCenterRegisterForm(forms.ModelForm):
                 'Dacă ai completat datele legale, încarcă și un document care să ateste deținerea firmei.'
             )
         if not categories:
-            self.add_error('categories', 'Selectează cel puțin o categorie sau bifează „Toate categoriile”.')
+            self.add_error('categories', 'Selectează cel puțin o categorie sau bifează „Toate categoriile".')
         return cleaned
 
     def save(self, commit=True):
@@ -107,6 +153,14 @@ class ServiceCenterRegisterForm(forms.ModelForm):
         else:
             center.verification_status = 'not_required'
             center.is_active = True
+
+        # ===== GEOCODING AUTOMAT =====
+        # Daca nu avem coordonate deja (sau s-a schimbat adresa), le calculam
+        if not center.latitude or not center.longitude:
+            lat, lng = geocodeaza_adresa(center.address, center.get_city_display())
+            if lat and lng:
+                center.latitude = lat
+                center.longitude = lng
 
         if commit:
             center.save()
@@ -162,7 +216,6 @@ class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
         p2 = cleaned.get('password2')
         if p1 and p2 and p1 != p2:
             self.add_error('password2', 'Parolele nu coincid.')
-
         if p1:
             try:
                 validate_password(p1)
@@ -189,8 +242,9 @@ class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
         if commit:
             user.save()
 
-        center = super().save(commit=False)
+        center = super(ServiceCenterRegisterForm, self).save(commit=False)
         center.owner = user
+
         selected_categories = self.cleaned_data.get('categories')
         if self.cleaned_data.get('all_categories'):
             selected_categories = self.fields['categories'].queryset
@@ -205,6 +259,13 @@ class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
         else:
             center.verification_status = 'not_required'
             center.is_active = True
+
+        # ===== GEOCODING AUTOMAT =====
+        if not center.latitude or not center.longitude:
+            lat, lng = geocodeaza_adresa(center.address, center.get_city_display())
+            if lat and lng:
+                center.latitude = lat
+                center.longitude = lng
 
         if commit:
             center.save()
