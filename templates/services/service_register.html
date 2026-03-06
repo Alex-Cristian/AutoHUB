@@ -1,5 +1,31 @@
 {% extends 'base.html' %}
-{% block title %}Înregistrare service — AutoHub{% endblock %}
+{% block title %}Înregistrare service — AutoHub<script>
+  (function () {
+    const legalIds = ['id_legal_name', 'id_headquarters', 'id_fiscal_code', 'id_trade_register_no'];
+    const docWrap = document.getElementById('wrap_legal_document');
+
+    function shouldShowDoc() {
+      return legalIds.some(id => {
+        const el = document.getElementById(id);
+        return el && (el.value || '').trim().length > 0;
+      });
+    }
+
+    function refresh() {
+      if (!docWrap) return;
+      docWrap.style.display = shouldShowDoc() ? '' : 'none';
+    }
+
+    legalIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', refresh);
+    });
+
+    refresh();
+  })();
+</script>
+{% endblock %}
+
 
 {% block content %}
 <div class="container py-5">
@@ -19,11 +45,11 @@
         <div class="col-lg-7">
           <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
             <h4 class="mb-3"><i class="bi bi-building me-2 text-red"></i>Date service</h4>
-            <form method="post">
+            <form method="post" enctype="multipart/form-data" novalidate>
               {% csrf_token %}
               <div class="row g-3">
                 {% for field in form %}
-                <div class="col-12">
+                <div class="col-12" id="wrap_{{ field.name }}">
                   <label class="form-label">{{ field.label }}</label>
                   {{ field }}
                   {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
@@ -87,4 +113,30 @@
     border-color: var(--ah-red) !important;
   }
 </style>
+<script>
+  (function () {
+    const legalIds = ['id_legal_name', 'id_headquarters', 'id_fiscal_code', 'id_trade_register_no'];
+    const docWrap = document.getElementById('wrap_legal_document');
+
+    function shouldShowDoc() {
+      return legalIds.some(id => {
+        const el = document.getElementById(id);
+        return el && (el.value || '').trim().length > 0;
+      });
+    }
+
+    function refresh() {
+      if (!docWrap) return;
+      docWrap.style.display = shouldShowDoc() ? '' : 'none';
+    }
+
+    legalIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', refresh);
+    });
+
+    refresh();
+  })();
+</script>
 {% endblock %}
+

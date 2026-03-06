@@ -1,9 +1,11 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
+from django.contrib.auth import login
 from django.db.models import Avg, Count, Min, Max, Q
+from django.utils import timezone
 from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite
-from .forms import ServiceCenterRegisterForm
+from .forms import ServiceCenterRegisterForm, ServiceCenterPublicRegisterForm
 
 from bookings.models import Booking, BookingNotification
 
@@ -142,17 +144,38 @@ def toggle_favorite(request, slug):
     return redirect(request.META.get('HTTP_REFERER', center.get_absolute_url()))
 
 
+
+def service_register_public(request):
+    """Înregistrare service fără login: creează și contul proprietarului, apoi îl autentifică."""
+    if request.method == 'POST':
+        form = ServiceCenterPublicRegisterForm(request.POST, request.FILES)
+        if form.is_valid():
+            center, user = form.save()
+            login(request, user)
+            if center.verification_status == 'pending':
+                messages.info(request, '✅ Contul și service-ul au fost create. Service-ul este în așteptare pentru verificare (date legale completate).')
+            else:
+                messages.success(request, '✅ Contul și service-ul au fost create. Bine ai venit în dashboard!')
+            return redirect('services:dashboard')
+    else:
+        form = ServiceCenterPublicRegisterForm()
+
+    return render(request, 'services/service_register_public.html', {'form': form})
+
+
 @login_required
 def service_register(request):
     """Register a new service center owned by the current user."""
     if request.method == 'POST':
-        form = ServiceCenterRegisterForm(request.POST)
+        form = ServiceCenterRegisterForm(request.POST, request.FILES)
         if form.is_valid():
             center = form.save(commit=False)
             center.owner = request.user
-            center.is_active = True
             center.save()
-            messages.success(request, '✅ Service-ul a fost înregistrat. Acum poți gestiona programările din dashboard.')
+            if center.verification_status == 'pending':
+                messages.info(request, '✅ Service-ul a fost înregistrat, dar este în așteptare pentru verificare (date legale completate).')
+            else:
+                messages.success(request, '✅ Service-ul a fost înregistrat. Acum poți gestiona programările din dashboard.')
             return redirect('services:dashboard')
     else:
         form = ServiceCenterRegisterForm()
@@ -162,6 +185,53 @@ def service_register(request):
         'existing_centers': ServiceCenter.objects.filter(owner=request.user).order_by('-created_at'),
     })
 
+
+
+
+# --- Verificare firmă / service (staff) ---
+
+def _staff_required(user):
+    return user.is_staff
+
+
+@user_passes_test(_staff_required)
+def verification_list(request):
+    pending = ServiceCenter.objects.filter(verification_status='pending').order_by('-created_at')
+    return render(request, 'services/verification_list.html', {'pending_centers': pending})
+
+
+@user_passes_test(_staff_required)
+def verification_detail(request, pk):
+    center = get_object_or_404(ServiceCenter, pk=pk)
+    return render(request, 'services/verification_detail.html', {'center': center})
+
+
+@user_passes_test(_staff_required)
+def verification_approve(request, pk):
+    center = get_object_or_404(ServiceCenter, pk=pk)
+    if request.method == 'POST':
+        center.verification_status = 'verified'
+        center.is_active = True
+        center.verified_at = timezone.now()
+        center.verification_note = (request.POST.get('note') or '').strip()
+        center.save()
+        messages.success(request, f'✅ "{center.name}" a fost verificat și activat.')
+        return redirect('services:verification_list')
+    return redirect('services:verification_detail', pk=pk)
+
+
+@user_passes_test(_staff_required)
+def verification_reject(request, pk):
+    center = get_object_or_404(ServiceCenter, pk=pk)
+    if request.method == 'POST':
+        center.verification_status = 'rejected'
+        center.is_active = False
+        center.verified_at = None
+        center.verification_note = (request.POST.get('note') or '').strip()
+        center.save()
+        messages.warning(request, f'⛔ "{center.name}" a fost respins.')
+        return redirect('services:verification_list')
+    return redirect('services:verification_detail', pk=pk)
 
 def _require_service_owner(request):
     centers = ServiceCenter.objects.filter(owner=request.user)
@@ -188,12 +258,17 @@ def service_dashboard(request):
     unread_count = BookingNotification.objects.filter(recipient=request.user, is_read=False).count()
     latest_notifications = BookingNotification.objects.filter(recipient=request.user)[:6]
 
+    pending_verifications = 0
+    if request.user.is_staff:
+        pending_verifications = ServiceCenter.objects.filter(verification_status='pending').count()
+
     return render(request, 'services/service_dashboard.html', {
         'centers': centers,
         'pending_bookings': pending,
         'bookings': active,
         'unread_count': unread_count,
         'latest_notifications': latest_notifications,
+        'pending_verifications': pending_verifications,
     })
 
 

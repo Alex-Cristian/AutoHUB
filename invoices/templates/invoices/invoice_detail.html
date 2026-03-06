@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% block title %}Factură{% if invoice.invoice_no %} #{{ invoice.invoice_no }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container py-5 no-print">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="mb-1">
+        Factură {% if invoice.invoice_no %}#{{ invoice.invoice_no }}{% else %}<span class="text-muted-custom">(draft)</span>{% endif %}
+      </h1>
+      <p class="text-muted-custom mb-0">{{ invoice.center.name }} • {{ invoice.issue_date }}</p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-light" href="{% url 'invoices:clients' %}"><i class="bi bi-people me-1"></i>Clienți</a>
+      <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+
+      {% if invoice.status == 'draft' %}
+        <form method="post" action="{% url 'invoices:finalize' invoice.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-success" type="submit"><i class="bi bi-check2-circle me-1"></i>Finalizează</button>
+        </form>
+      {% endif %}
+
+      <button class="btn btn-nav-cta" type="button" onclick="window.print()">
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- "Hârtia" facturii (A4) -->
+<div class="invoice-page" id="invoice-paper">
+  <header class="invoice-header">
+    <div>
+      <div class="invoice-supplier-name">{{ invoice.company_name }}</div>
+      <div class="muted">{{ invoice.company_address }}{% if invoice.company_city %}, {{ invoice.company_city }}{% endif %}</div>
+      <div class="muted">Tel: {{ invoice.company_phone|default:"—" }} · Email: {{ invoice.company_email|default:"—" }}</div>
+      <div class="muted">CIF: {{ invoice.company_fiscal_code|default:"—" }}{% if invoice.company_trade_register_no %} · Nr. RC: {{ invoice.company_trade_register_no }}{% endif %}</div>
+    </div>
+
+    <div class="invoice-meta">
+      <div class="invoice-title">FACTURĂ</div>
+      <div class="meta-row">
+        <span class="muted">Nr.</span>
+        <span class="meta-strong">{% if invoice.invoice_no %}{{ invoice.invoice_no }}{% else %}—{% endif %}</span>
+      </div>
+      <div class="meta-row">
+        <span class="muted">Data</span>
+        <span class="meta-strong">{{ invoice.issue_date }}</span>
+      </div>
+      {% if invoice.booking %}
+      <div class="meta-row">
+        <span class="muted">Programare</span>
+        <span class="meta-strong">#{{ invoice.booking.pk }}</span>
+      </div>
+      {% endif %}
+      {% if invoice.due_date %}
+      <div class="meta-row">
+        <span class="muted">Scadență</span>
+        <span class="meta-strong">{{ invoice.due_date }}</span>
+      </div>
+      {% endif %}
+      <div class="meta-row">
+        <span class="muted">Status</span>
+        <span class="meta-strong">{{ invoice.get_status_display }}</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="invoice-parties">
+    <div class="party-box">
+      <div class="party-title">Furnizor</div>
+      <div class="party-name">{{ invoice.company_name }}</div>
+      <div class="muted">{{ invoice.company_address }}{% if invoice.company_city %}, {{ invoice.company_city }}{% endif %}</div>
+      <div class="muted">CIF: {{ invoice.company_fiscal_code|default:"—" }}</div>
+      <div class="muted">Nr. RC: {{ invoice.company_trade_register_no|default:"—" }}</div>
+    </div>
+
+    <div class="party-box">
+      <div class="party-title">Client</div>
+      <div class="party-name">{{ invoice.client_name }}</div>
+      {% if invoice.client_address %}<div class="muted">{{ invoice.client_address }}</div>{% endif %}
+      <div class="muted">Tel: {{ invoice.client_phone|default:"—" }} · Email: {{ invoice.client_email|default:"—" }}</div>
+      <div class="muted">CIF: {{ invoice.client_fiscal_code|default:"—" }}</div>
+    </div>
+  </section>
+
+  <section class="invoice-lines">
+    <table class="invoice-table">
+      <thead>
+        <tr>
+          <th style="width:44px">Nr.</th>
+          <th>Descriere</th>
+          <th style="width:64px">UM</th>
+          <th class="right" style="width:92px">Cant.</th>
+          <th class="right" style="width:110px">Preț (RON)</th>
+          <th class="right" style="width:120px">Valoare (RON)</th>
+          <th class="right" style="width:70px">TVA</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in invoice.lines.all %}
+          <tr>
+            <td class="center">{{ forloop.counter }}</td>
+            <td>{{ l.description }}</td>
+            <td class="center">buc</td>
+            <td class="right">{{ l.quantity }}</td>
+            <td class="right">{{ l.unit_price }}</td>
+            <td class="right">{{ l.line_total }}</td>
+            <td class="right">0%</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="muted">Nicio linie.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="invoice-totals">
+    <div class="totals-box">
+      <div class="tot-row">
+        <span class="muted">Subtotal</span>
+        <span class="strong">{{ invoice.subtotal }} RON</span>
+      </div>
+      <div class="tot-row">
+        <span class="muted">TVA</span>
+        <span class="strong">0.00 RON</span>
+      </div>
+      <div class="tot-row grand">
+        <span>Total de plată</span>
+        <span>{{ invoice.total }} RON</span>
+      </div>
+    </div>
+  </section>
+
+  {% if invoice.notes %}
+  <section class="invoice-notes">
+    <div class="notes-title">Observații</div>
+    <div class="notes-body">{{ invoice.notes|linebreaksbr }}</div>
+  </section>
+  {% endif %}
+
+  <footer class="invoice-footer">
+    <div class="sig">
+      <div class="sig-title">Semnătură furnizor</div>
+      <div class="sig-line"></div>
+    </div>
+    <div class="sig">
+      <div class="sig-title">Semnătură client</div>
+      <div class="sig-line"></div>
+    </div>
+  </footer>
+</div>
+
+<style>
+  /* Factură "de firmă" (A4) – arată ok și pe Print */
+  .invoice-page{
+    max-width: 210mm;
+    margin: 0 auto 28px;
+    background: #fff;
+    color: #111;
+    border: 1px solid #e6e6e6;
+    border-radius: 14px;
+    padding: 18mm 16mm;
+    box-shadow: 0 10px 30px rgba(0,0,0,.12);
+  }
+  .invoice-header{
+    display:flex;
+    justify-content:space-between;
+    gap: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #111;
+  }
+  .invoice-supplier-name{ font-size: 18px; font-weight: 800; letter-spacing:.2px; }
+  .invoice-title{ font-size: 24px; font-weight: 900; letter-spacing: .6px; text-align:right; }
+  .invoice-meta{ min-width: 240px; text-align:right; }
+  .meta-row{ display:flex; justify-content:space-between; gap: 12px; }
+  .meta-strong{ font-weight: 800; }
+  .muted{ color:#555; font-size: 12px; }
+  .strong{ font-weight: 800; }
+
+  .invoice-parties{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .party-box{ border: 1px solid #e6e6e6; border-radius: 12px; padding: 10px 12px; }
+  .party-title{ font-size: 12px; color:#555; text-transform: uppercase; letter-spacing: .6px; }
+  .party-name{ font-weight: 800; margin-top: 2px; }
+
+  .invoice-lines{ margin-top: 14px; }
+  .invoice-table{ width:100%; border-collapse: collapse; font-size: 12px; }
+  .invoice-table th, .invoice-table td{ border: 1px solid #e6e6e6; padding: 8px 8px; vertical-align: top; }
+  .invoice-table thead th{ background:#f6f6f6; font-weight: 800; }
+  .right{ text-align:right; }
+  .center{ text-align:center; }
+
+  .invoice-totals{ display:flex; justify-content:flex-end; margin-top: 12px; }
+  .totals-box{ width: 320px; border: 1px solid #e6e6e6; border-radius: 12px; padding: 10px 12px; }
+  .tot-row{ display:flex; justify-content:space-between; padding: 4px 0; }
+  .tot-row.grand{ margin-top: 8px; padding-top: 10px; border-top: 2px solid #111; font-weight: 900; }
+
+  .invoice-notes{ margin-top: 14px; border: 1px dashed #d6d6d6; border-radius: 12px; padding: 10px 12px; }
+  .notes-title{ font-weight: 900; margin-bottom: 6px; }
+  .notes-body{ font-size: 12px; color:#222; }
+
+  .invoice-footer{ display:flex; justify-content:space-between; gap: 14px; margin-top: 18px; }
+  .sig{ flex:1; }
+  .sig-title{ font-size: 12px; color:#555; margin-bottom: 8px; }
+  .sig-line{ border-bottom: 1px solid #111; height: 34px; }
+
+  /* Print */
+  @page { size: A4; margin: 12mm; }
+  @media print {
+    .no-print, .navbar, .navbar-autohub, footer, .btn, .badge { display:none !important; }
+    body{ background:#fff !important; color:#111 !important; }
+    .invoice-page{ box-shadow:none !important; border:none !important; border-radius: 0 !important; padding: 0 !important; max-width: none !important; }
+  }
+
+  @media (max-width: 768px){
+    .invoice-page{ padding: 14px; border-radius: 12px; }
+    .invoice-parties{ grid-template-columns: 1fr; }
+    .invoice-meta{ min-width: 0; }
+  }
+</style>
+{% endblock %}
