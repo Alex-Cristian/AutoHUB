@@ -2,7 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils.text import slugify
 from django.urls import reverse
-from django.db.models import Avg, Count
+from django.db.models import Avg
+from django.core.exceptions import ValidationError
 
 
 CITY_CHOICES = [
@@ -49,7 +50,7 @@ class ServiceCategory(models.Model):
         return reverse('services:list') + f'?category={self.slug}'
 
     def center_count(self):
-        return self.servicecenter_set.filter(is_active=True).count()
+        return self.center_categories.filter(is_active=True).distinct().count()
 
 
 class ServiceCenter(models.Model):
@@ -57,6 +58,12 @@ class ServiceCenter(models.Model):
     slug = models.SlugField(unique=True, blank=True)
     category = models.ForeignKey(
         ServiceCategory, on_delete=models.CASCADE, verbose_name='Categorie principală'
+    )
+    categories = models.ManyToManyField(
+        ServiceCategory,
+        blank=True,
+        related_name='center_categories',
+        verbose_name='Categorii disponibile'
     )
     description = models.TextField(verbose_name='Descriere')
     address = models.CharField(max_length=300, verbose_name='Adresă')
@@ -68,12 +75,13 @@ class ServiceCenter(models.Model):
         max_length=200, default='Lun-Vin: 08:00-18:00',
         verbose_name='Program lucru'
     )
-    # Mock geo coords
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    card_image = models.ImageField(
+        upload_to='service_cards/', blank=True, null=True,
+        verbose_name='Poză card service'
+    )
 
-
-    # --- Date legale (opțional) ---
     legal_name = models.CharField(max_length=255, blank=True, verbose_name='Denumire legală (opțional)')
     headquarters = models.CharField(max_length=300, blank=True, verbose_name='Sediu social (opțional)')
     fiscal_code = models.CharField(max_length=50, blank=True, verbose_name='Cod fiscal / CIF (opțional)')
@@ -82,7 +90,7 @@ class ServiceCenter(models.Model):
         upload_to='legal_docs/', blank=True, null=True,
         verbose_name='Document legal (opțional)'
     )
-    
+
     VERIFICATION_CHOICES = [
         ('not_required', 'Nu necesită verificare'),
         ('pending', 'În așteptare verificare'),
@@ -136,18 +144,64 @@ class ServiceCenter(models.Model):
 
     def min_price(self):
         from django.db.models import Min
-        result = self.serviceitem_set.aggregate(m=Min('price_from'))
-        return result['m']
+        return self.serviceitem_set.aggregate(m=Min('price_from'))['m']
 
     def max_price(self):
         from django.db.models import Max
-        result = self.serviceitem_set.aggregate(m=Max('price_to'))
-        return result['m']
+        return self.serviceitem_set.aggregate(m=Max('price_to'))['m']
 
     def is_favorited_by(self, user):
         if user and user.is_authenticated:
             return self.favorites.filter(user=user).exists()
         return False
+
+    def display_categories(self):
+        categories = list(self.categories.all())
+        if categories:
+            return categories
+        return [self.category] if self.category_id else []
+
+
+class ServiceGarage(models.Model):
+    center = models.ForeignKey(ServiceCenter, on_delete=models.CASCADE, related_name='garages', verbose_name='Service')
+    name = models.CharField(max_length=120, verbose_name='Nume garaj')
+    category = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, verbose_name='Categorie')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Garaj service'
+        verbose_name_plural = 'Garaje service'
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} - {self.center.name}"
+
+    def clean(self):
+
+        if not self.center_id:
+            return
+
+        allowed_ids = set(self.center.categories.values_list('id', flat=True))
+        if not allowed_ids and self.center.category_id:
+            allowed_ids.add(self.center.category_id)
+
+        if self.category_id and self.category_id not in allowed_ids:
+            raise ValidationError({'category': 'Poți alege doar o categorie din cele selectate de service.'})
+
+
+class ServiceImage(models.Model):
+    center = models.ForeignKey(ServiceCenter, on_delete=models.CASCADE, related_name='gallery_images', verbose_name='Service')
+    image = models.ImageField(upload_to='service_gallery/', verbose_name='Poză')
+    caption = models.CharField(max_length=120, blank=True, verbose_name='Descriere scurtă')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Poză service'
+        verbose_name_plural = 'Poze service'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.caption or f"Poză {self.pk} - {self.center.name}"
 
 
 class ServiceItem(models.Model):
