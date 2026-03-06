@@ -1,13 +1,9 @@
 {% extends "base.html" %}
-
-{% block title %}
-  Service-uri Auto{% if selected_city %} în {{ selected_city }}{% endif %} – AutoHub
-{% endblock title %}
-
+{% block title %}Service-uri Auto – AutoHub{% endblock %}
 {% block content %}
 <div class="container-fluid py-4" style="max-width: 1400px">
 
-  <!-- Breadcrumb + header -->
+  <!-- Breadcrumb -->
   <div class="container-fluid mb-3">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
@@ -17,14 +13,37 @@
         <li class="breadcrumb-item active text-muted-custom">Service-uri</li>
       </ol>
     </nav>
+  </div>
+
+  <!-- Header + sort -->
+  <div class="container-fluid mb-4">
     <div class="d-flex justify-content-between align-items-end flex-wrap gap-2">
+
       <div>
         <h1 class="section-title mb-1">Service-uri auto</h1>
         <p class="text-muted-custom small mb-0">
           <strong class="text-white">{{ total_count }}</strong> rezultate găsite
-          {% if search_q %} pentru „<em>{{ search_q }}</em>"{% endif %}
+          {% if search_q %} pentru „<em>{{ search_q }}</em>”{% endif %}
         </p>
       </div>
+
+      <form method="get" id="sortForm" class="d-flex align-items-center gap-2">
+        {% if search_q %}<input type="hidden" name="q" value="{{ search_q }}">{% endif %}
+        {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
+        {% if selected_city %}<input type="hidden" name="city" value="{{ selected_city }}">{% endif %}
+
+        <label class="text-muted-custom small mb-0">Sortare:</label>
+
+        <select name="sort" class="form-select form-select-sm" style="width:auto"
+                onchange="document.getElementById('sortForm').submit()">
+          <option value="rating" {% if selected_sort == "rating" or not selected_sort %}selected{% endif %}>⭐ Rating</option>
+          <option value="reviews" {% if selected_sort == "reviews" %}selected{% endif %}>💬 Nr. recenzii</option>
+          <option value="price_asc" {% if selected_sort == "price_asc" %}selected{% endif %}>💰 Preț crescător</option>
+          <option value="price_desc" {% if selected_sort == "price_desc" %}selected{% endif %}>💰 Preț descrescător</option>
+          <option value="name" {% if selected_sort == "name" %}selected{% endif %}>🔤 Nume</option>
+        </select>
+      </form>
+
     </div>
   </div>
 
@@ -160,8 +179,7 @@
       </div>
     </div>
 
-    <!-- ======= LISTA SERVICE-URI ======= -->
-    <div class="col-lg-7 col-md-9">
+    <div class="col-lg-10 col-md-9">
       {% if centers %}
         <div class="row g-3" id="servicesContainer">
           {% for center in centers %}
@@ -172,24 +190,13 @@
                 <div class="card-img-placeholder flex-shrink-0" style="width:120px;min-height:120px;border-radius:12px 0 0 12px;">
                   <span style="font-size:2.5rem">{{ center.category.icon }}</span>
                 </div>
-
                 <div class="p-3 flex-grow-1 d-flex flex-column justify-content-between">
                   <div>
                     <div class="d-flex justify-content-between align-items-start gap-2">
                       <div>
-                        <h6 class="fw-bold mb-1">
-                          <a href="{{ center.get_absolute_url }}" class="text-white text-decoration-none hover-red">
-                            {{ center.name }}
-                          </a>
-                          {% if center.is_featured %}
-                            <span class="badge-featured ms-2">⭐ Top</span>
-                          {% endif %}
-                        </h6>
-                        <p class="text-muted-custom small mb-0">
-                          <i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}
-                          <span class="mx-2">·</span>
-                          <i class="bi bi-tag me-1"></i>{{ center.category.name }}
-                        </p>
+                        <h6 class="fw-bold mb-1"><a href="{{ center.get_absolute_url }}" class="text-white text-decoration-none hover-red">{{ center.name }}</a>{% if center.is_featured %}<span class="badge-featured ms-2">⭐ Top</span>{% endif %}</h6>
+                        <p class="text-muted-custom small mb-1"><i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}</p>
+                        <div class="d-flex flex-wrap gap-2">{% for cat in center.display_categories %}<span class="badge bg-secondary-subtle text-white border" style="border-color:var(--ah-border) !important;">{{ cat.icon }} {{ cat.name }}</span>{% endfor %}</div>
                       </div>
                       {% if user.is_authenticated %}
                         <a href="{% url 'services:toggle_favorite' center.slug %}"
@@ -205,7 +212,6 @@
                       {{ center.description }}
                     </p>
                   </div>
-
                   <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
                     <div class="d-flex align-items-center gap-3">
                       <div class="d-flex align-items-center gap-1">
@@ -237,66 +243,7 @@
           {% endfor %}
         </div>
       {% else %}
-        <div class="text-center py-5">
-          <div style="font-size:4rem;opacity:0.3">🔍</div>
-          <h4 class="fw-bold mt-3">Niciun rezultat</h4>
-          <p class="text-muted-custom">Încearcă să modifici filtrele sau caută alt termen.</p>
-          <a href="{% url 'services:list' %}" class="btn btn-primary">Resetează filtrele</a>
-        </div>
-      {% endif %}
-    </div>
-
-    <!-- ======= HARTA LEAFLET ======= -->
-    <div class="col-lg-3 d-none d-lg-block">
-      <div class="mb-2 d-flex gap-2 align-items-center">
-        <button id="btnLocatie" class="btn btn-sm btn-outline-primary w-100" type="button" onclick="detecteazaLocatia()">
-          <i class="bi bi-geo-alt-fill me-1"></i>Locația mea
-        </button>
-        <button id="btnResetMap" class="btn btn-sm btn-outline-secondary" type="button" onclick="resetHarta()"
-          title="Resetează harta" style="display:none">
-          <i class="bi bi-x"></i>
-        </button>
-      </div>
-
-      <div id="locatieStatus" class="small text-muted-custom mb-2" style="display:none"></div>
-
-      <div id="map" style="height:300px;border-radius:12px;border:1px solid var(--ah-border);overflow:hidden;background:var(--ah-dark3);">
-        <div class="d-flex align-items-center justify-content-center h-100 text-muted-custom flex-column">
-          <div style="font-size:2rem;opacity:0.3">🗺️</div>
-          <p class="small mt-2 mb-0">Apasă "Locația mea"</p>
-          <p class="small">pentru a vedea harta</p>
-        </div>
-      </div>
-
-      <div id="nearbyList" class="mt-3" style="display:none">
-        <p class="filter-title mb-2">
-          <i class="bi bi-geo-alt text-red me-1"></i>Cele mai apropiate
-        </p>
-        <div id="nearbyItems"></div>
-      </div>
-
-      {% if top5 %}
-      <div id="top5List" class="mt-3">
-        <p class="filter-title mb-2">
-          <i class="bi bi-trophy text-orange me-1"></i>Top {{ top5|length }}
-        </p>
-        {% for c in top5 %}
-          <a href="{{ c.get_absolute_url }}"
-             class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none mb-1"
-             style="transition: background 0.15s"
-             onmouseover="this.style.background='var(--ah-dark4)'"
-             onmouseout="this.style.background='transparent'">
-            <span class="fw-bold text-red" style="min-width:20px">{{ forloop.counter }}</span>
-            <div class="flex-grow-1 overflow-hidden">
-              <p class="mb-0 small fw-bold text-white text-truncate">{{ c.name }}</p>
-              <p class="mb-0 text-muted-custom" style="font-size:0.75rem">
-                {{ c.get_city_display }}
-                {% if c.avg_rating %}· <span class="text-orange">{{ c.avg_rating|floatformat:1 }}★</span>{% endif %}
-              </p>
-            </div>
-          </a>
-        {% endfor %}
-      </div>
+        <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border)">Niciun service găsit.</div>
       {% endif %}
     </div>
 

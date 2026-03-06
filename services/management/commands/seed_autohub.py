@@ -9,8 +9,12 @@ Creează:
 - Idempotent: șterge datele existente și recreează
 """
 import random
+from pathlib import Path
+from django.conf import settings
+from django.core.files import File
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
+from PIL import Image, ImageDraw
 
 
 CATEGORIES = [
@@ -497,19 +501,31 @@ class Command(BaseCommand):
             help='Șterge datele existente înainte de import',
         )
 
+    def _generate_seed_image(self, slug, title, color):
+        seed_dir = Path(settings.MEDIA_ROOT) / 'seed'
+        seed_dir.mkdir(parents=True, exist_ok=True)
+        image_path = seed_dir / f'{slug}.png'
+        img = Image.new('RGB', (1200, 800), color)
+        draw = ImageDraw.Draw(img)
+        draw.rounded_rectangle((40, 40, 1160, 760), radius=36, outline='white', width=6)
+        draw.text((90, 120), title[:28], fill='white')
+        draw.text((90, 190), 'AutoHub demo image', fill='white')
+        img.save(image_path)
+        return image_path
+
     def handle(self, *args, **options):
-        from services.models import ServiceCategory, ServiceCenter, ServiceItem, Review
+        from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review
 
         self.stdout.write(self.style.WARNING('🚀 Pornind seed AutoHub...'))
 
-        # Idempotent: ștergem datele existente
         self.stdout.write('🧹 Ștergere date anterioare...')
         Review.objects.all().delete()
         ServiceItem.objects.all().delete()
+        ServiceGarage.objects.all().delete()
+        ServiceImage.objects.all().delete()
         ServiceCenter.objects.all().delete()
         ServiceCategory.objects.all().delete()
 
-        # ---- 1. CATEGORII ----
         self.stdout.write('📂 Creare categorii...')
         cats = {}
         for cat_data in CATEGORIES:
@@ -517,7 +533,6 @@ class Command(BaseCommand):
             cats[cat_data['slug']] = cat
             self.stdout.write(f'  ✓ {cat.icon} {cat.name}')
 
-        # ---- 2. MOCK USERS pentru reviews ----
         self.stdout.write('👤 Creare utilizatori mock...')
         mock_users = []
         mock_usernames = [
@@ -531,101 +546,76 @@ class Command(BaseCommand):
             ('laura_popa', 'Laura', 'Popa'),
         ]
         for username, first, last in mock_usernames:
-            user, _ = User.objects.get_or_create(
-                username=username,
-                defaults={
-                    'first_name': first,
-                    'last_name': last,
-                    'email': f'{username}@example.ro',
-                }
-            )
+            user, _ = User.objects.get_or_create(username=username, defaults={'first_name': first, 'last_name': last, 'email': f'{username}@example.ro'})
             user.set_password('demo1234')
             user.save()
             mock_users.append(user)
 
-        # ---- 3. SERVICE CENTERS ----
         self.stdout.write(f'🏢 Creare {len(CENTERS_DATA)} service-uri...')
         created_centers = []
-        for data in CENTERS_DATA:
+        all_slugs = [c['slug'] for c in CATEGORIES]
+        for idx, raw in enumerate(CENTERS_DATA):
+            data = raw.copy()
             cat_slug = data.pop('category')
             featured = data.pop('featured', False)
             lat = data.pop('lat', None)
             lng = data.pop('lng', None)
 
-            center = ServiceCenter.objects.create(
-                category=cats[cat_slug],
-                is_featured=featured,
-                latitude=lat,
-                longitude=lng,
-                **data
-            )
-            created_centers.append((center, cat_slug))
-            self.stdout.write(f'  ✓ {center.name} ({center.get_city_display()})')
+            extra_slugs = [slug for slug in all_slugs if slug != cat_slug]
+            random.shuffle(extra_slugs)
+            category_slugs = [cat_slug] + extra_slugs[:random.randint(1, 2)]
 
-        # ---- 4. SERVICE ITEMS ----
+            center = ServiceCenter.objects.create(category=cats[cat_slug], is_featured=featured, latitude=lat, longitude=lng, **data)
+            center.categories.set([cats[slug] for slug in category_slugs])
+
+            card_path = self._generate_seed_image(f'card_{center.slug}', center.name, cats[cat_slug].color)
+            with card_path.open('rb') as fh:
+                center.card_image.save(card_path.name, File(fh), save=True)
+
+            for gallery_index, slug in enumerate(category_slugs[:2], start=1):
+                gallery_path = self._generate_seed_image(f'gallery_{center.slug}_{gallery_index}', f'{center.name} {gallery_index}', cats[slug].color)
+                with gallery_path.open('rb') as fh:
+                    ServiceImage.objects.create(center=center, caption=f'Zona {gallery_index} - {cats[slug].name}', image=File(fh, name=gallery_path.name))
+
+            for garage_index, slug in enumerate(category_slugs, start=1):
+                ServiceGarage.objects.create(center=center, name=f'Garaj {garage_index}', category=cats[slug])
+
+            created_centers.append((center, cat_slug))
+            self.stdout.write(f'  ✓ {center.name} ({center.get_city_display()}) - categorii: {", ".join(category_slugs)}')
+
         self.stdout.write('🔧 Creare servicii + prețuri...')
         for center, cat_slug in created_centers:
             items = SERVICE_ITEMS.get(cat_slug, [])
-            # Shuffle pentru variație
             items_copy = list(items)
             random.shuffle(items_copy)
-            # 6-10 servicii per center
             n = random.randint(6, min(10, len(items_copy)))
             popular_indices = random.sample(range(n), k=min(2, n))
-
             for i, (name, price_from, price_to, duration) in enumerate(items_copy[:n]):
-                # Variație preț ±10%
                 pf = round(price_from * random.uniform(0.9, 1.1))
                 pt = round(price_to * random.uniform(0.9, 1.1))
-                ServiceItem.objects.create(
-                    center=center,
-                    name=name,
-                    price_from=pf,
-                    price_to=pt,
-                    duration_minutes=duration,
-                    is_popular=(i in popular_indices),
-                )
+                ServiceItem.objects.create(center=center, name=name, price_from=pf, price_to=pt, duration_minutes=duration, is_popular=(i in popular_indices))
 
-        # ---- 5. REVIEWS ----
         self.stdout.write('⭐ Creare recenzii...')
         for center, _ in created_centers:
-            # 1-3 reviews per center
             n_reviews = random.randint(1, 3)
             users_to_review = random.sample(mock_users, k=min(n_reviews, len(mock_users)))
-
             for user in users_to_review:
-                rating = random.choices(
-                    [3, 4, 4, 5, 5, 5],  # Skew spre pozitiv
-                    k=1
-                )[0]
-                Review.objects.create(
-                    center=center,
-                    user=user,
-                    rating=rating,
-                    title=random.choice(REVIEW_TITLES),
-                    body=random.choice(REVIEW_BODIES),
-                    is_approved=True,
-                )
+                rating = random.choices([3, 4, 4, 5, 5, 5], k=1)[0]
+                Review.objects.create(center=center, user=user, rating=rating, title=random.choice(REVIEW_TITLES), body=random.choice(REVIEW_BODIES), is_approved=True)
 
-        # ---- SUPERUSER ----
         if not User.objects.filter(username='admin').exists():
-            User.objects.create_superuser(
-                username='admin',
-                email='admin@autohub.ro',
-                password='admin123',
-                first_name='Admin',
-                last_name='AutoHub',
-            )
+            User.objects.create_superuser(username='admin', email='admin@autohub.ro', password='admin123', first_name='Admin', last_name='AutoHub')
             self.stdout.write(self.style.SUCCESS('👑 Superuser creat: admin / admin123'))
 
-        # ---- STATS ----
-        from services.models import ServiceCategory, ServiceCenter, ServiceItem, Review
+        from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review
         self.stdout.write('\n' + '='*50)
         self.stdout.write(self.style.SUCCESS('✅ Seed finalizat cu succes!'))
-        self.stdout.write(f'  📂 Categorii:  {ServiceCategory.objects.count()}')
+        self.stdout.write(f'  📂 Categorii:   {ServiceCategory.objects.count()}')
         self.stdout.write(f'  🏢 Service-uri: {ServiceCenter.objects.count()}')
-        self.stdout.write(f'  🔧 Servicii:   {ServiceItem.objects.count()}')
-        self.stdout.write(f'  ⭐ Recenzii:   {Review.objects.count()}')
+        self.stdout.write(f'  🏗️ Garaje:      {ServiceGarage.objects.count()}')
+        self.stdout.write(f'  🖼️ Poze:        {ServiceImage.objects.count()} + {ServiceCenter.objects.exclude(card_image='').count()} poze de card')
+        self.stdout.write(f'  🔧 Servicii:    {ServiceItem.objects.count()}')
+        self.stdout.write(f'  ⭐ Recenzii:    {Review.objects.count()}')
         self.stdout.write(f'  👤 Utilizatori: {User.objects.count()}')
         self.stdout.write('='*50)
         self.stdout.write(self.style.SUCCESS('🌐 Pornește serverul: python manage.py runserver'))

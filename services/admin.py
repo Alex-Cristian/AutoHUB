@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite
+from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite, ServiceGarage, ServiceImage
 
 
 class ServiceItemInline(admin.TabularInline):
@@ -8,6 +8,18 @@ class ServiceItemInline(admin.TabularInline):
     extra = 2
     fields = ('name', 'price_from', 'price_to', 'duration_minutes', 'is_popular')
     show_change_link = True
+
+
+class ServiceGarageInline(admin.TabularInline):
+    model = ServiceGarage
+    extra = 1
+    fields = ('name', 'category')
+
+
+class ServiceImageInline(admin.TabularInline):
+    model = ServiceImage
+    extra = 1
+    fields = ('image', 'caption')
 
 
 @admin.register(ServiceCategory)
@@ -18,7 +30,7 @@ class ServiceCategoryAdmin(admin.ModelAdmin):
     search_fields = ('name',)
 
     def center_count_display(self, obj):
-        count = obj.servicecenter_set.filter(is_active=True).count()
+        count = obj.center_categories.filter(is_active=True).distinct().count()
         return format_html('<strong>{}</strong> service-uri', count)
     center_count_display.short_description = 'Service-uri active'
 
@@ -30,15 +42,19 @@ class ServiceCenterAdmin(admin.ModelAdmin):
         'avg_rating_display', 'review_count_display',
         'verification_status', 'is_active', 'is_featured', 'created_at'
     )
-    list_filter = ('category', 'city', 'verification_status', 'is_active', 'is_featured', 'created_at')
+    list_filter = ('category', 'categories', 'city', 'verification_status', 'is_active', 'is_featured', 'created_at')
     search_fields = ('name', 'address', 'phone', 'email', 'description')
     list_editable = ('is_active', 'is_featured')
     prepopulated_fields = {'slug': ('name',)}
+    filter_horizontal = ('categories',)
     readonly_fields = ('created_at', 'avg_rating_display', 'review_count_display', 'verified_at')
-    inlines = [ServiceItemInline]
+    inlines = [ServiceGarageInline, ServiceImageInline, ServiceItemInline]
     fieldsets = (
         ('Informații Principale', {
-            'fields': ('name', 'slug', 'category', 'description', 'owner')
+            'fields': ('name', 'slug', 'category', 'categories', 'description', 'owner')
+        }),
+        ('Media', {
+            'fields': ('card_image',)
         }),
         ('Contact & Locație', {
             'fields': ('address', 'city', 'phone', 'email', 'website', 'schedule', 'latitude', 'longitude')
@@ -89,12 +105,22 @@ class ServiceItemAdmin(admin.ModelAdmin):
     price_display_col.short_description = 'Preț orientativ'
 
 
+@admin.register(ServiceGarage)
+class ServiceGarageAdmin(admin.ModelAdmin):
+    list_display = ('name', 'center', 'category', 'created_at')
+    list_filter = ('category', 'center__city')
+    search_fields = ('name', 'center__name')
+
+
+@admin.register(ServiceImage)
+class ServiceImageAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'center', 'created_at')
+    search_fields = ('caption', 'center__name')
+
+
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
-    list_display = (
-        'user', 'center', 'rating_stars', 'title',
-        'is_approved', 'created_at'
-    )
+    list_display = ('user', 'center', 'rating_stars', 'title', 'is_approved', 'created_at')
     list_filter = ('rating', 'is_approved', 'created_at', 'center__city', 'center__category')
     search_fields = ('user__username', 'user__email', 'center__name', 'title', 'body')
     list_editable = ('is_approved',)

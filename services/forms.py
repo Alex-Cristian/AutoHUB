@@ -3,17 +3,27 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
-from .models import ServiceCenter
+from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage
 
 
 class ServiceCenterRegisterForm(forms.ModelForm):
     """Form standard (din cont) pentru înregistrarea unui service."""
 
+    categories = forms.ModelMultipleChoiceField(
+        label='Categorii disponibile',
+        queryset=ServiceCategory.objects.order_by('order', 'name'),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+    all_categories = forms.BooleanField(
+        required=False,
+        label='Toate categoriile',
+    )
+
     class Meta:
         model = ServiceCenter
         fields = [
             'name',
-            'category',
             'description',
             'address',
             'city',
@@ -21,7 +31,7 @@ class ServiceCenterRegisterForm(forms.ModelForm):
             'email',
             'website',
             'schedule',
-            # date legale (opțional)
+            'card_image',
             'legal_name',
             'headquarters',
             'fiscal_code',
@@ -30,7 +40,6 @@ class ServiceCenterRegisterForm(forms.ModelForm):
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Service Auto X'}),
-            'category': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
             'address': forms.TextInput(attrs={'class': 'form-control'}),
             'city': forms.Select(attrs={'class': 'form-select'}),
@@ -38,13 +47,22 @@ class ServiceCenterRegisterForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'website': forms.URLInput(attrs={'class': 'form-control'}),
             'schedule': forms.TextInput(attrs={'class': 'form-control'}),
-
+            'card_image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'legal_name': forms.TextInput(attrs={'class': 'form-control'}),
             'headquarters': forms.TextInput(attrs={'class': 'form-control'}),
             'fiscal_code': forms.TextInput(attrs={'class': 'form-control'}),
             'trade_register_no': forms.TextInput(attrs={'class': 'form-control'}),
             'legal_document': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            existing = self.instance.categories.all()
+            if existing.exists():
+                self.fields['categories'].initial = existing
+            elif self.instance.category_id:
+                self.fields['categories'].initial = [self.instance.category_id]
 
     def _any_legal_data(self, cleaned):
         return any([
@@ -58,19 +76,32 @@ class ServiceCenterRegisterForm(forms.ModelForm):
         cleaned = super().clean()
         any_legal = self._any_legal_data(cleaned)
         doc = cleaned.get('legal_document')
-        if any_legal and not doc:
+        categories = cleaned.get('categories')
+        if cleaned.get('all_categories'):
+            categories = self.fields['categories'].queryset
+            cleaned['categories'] = categories
+        if any_legal and not doc and not getattr(self.instance, 'legal_document', None):
             self.add_error(
                 'legal_document',
                 'Dacă ai completat datele legale, încarcă și un document care să ateste deținerea firmei.'
             )
+        if not categories:
+            self.add_error('categories', 'Selectează cel puțin o categorie sau bifează „Toate categoriile”.')
         return cleaned
 
     def save(self, commit=True):
         center = super().save(commit=False)
 
+        selected_categories = self.cleaned_data.get('categories')
+        if self.cleaned_data.get('all_categories'):
+            selected_categories = self.fields['categories'].queryset
+
+        primary_category = selected_categories.first() if selected_categories is not None else None
+        if primary_category:
+            center.category = primary_category
+
         any_legal = self._any_legal_data(self.cleaned_data)
         if any_legal:
-            # intră la verificare manuală
             center.verification_status = 'pending'
             center.is_active = False
         else:
@@ -79,8 +110,16 @@ class ServiceCenterRegisterForm(forms.ModelForm):
 
         if commit:
             center.save()
-            self.save_m2m()
+            if selected_categories is not None:
+                center.categories.set(selected_categories)
+        else:
+            self._pending_categories = selected_categories
         return center
+
+    def save_m2m(self):
+        super().save_m2m()
+        if hasattr(self, '_pending_categories') and self.instance.pk and self._pending_categories is not None:
+            self.instance.categories.set(self._pending_categories)
 
 
 class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
@@ -119,7 +158,6 @@ class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
 
     def clean(self):
         cleaned = super().clean()
-
         p1 = cleaned.get('password1')
         p2 = cleaned.get('password2')
         if p1 and p2 and p1 != p2:
@@ -130,11 +168,9 @@ class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
                 validate_password(p1)
             except ValidationError as e:
                 self.add_error('password1', e)
-
         return cleaned
 
     def save(self, commit=True):
-        # Creează user
         email = self.cleaned_data['owner_email'].strip().lower()
         username_base = email.split('@')[0]
         username = username_base
@@ -155,7 +191,13 @@ class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
 
         center = super().save(commit=False)
         center.owner = user
-        # ServiceCenterRegisterForm.save() setează status + is_active
+        selected_categories = self.cleaned_data.get('categories')
+        if self.cleaned_data.get('all_categories'):
+            selected_categories = self.fields['categories'].queryset
+        primary_category = selected_categories.first() if selected_categories is not None else None
+        if primary_category:
+            center.category = primary_category
+
         any_legal = self._any_legal_data(self.cleaned_data)
         if any_legal:
             center.verification_status = 'pending'
@@ -166,6 +208,55 @@ class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
 
         if commit:
             center.save()
-            self.save_m2m()
+            if selected_categories is not None:
+                center.categories.set(selected_categories)
 
         return center, user
+
+
+class ServiceGarageForm(forms.ModelForm):
+    class Meta:
+        model = ServiceGarage
+        fields = ['name', 'category']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Elevator 1 / Garaj rapid'}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.center = kwargs.pop('center', None)
+        super().__init__(*args, **kwargs)
+
+        queryset = ServiceCategory.objects.none()
+        if self.center is not None:
+            queryset = self.center.categories.all()
+            if not queryset.exists() and self.center.category_id:
+                queryset = ServiceCategory.objects.filter(pk=self.center.category_id)
+
+        self.fields['category'].queryset = queryset
+
+    def clean(self):
+        cleaned = super().clean()
+        category = cleaned.get('category')
+
+        if self.center is None:
+            raise forms.ValidationError('Nu a fost transmis service-ul pentru acest garaj.')
+
+        allowed_ids = set(self.center.categories.values_list('id', flat=True))
+        if not allowed_ids and self.center.category_id:
+            allowed_ids.add(self.center.category_id)
+
+        if category and category.id not in allowed_ids:
+            self.add_error('category', 'Poți alege doar o categorie din cele selectate de service.')
+
+        return cleaned
+
+
+class ServiceGalleryImageForm(forms.ModelForm):
+    class Meta:
+        model = ServiceImage
+        fields = ['image', 'caption']
+        widgets = {
+            'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'caption': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Recepție / Intrare / Atelier'}),
+        }

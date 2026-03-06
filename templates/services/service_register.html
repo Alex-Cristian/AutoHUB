@@ -1,31 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Înregistrare service — AutoHub<script>
-  (function () {
-    const legalIds = ['id_legal_name', 'id_headquarters', 'id_fiscal_code', 'id_trade_register_no'];
-    const docWrap = document.getElementById('wrap_legal_document');
-
-    function shouldShowDoc() {
-      return legalIds.some(id => {
-        const el = document.getElementById(id);
-        return el && (el.value || '').trim().length > 0;
-      });
-    }
-
-    function refresh() {
-      if (!docWrap) return;
-      docWrap.style.display = shouldShowDoc() ? '' : 'none';
-    }
-
-    legalIds.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.addEventListener('input', refresh);
-    });
-
-    refresh();
-  })();
-</script>
-{% endblock %}
-
+{% block title %}Înregistrare service — AutoHub{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -34,7 +8,7 @@
       <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
           <h1 class="mb-1">Înregistrare service</h1>
-          <p class="text-muted-custom mb-0">Creează profilul service-ului ca să primești programări și notificări.</p>
+          <p class="text-muted-custom mb-0">Alege mai multe categorii, setează poza de card și pornește profilul service-ului.</p>
         </div>
         <a href="{% url 'services:list' %}" class="btn btn-outline-light rounded-xl">
           <i class="bi bi-arrow-left me-1"></i>Înapoi
@@ -53,19 +27,13 @@
                   <label class="form-label">{{ field.label }}</label>
                   {{ field }}
                   {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                  {% for err in field.errors %}
-                    <div class="text-danger small">{{ err }}</div>
-                  {% endfor %}
+                  {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
                 </div>
                 {% endfor %}
               </div>
               <div class="d-flex gap-2 mt-4">
-                <button class="btn btn-nav-cta" type="submit">
-                  <i class="bi bi-check2-circle me-1"></i>Înregistrează service
-                </button>
-                <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}">
-                  Mergi la dashboard
-                </a>
+                <button class="btn btn-nav-cta" type="submit"><i class="bi bi-check2-circle me-1"></i>Înregistrează service</button>
+                <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}">Mergi la dashboard</a>
               </div>
             </form>
           </div>
@@ -73,11 +41,11 @@
 
         <div class="col-lg-5">
           <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
-            <h5 class="mb-3"><i class="bi bi-bell me-2 text-orange"></i>Ce primești</h5>
-            <ul class="small text-muted-custom">
-              <li>Notificări instant pentru fiecare programare nouă</li>
-              <li>Buton de <b>Acceptă</b> / <b>Respinge</b> direct din dashboard</li>
-              <li>Istoric programări și statusuri</li>
+            <h5 class="mb-3"><i class="bi bi-stars me-2 text-orange"></i>Ce poți face acum</h5>
+            <ul class="small text-muted-custom mb-0">
+              <li>Alegi mai multe categorii sau direct <b>Toate categoriile</b></li>
+              <li>Încarci o imagine specială pentru cardul service-ului</li>
+              <li>Din profil adaugi ulterior garaje și galerie foto</li>
             </ul>
 
             {% if existing_centers %}
@@ -85,9 +53,9 @@
               <h6 class="text-white mb-2">Service-urile tale</h6>
               <div class="d-grid gap-2">
                 {% for c in existing_centers %}
-                  <a class="btn btn-outline-light text-start" href="{% url 'services:detail' c.slug %}">
+                  <a class="btn btn-outline-light text-start" href="{% url 'services:manage_profile' c.pk %}">
                     <div class="fw-semibold">{{ c.name }}</div>
-                    <div class="small text-muted-custom">{{ c.get_city_display }} • {{ c.category.name }}</div>
+                    <div class="small text-muted-custom">{{ c.get_city_display }} • {{ c.display_categories|join:', ' }}</div>
                   </a>
                 {% endfor %}
               </div>
@@ -100,7 +68,6 @@
 </div>
 
 <style>
-  /* Make Django form inputs match site */
   input, select, textarea {
     background: var(--ah-dark3) !important;
     border: 1px solid var(--ah-border) !important;
@@ -112,31 +79,22 @@
     box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.35) !important;
     border-color: var(--ah-red) !important;
   }
+  #id_categories, #profile-id_categories {display:grid;grid-template-columns:1fr 1fr;gap:.5rem 1rem;}
+  #id_categories label, #profile-id_categories label {display:flex;align-items:center;gap:.45rem;color:#fff;}
 </style>
 <script>
-  (function () {
-    const legalIds = ['id_legal_name', 'id_headquarters', 'id_fiscal_code', 'id_trade_register_no'];
-    const docWrap = document.getElementById('wrap_legal_document');
-
-    function shouldShowDoc() {
-      return legalIds.some(id => {
-        const el = document.getElementById(id);
-        return el && (el.value || '').trim().length > 0;
-      });
-    }
-
-    function refresh() {
-      if (!docWrap) return;
-      docWrap.style.display = shouldShowDoc() ? '' : 'none';
-    }
-
-    legalIds.forEach(id => {
+(function () {
+  const legalIds = ['id_legal_name', 'id_headquarters', 'id_fiscal_code', 'id_trade_register_no'];
+  const docWrap = document.getElementById('wrap_legal_document');
+  function shouldShowDoc() {
+    return legalIds.some(id => {
       const el = document.getElementById(id);
-      if (el) el.addEventListener('input', refresh);
+      return el && (el.value || '').trim().length > 0;
     });
-
-    refresh();
-  })();
+  }
+  function refresh() { if (docWrap) docWrap.style.display = shouldShowDoc() ? '' : 'none'; }
+  legalIds.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', refresh); });
+  refresh();
+})();
 </script>
 {% endblock %}
-
