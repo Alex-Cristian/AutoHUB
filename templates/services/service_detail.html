@@ -37,6 +37,23 @@
               <span class="mx-2">·</span>
               <i class="bi bi-tag me-1"></i>{{ center.category.name }}
             </p>
+            {% if center.latitude and center.longitude %}
+              <div id="routeInfo" class="mt-2 small text-muted-custom">
+                <i class="bi bi-signpost-2 text-red me-1"></i>
+                Calculăm distanța până la tine...
+              </div>
+
+              <!-- coordonatele service-ului pentru JS -->
+              <div id="centerCoords"
+                  data-lat="{{ center.latitude|stringformat:'f' }}"
+                  data-lng="{{ center.longitude|stringformat:'f' }}"
+                  class="d-none"></div>
+            {% else %}
+              <div class="mt-2 small text-muted-custom">
+                <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+                Locația acestui service nu este setată încă.
+              </div>
+            {% endif %}
           </div>
           <!-- Favorite button -->
           {% if user.is_authenticated %}
@@ -267,4 +284,66 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+  const coordsEl = document.getElementById("centerCoords");
+  const routeInfo = document.getElementById("routeInfo");
+
+  if (coordsEl && routeInfo) {
+
+    const serviceLat = parseFloat(coordsEl.dataset.lat);
+    const serviceLng = parseFloat(coordsEl.dataset.lng);
+    const ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjZkZWJjMDU5ZGY2ZjQxYTU4ZDExOWE4NGQ1MjQzMzcxIiwiaCI6Im11cm11cjY0In0=";
+
+    function getRouteDistance(userLat, userLng) {
+      const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_KEY}&start=${userLng},${userLat}&end=${serviceLng},${serviceLat}`;
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          const summary = data.features[0].properties.summary;
+          const km = (summary.distance / 1000).toFixed(1);
+          const timeCar = Math.round(summary.duration / 60);
+
+          routeInfo.innerHTML =
+            `<i class="bi bi-signpost-2 text-red me-1"></i>
+             <strong>${km} km</strong> de tine
+             <span class="mx-2">·</span>
+             <i class="bi bi-car-front"></i> ~${timeCar} min cu mașina`;
+        })
+        .catch(() => {
+          routeInfo.innerHTML = "Nu am putut calcula ruta.";
+        });
+    }
+
+    function getUserLocation() {
+      const saved = localStorage.getItem("user_loc");
+      if (saved) {
+        const loc = JSON.parse(saved);
+        getRouteDistance(loc.lat, loc.lng);
+        return;
+      }
+      if (!navigator.geolocation) {
+        routeInfo.innerHTML = "Nu putem detecta locația.";
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          localStorage.setItem("user_loc", JSON.stringify({ lat, lng }));
+          getRouteDistance(lat, lng);
+        },
+        () => {
+          routeInfo.innerHTML = "Activează locația pentru a vedea distanța.";
+        }
+      );
+    }
+
+    getUserLocation();
+  }
+</script>
 {% endblock %}
