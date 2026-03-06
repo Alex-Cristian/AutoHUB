@@ -8,8 +8,18 @@
       <p class="text-muted-custom mb-0">Gestionează programările, profilul, garajele și pozele service-urilor tale.</p>
     </div>
     <div class="d-flex gap-2">
-      <a class="btn btn-outline-light" href="{% url 'services:notifications' %}"><i class="bi bi-bell me-1"></i>Notificări {% if unread_count %}<span class="badge bg-danger ms-1">{{ unread_count }}</span>{% endif %}</a>
-      <a class="btn btn-nav-cta" href="{% url 'services:register_service' %}"><i class="bi bi-plus-circle me-1"></i>Adaugă service</a>
+      <a class="btn btn-outline-light" href="{% url 'invoices:clients' %}">
+        <i class="bi bi-receipt me-1"></i>Facturi
+      </a>
+      <a class="btn btn-outline-light" href="{% url 'services:notifications' %}">
+        <i class="bi bi-bell me-1"></i>Notificări
+        {% if unread_count %}
+          <span class="badge bg-danger ms-1">{{ unread_count }}</span>
+        {% endif %}
+      </a>
+      <a class="btn btn-nav-cta" href="{% url 'services:register_service' %}">
+        <i class="bi bi-plus-circle me-1"></i>Adaugă service
+      </a>
     </div>
   </div>
 
