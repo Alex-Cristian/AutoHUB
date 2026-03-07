@@ -20,6 +20,7 @@ urlpatterns = [
     path('verificare/<int:pk>/', views.verification_detail, name='verification_detail'),
     path('verificare/<int:pk>/aproba/', views.verification_approve, name='verification_approve'),
     path('verificare/<int:pk>/respinge/', views.verification_reject, name='verification_reject'),
+    path('<slug:slug>/recenzie/', views.review_create, name='review_create'),
     path('<slug:slug>/', views.service_detail, name='detail'),
     path('<slug:slug>/favorit/', views.toggle_favorite, name='toggle_favorite'),
 ]

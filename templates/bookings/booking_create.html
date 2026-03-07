@@ -3,8 +3,6 @@
 
 {% block content %}
 <div class="container py-4">
-
-  <!-- Breadcrumb -->
   <nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{% url 'core:home' %}" class="text-red text-decoration-none">Acasă</a></li>
@@ -14,62 +12,31 @@
   </nav>
 
   <div class="row g-4">
-    <!-- FORM -->
     <div class="col-lg-8">
       <div class="rounded-xl p-4" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
-        <h2 class="section-title mb-1">
-          <i class="bi bi-calendar-plus me-2 text-red"></i>Programare online
-        </h2>
+        <h2 class="section-title mb-1"><i class="bi bi-calendar-plus me-2 text-red"></i>Programare online</h2>
         <p class="text-muted-custom mb-4">la <strong>{{ center.name }}</strong></p>
 
-        <form method="post" novalidate>
+        <form method="post" enctype="multipart/form-data" novalidate>
           {% csrf_token %}
 
-          <!-- Section: Date client -->
           <div class="mb-4">
             <div class="d-flex align-items-center gap-2 mb-3">
-              <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
-                    style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">1</span>
+              <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">1</span>
               <h5 class="fw-bold mb-0">Datele tale de contact</h5>
             </div>
             <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label" for="{{ form.client_name.id_for_label }}">
-                  Nume complet <span class="text-red">*</span>
-                </label>
-                {{ form.client_name }}
-                {% if form.client_name.errors %}
-                <div class="text-danger small mt-1">{{ form.client_name.errors|join:" " }}</div>
-                {% endif %}
-              </div>
-              <div class="col-md-6">
-                <label class="form-label" for="{{ form.client_phone.id_for_label }}">
-                  Telefon <span class="text-red">*</span>
-                </label>
-                {{ form.client_phone }}
-                {% if form.client_phone.errors %}
-                <div class="text-danger small mt-1">{{ form.client_phone.errors|join:" " }}</div>
-                {% endif %}
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="{{ form.client_email.id_for_label }}">
-                  Email <span class="text-red">*</span>
-                </label>
-                {{ form.client_email }}
-                {% if form.client_email.errors %}
-                <div class="text-danger small mt-1">{{ form.client_email.errors|join:" " }}</div>
-                {% endif %}
-              </div>
+              <div class="col-md-6"><label class="form-label" for="{{ form.client_name.id_for_label }}">Nume complet <span class="text-red">*</span></label>{{ form.client_name }}{% if form.client_name.errors %}<div class="text-danger small mt-1">{{ form.client_name.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label" for="{{ form.client_phone.id_for_label }}">Telefon <span class="text-red">*</span></label>{{ form.client_phone }}{% if form.client_phone.errors %}<div class="text-danger small mt-1">{{ form.client_phone.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-12"><label class="form-label" for="{{ form.client_email.id_for_label }}">Email <span class="text-red">*</span></label>{{ form.client_email }}{% if form.client_email.errors %}<div class="text-danger small mt-1">{{ form.client_email.errors|join:" " }}</div>{% endif %}</div>
             </div>
           </div>
 
           <hr style="border-color:var(--ah-border);">
 
-          <!-- Section: Date mașină -->
           <div class="mb-4">
             <div class="d-flex align-items-center gap-2 mb-3">
-              <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
-                    style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">2</span>
+              <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">2</span>
               <h5 class="fw-bold mb-0">Datele mașinii</h5>
             </div>
 
@@ -80,185 +47,169 @@
                   <p class="fw-bold mb-0"><i class="bi bi-car-front me-2 text-red"></i>Alege din mașinile salvate</p>
                   <p class="text-muted-custom small mb-0">Selectează o mașină și completăm automat câmpurile de mai jos.</p>
                 </div>
-                <a class="btn btn-outline-primary btn-sm"
-                   href="{% url 'accounts:car_create' %}?next={{ request.path|urlencode }}">
-                  <i class="bi bi-plus-lg me-1"></i>Adaugă mașină
-                </a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'accounts:car_create' %}?next={{ request.path|urlencode }}"><i class="bi bi-plus-lg me-1"></i>Adaugă mașină</a>
               </div>
 
               <div class="row g-2 align-items-end">
-                <div class="col-md-6">
-                  <label class="form-label">Caută rapid</label>
-                  <input type="text" class="form-control" id="carSearch" placeholder="ex: Golf / B 123 ABC / 2018">
-                </div>
+                <div class="col-md-6"><label class="form-label">Caută rapid</label><input type="text" class="form-control" id="carSearch" placeholder="ex: Golf / B 123 ABC / 2018"></div>
                 <div class="col-md-6">
                   <label class="form-label" for="id_saved_car">Mașină salvată</label>
                   <select name="saved_car" class="form-select" id="id_saved_car">
                     <option value="">— Alege o mașină salvată (opțional) —</option>
                     {% for c in cars %}
-                      <option value="{{ c.id }}"
-                              data-make="{{ c.make|escape }}"
-                              data-model="{{ c.model|escape }}"
-                              data-year="{{ c.year|default:'' }}"
-                              data-fuel="{{ c.fuel|default:'' }}"
-                              data-plate="{{ c.plate_number|escape }}"
-                              {% if form.saved_car.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>
-                        {{ c.make }} {{ c.model }}{% if c.year %} {{ c.year }}{% endif %} · {{ c.plate_number }}
-                      </option>
+                    <option value="{{ c.id }}" data-make="{{ c.make|escape }}" data-model="{{ c.model|escape }}" data-year="{{ c.year|default:'' }}" data-fuel="{{ c.fuel|default:'' }}" data-plate="{{ c.plate_number|escape }}" {% if form.saved_car.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>{{ c.make }} {{ c.model }}{% if c.year %} {{ c.year }}{% endif %} · {{ c.plate_number }}</option>
                     {% endfor %}
                   </select>
-                  {% if form.saved_car.errors %}
-                    <div class="text-danger small mt-1">{{ form.saved_car.errors|join:" " }}</div>
-                  {% endif %}
+                  {% if form.saved_car.errors %}<div class="text-danger small mt-1">{{ form.saved_car.errors|join:" " }}</div>{% endif %}
                 </div>
               </div>
               <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
-                <button class="btn btn-outline-secondary btn-sm" type="button" id="clearCarBtn">
-                  <i class="bi bi-x-circle me-1"></i>Nu folosesc o mașină salvată
-                </button>
-                <span class="text-muted-custom small">
-                  Tip: poți edita manual câmpurile dacă ai nevoie.
-                </span>
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="clearCarBtn"><i class="bi bi-x-circle me-1"></i>Nu folosesc o mașină salvată</button>
+                <span class="text-muted-custom small">Tip: poți edita manual câmpurile dacă ai nevoie.</span>
               </div>
             </div>
             {% endif %}
 
             <div class="row g-3">
-              <div class="col-md-4">
-                <label class="form-label">Marcă <span class="text-red">*</span></label>
-                {{ form.car_brand }}
-                {% if form.car_brand.errors %}
-                <div class="text-danger small mt-1">{{ form.car_brand.errors|join:" " }}</div>
-                {% endif %}
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Model <span class="text-red">*</span></label>
-                {{ form.car_model }}
-                {% if form.car_model.errors %}
-                <div class="text-danger small mt-1">{{ form.car_model.errors|join:" " }}</div>
-                {% endif %}
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">An fabricație <span class="text-red">*</span></label>
-                {{ form.car_year }}
-                {% if form.car_year.errors %}
-                <div class="text-danger small mt-1">{{ form.car_year.errors|join:" " }}</div>
-                {% endif %}
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Combustibil <span class="text-red">*</span></label>
-                {{ form.car_fuel }}
-                {% if form.car_fuel.errors %}
-                <div class="text-danger small mt-1">{{ form.car_fuel.errors|join:" " }}</div>
-                {% endif %}
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Nr. înmatriculare <span class="text-red">*</span></label>
-                {{ form.car_plate }}
-                {% if form.car_plate.errors %}
-                <div class="text-danger small mt-1">{{ form.car_plate.errors|join:" " }}</div>
-                {% endif %}
-              </div>
+              <div class="col-md-4"><label class="form-label">Marcă <span class="text-red">*</span></label>{{ form.car_brand }}{% if form.car_brand.errors %}<div class="text-danger small mt-1">{{ form.car_brand.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-md-4"><label class="form-label">Model <span class="text-red">*</span></label>{{ form.car_model }}{% if form.car_model.errors %}<div class="text-danger small mt-1">{{ form.car_model.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-md-4"><label class="form-label">An fabricație <span class="text-red">*</span></label>{{ form.car_year }}{% if form.car_year.errors %}<div class="text-danger small mt-1">{{ form.car_year.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Combustibil <span class="text-red">*</span></label>{{ form.car_fuel }}{% if form.car_fuel.errors %}<div class="text-danger small mt-1">{{ form.car_fuel.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Nr. înmatriculare <span class="text-red">*</span></label>{{ form.car_plate }}{% if form.car_plate.errors %}<div class="text-danger small mt-1">{{ form.car_plate.errors|join:" " }}</div>{% endif %}</div>
             </div>
           </div>
 
           <hr style="border-color:var(--ah-border);">
 
-          <!-- Section: Serviciu + problemă -->
           <div class="mb-4">
             <div class="d-flex align-items-center gap-2 mb-3">
-              <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
-                    style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">3</span>
+              <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">3</span>
               <h5 class="fw-bold mb-0">Serviciul dorit</h5>
             </div>
             <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label">Serviciu (opțional)</label>
-                {{ form.service_item }}
-              </div>
-              <div class="col-12">
-                <label class="form-label">Descriere problemă / serviciu dorit <span class="text-red">*</span></label>
-                {{ form.problem_description }}
-                {% if form.problem_description.errors %}
-                <div class="text-danger small mt-1">{{ form.problem_description.errors|join:" " }}</div>
-                {% endif %}
-              </div>
+              <div class="col-12"><label class="form-label">Serviciu (opțional)</label>{{ form.service_item }}</div>
+              <div class="col-12"><label class="form-label">Descriere problemă / serviciu dorit <span class="text-red">*</span></label>{{ form.problem_description }}{% if form.problem_description.errors %}<div class="text-danger small mt-1">{{ form.problem_description.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-12"><label class="form-label">Poze / video problemă</label>{{ form.attachments }}<div class="small text-muted-custom mt-1">Încarcă poze sau clipuri scurte ca service-ul să înțeleagă problema mai repede.</div>{% if form.attachments.errors %}<div class="text-danger small mt-1">{{ form.attachments.errors|join:" " }}</div>{% endif %}</div>
             </div>
           </div>
 
           <hr style="border-color:var(--ah-border);">
 
-          <!-- Section: Data și ora -->
           <div class="mb-4">
             <div class="d-flex align-items-center gap-2 mb-3">
-              <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
-                    style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">4</span>
-              <h5 class="fw-bold mb-0">Data și ora programării</h5>
+              <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">4</span>
+              <h5 class="fw-bold mb-0">Garaj + oră disponibilă</h5>
             </div>
             <div class="row g-3">
               <div class="col-md-6">
-                <label class="form-label">Data <span class="text-red">*</span></label>
-                {{ form.booking_date }}
-                {% if form.booking_date.errors %}
-                <div class="text-danger small mt-1">{{ form.booking_date.errors|join:" " }}</div>
-                {% endif %}
+                <label class="form-label">Garaj <span class="text-red">*</span></label>
+                {{ form.garage }}
+                {% if form.garage.errors %}<div class="text-danger small mt-1">{{ form.garage.errors|join:" " }}</div>{% endif %}
               </div>
               <div class="col-md-6">
-                <label class="form-label">Ora <span class="text-red">*</span></label>
-                {{ form.booking_time }}
-                {% if form.booking_time.errors %}
-                <div class="text-danger small mt-1">{{ form.booking_time.errors|join:" " }}</div>
-                {% endif %}
+                <label class="form-label">Data <span class="text-red">*</span></label>
+                {{ form.booking_date }}
+                {% if form.booking_date.errors %}<div class="text-danger small mt-1">{{ form.booking_date.errors|join:" " }}</div>{% endif %}
               </div>
             </div>
-            <p class="small text-muted-custom mt-2">
-              <i class="bi bi-clock me-1"></i>Program service: <strong>{{ center.schedule }}</strong>
-            </p>
+
+            {{ form.booking_time }}
+            <div class="mt-3 p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="d-flex justify-content-between flex-wrap gap-2 align-items-center mb-2">
+                <div>
+                  <div class="fw-semibold">Calendar garaj</div>
+                  <div class="small text-muted-custom" id="slotHelp">Alege mai întâi garajul și data. Apoi selectează o oră liberă.</div>
+                </div>
+                <span class="badge text-bg-dark" id="slotMeta">{{ center.schedule }}</span>
+              </div>
+              <div id="slotGrid" class="d-flex flex-wrap gap-2"></div>
+              {% if form.booking_time.errors %}<div class="text-danger small mt-2">{{ form.booking_time.errors|join:" " }}</div>{% endif %}
+            </div>
           </div>
 
-          <!-- Non-field errors -->
-          {% if form.non_field_errors %}
-          <div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>
-          {% endif %}
+          {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
 
-          <button type="submit" class="btn btn-primary btn-lg w-100">
-            <i class="bi bi-calendar-check me-2"></i>Trimite programarea
-          </button>
-          <p class="text-muted-custom small text-center mt-2 mb-0">
-            Vei fi contactat de service pentru confirmare.
-          </p>
+          <button type="submit" class="btn btn-primary btn-lg w-100"><i class="bi bi-calendar-check me-2"></i>Trimite programarea</button>
+          <p class="text-muted-custom small text-center mt-2 mb-0">Vei fi contactat de service pentru confirmare.</p>
         </form>
       </div>
     </div>
 
-    <!-- SIDEBAR info service -->
     <div class="col-lg-4">
       <div class="rounded-xl p-4" style="background:var(--ah-dark2);border:1px solid var(--ah-border);position:sticky;top:80px;">
-        <div class="text-center mb-3">
-          <div style="font-size:3rem;">{{ center.category.icon }}</div>
-        </div>
+        <div class="text-center mb-3"><div style="font-size:3rem;">{{ center.category.icon }}</div></div>
         <h5 class="fw-bold text-center mb-1">{{ center.name }}</h5>
-        <p class="text-muted-custom small text-center mb-3">
-          <i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}
-        </p>
+        <p class="text-muted-custom small text-center mb-3"><i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}</p>
         <hr style="border-color:var(--ah-border);">
         <ul class="list-unstyled small mb-0">
-          <li class="mb-2">
-            <i class="bi bi-clock text-red me-2"></i>{{ center.schedule }}
-          </li>
-          {% if center.phone %}
-          <li class="mb-2">
-            <i class="bi bi-telephone text-red me-2"></i>{{ center.phone }}
-          </li>
-          {% endif %}
-          <li>
-            <i class="bi bi-tag text-red me-2"></i>{{ center.category.name }}
-          </li>
+          <li class="mb-2"><i class="bi bi-clock text-red me-2"></i>{{ center.schedule }}</li>
+          {% if center.phone %}<li class="mb-2"><i class="bi bi-telephone text-red me-2"></i>{{ center.phone }}</li>{% endif %}
+          <li class="mb-2"><i class="bi bi-building-gear text-red me-2"></i>{{ center.garages.count }} garaje configurate</li>
+          <li><i class="bi bi-tag text-red me-2"></i>{{ center.category.name }}</li>
         </ul>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+(function() {
+  const garageSelect = document.getElementById('id_garage');
+  const dateInput = document.getElementById('id_booking_date');
+  const timeInput = document.getElementById('id_booking_time');
+  const slotGrid = document.getElementById('slotGrid');
+  const slotHelp = document.getElementById('slotHelp');
+  const slotMeta = document.getElementById('slotMeta');
+  const initialTime = timeInput ? timeInput.value : '';
+
+  function renderSlotButton(value, active) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm ' + (active ? 'btn-primary' : 'btn-outline-secondary');
+    btn.textContent = value;
+    btn.dataset.time = value;
+    btn.addEventListener('click', function() {
+      timeInput.value = value;
+      [...slotGrid.querySelectorAll('button')].forEach(b => b.className = 'btn btn-sm btn-outline-secondary');
+      btn.className = 'btn btn-sm btn-primary';
+    });
+    return btn;
+  }
+
+  async function loadSlots() {
+    slotGrid.innerHTML = '';
+    timeInput.value = '';
+    if (!garageSelect.value || !dateInput.value) {
+      slotHelp.textContent = 'Alege mai întâi garajul și data. Apoi selectează o oră liberă.';
+      return;
+    }
+    slotHelp.textContent = 'Se încarcă orele disponibile...';
+    try {
+      const url = `{% url 'bookings:garage_slots' center.slug %}?garage=${garageSelect.value}&date=${dateInput.value}`;
+      const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      const data = await response.json();
+      slotMeta.textContent = `${data.garage} · ${data.open_time}–${data.close_time} · slot ${data.slot_minutes} min`;
+      if (!data.slots || !data.slots.length) {
+        slotHelp.textContent = 'Nu există ore libere pentru combinația selectată.';
+        return;
+      }
+      slotHelp.textContent = 'Selectează o oră liberă pentru garajul ales.';
+      data.slots.forEach(slot => slotGrid.appendChild(renderSlotButton(slot, slot === initialTime)));
+      if (initialTime && data.slots.includes(initialTime)) {
+        timeInput.value = initialTime;
+      }
+    } catch (err) {
+      slotHelp.textContent = 'Nu am putut încărca sloturile acum.';
+    }
+  }
+
+  if (garageSelect && dateInput && timeInput) {
+    garageSelect.addEventListener('change', loadSlots);
+    dateInput.addEventListener('change', loadSlots);
+    if (garageSelect.value && dateInput.value) loadSlots();
+  }
+})();
+</script>
 
 {% if user.is_authenticated %}
 <script>
@@ -266,83 +217,46 @@
     const search = document.getElementById('carSearch');
     const select = document.getElementById('id_saved_car');
     const clearBtn = document.getElementById('clearCarBtn');
-
     const brand = document.getElementById('id_car_brand');
     const model = document.getElementById('id_car_model');
     const year  = document.getElementById('id_car_year');
     const fuel  = document.getElementById('id_car_fuel');
     const plate = document.getElementById('id_car_plate');
-
     if (!select) return;
-
-    // Cache original options for filtering
-    const originalOptions = Array.from(select.options).map(o => ({
-      value: o.value,
-      text: o.text,
-      selected: o.selected
-    }));
-
+    const originalOptions = Array.from(select.options).map(o => ({ value: o.value, text: o.text, selected: o.selected, dataset: {...o.dataset} }));
     function restoreOptions() {
       select.innerHTML = '';
       for (const opt of originalOptions) {
         const o = document.createElement('option');
-        o.value = opt.value;
-        o.textContent = opt.text;
-        if (opt.selected) o.selected = true;
+        o.value = opt.value; o.textContent = opt.text; if (opt.selected) o.selected = true;
+        Object.entries(opt.dataset).forEach(([k,v]) => o.dataset[k] = v);
         select.appendChild(o);
       }
     }
-
     function filterOptions(q) {
       const query = (q || '').trim().toLowerCase();
-      if (!query) {
-        restoreOptions();
-        return;
-      }
+      if (!query) return restoreOptions();
       select.innerHTML = '';
       for (const opt of originalOptions) {
-        // keep empty label always
-        if (!opt.value) {
-          const o = document.createElement('option');
-          o.value = opt.value;
-          o.textContent = opt.text;
-          select.appendChild(o);
-          continue;
-        }
-        if (opt.text.toLowerCase().includes(query)) {
-          const o = document.createElement('option');
-          o.value = opt.value;
-          o.textContent = opt.text;
+        if (!opt.value || opt.text.toLowerCase().includes(query)) {
+          const o = document.createElement('option'); o.value = opt.value; o.textContent = opt.text;
+          Object.entries(opt.dataset).forEach(([k,v]) => o.dataset[k] = v);
           select.appendChild(o);
         }
       }
     }
-
-    // Attach car data to options using dataset
-    // We'll do it by parsing the label? Better: we inject dataset server-side in template.
-    // So here we just read data-* if present.
     function applySelectedCar() {
-      const opt = select.options[select.selectedIndex];
-      if (!opt || !opt.value) return;
+      const opt = select.options[select.selectedIndex]; if (!opt || !opt.value) return;
       if (opt.dataset.make) brand.value = opt.dataset.make;
       if (opt.dataset.model) model.value = opt.dataset.model;
       if (opt.dataset.year) year.value = opt.dataset.year;
       if (opt.dataset.fuel) fuel.value = opt.dataset.fuel;
       if (opt.dataset.plate) plate.value = opt.dataset.plate;
     }
-
-    function clearSelectedCar() {
-      select.value = '';
-      // allow manual edit but don't wipe user input aggressively
-    }
-
-    if (search) {
-      search.addEventListener('input', (e) => filterOptions(e.target.value));
-    }
+    function clearSelectedCar() { select.value = ''; }
+    if (search) search.addEventListener('input', e => filterOptions(e.target.value));
     select.addEventListener('change', applySelectedCar);
     if (clearBtn) clearBtn.addEventListener('click', clearSelectedCar);
-
-    // apply on load if preselected
     applySelectedCar();
   })();
 </script>

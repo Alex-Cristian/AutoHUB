@@ -110,7 +110,37 @@
       <!-- Recenzii -->
       <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
         <h5 class="mb-3">Recenzii</h5>
-        {% for review in reviews|slice:':5' %}<div class="border-bottom pb-3 mb-3" style="border-color:var(--ah-border) !important;"><div class="fw-semibold">{{ review.title }}</div><div class="small text-orange">{{ review.rating }}★</div><div class="small text-muted-custom">{{ review.body }}</div></div>{% empty %}<div class="text-muted-custom">Nicio recenzie încă.</div>{% endfor %}
+        {% if user.is_authenticated and can_review and not user_review %}
+          <form method="post" action="{% url 'services:review_create' center.slug %}" enctype="multipart/form-data" class="mb-4">
+            {% csrf_token %}
+            <div class="row g-2">
+              <div class="col-md-4">{{ review_form.rating }}</div>
+              <div class="col-md-8">{{ review_form.title }}</div>
+              <div class="col-12">{{ review_form.body }}</div>
+              <div class="col-12">{{ review_form.images }}<div class="small text-muted-custom mt-1">Poți adăuga poze la recenzie.</div></div>
+              <div class="col-12"><button class="btn btn-nav-cta w-100" type="submit">Trimite recenzia</button></div>
+            </div>
+          </form>
+        {% elif user.is_authenticated and user_review %}
+          <div class="alert alert-secondary">Ai lăsat deja o recenzie pentru acest service.</div>
+        {% elif user.is_authenticated %}
+          <div class="alert alert-secondary">Poți lăsa o recenzie după ce ai o programare finalizată la acest service.</div>
+        {% endif %}
+
+        {% for review in reviews|slice:':5' %}
+          <div class="border-bottom pb-3 mb-3" style="border-color:var(--ah-border) !important;">
+            <div class="fw-semibold">{{ review.title }}</div>
+            <div class="small text-orange mb-2">{{ review.rating }}★ · {{ review.user.username }}</div>
+            <div class="small text-muted-custom">{{ review.body }}</div>
+            {% if review.images.all %}
+              <div class="row g-2 mt-2">
+                {% for image in review.images.all %}
+                  <div class="col-4"><img src="{{ image.image.url }}" class="img-fluid rounded-3 w-100" style="height:90px;object-fit:cover;" alt="poză recenzie"></div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% empty %}<div class="text-muted-custom">Nicio recenzie încă.</div>{% endfor %}
       </div>
 
     </div>

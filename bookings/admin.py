@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Booking, BookingNotification
+from .models import Booking, BookingAttachment, BookingNotification
 
 
 @admin.register(Booking)
@@ -91,3 +91,9 @@ class BookingNotificationAdmin(admin.ModelAdmin):
     list_filter = ('kind', 'is_read', 'created_at')
     search_fields = ('title', 'message', 'recipient__username', 'recipient__email')
     readonly_fields = ('created_at',)
+
+
+@admin.register(BookingAttachment)
+class BookingAttachmentAdmin(admin.ModelAdmin):
+    list_display = ('booking', 'media_kind', 'uploaded_at')
+    list_filter = ('media_kind', 'uploaded_at')

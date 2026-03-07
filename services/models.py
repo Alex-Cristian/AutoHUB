@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from django.utils.text import slugify
 from django.urls import reverse
 from django.db.models import Avg
+from datetime import datetime, timedelta
+
 from django.core.exceptions import ValidationError
 
 
@@ -166,6 +168,9 @@ class ServiceGarage(models.Model):
     center = models.ForeignKey(ServiceCenter, on_delete=models.CASCADE, related_name='garages', verbose_name='Service')
     name = models.CharField(max_length=120, verbose_name='Nume garaj')
     category = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, verbose_name='Categorie')
+    open_time = models.TimeField(default='08:00', verbose_name='Deschidere')
+    close_time = models.TimeField(default='18:00', verbose_name='Închidere')
+    slot_minutes = models.PositiveIntegerField(default=60, verbose_name='Durată slot (minute)')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -187,6 +192,30 @@ class ServiceGarage(models.Model):
 
         if self.category_id and self.category_id not in allowed_ids:
             raise ValidationError({'category': 'Poți alege doar o categorie din cele selectate de service.'})
+
+        if self.close_time <= self.open_time:
+            raise ValidationError({'close_time': 'Ora de închidere trebuie să fie după ora de deschidere.'})
+
+    def available_slots_for_date(self, booking_date):
+        if not booking_date:
+            return []
+        slots = []
+        start_dt = datetime.combine(booking_date, self.open_time)
+        end_dt = datetime.combine(booking_date, self.close_time)
+        step = timedelta(minutes=max(self.slot_minutes, 15))
+        current = start_dt
+        while current + step <= end_dt:
+            slot_time = current.time().replace(second=0, microsecond=0)
+            if self.is_time_available(booking_date, slot_time):
+                slots.append(slot_time.strftime('%H:%M'))
+            current += step
+        return slots
+
+    def is_time_available(self, booking_date, booking_time, exclude_booking_id=None):
+        qs = self.bookings.filter(booking_date=booking_date).exclude(status='cancelled')
+        if exclude_booking_id:
+            qs = qs.exclude(pk=exclude_booking_id)
+        return not qs.filter(booking_time=booking_time).exists()
 
 
 class ServiceImage(models.Model):
@@ -266,11 +295,37 @@ class Review(models.Model):
     def __str__(self):
         return f"{self.user.username} → {self.center.name} ({self.rating}★)"
 
+    def clean(self):
+        from bookings.models import Booking
+
+        if self.user_id and self.center_id:
+            has_done_booking = Booking.objects.filter(
+                user_id=self.user_id,
+                center_id=self.center_id,
+                status=Booking.STATUS_DONE,
+            ).exists()
+            if not has_done_booking:
+                raise ValidationError('Poți lăsa o recenzie doar după o programare finalizată la acest service.')
+
     def stars_range(self):
         return range(1, self.rating + 1)
 
     def empty_stars_range(self):
         return range(self.rating + 1, 6)
+
+
+class ReviewImage(models.Model):
+    review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='review_images/', verbose_name='Poză recenzie')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Poză recenzie'
+        verbose_name_plural = 'Poze recenzii'
+        ordering = ['uploaded_at']
+
+    def __str__(self):
+        return f"Poză recenzie {self.review_id}"
 
 
 class Favorite(models.Model):

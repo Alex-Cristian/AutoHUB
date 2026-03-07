@@ -124,6 +124,38 @@ def service_detail(request, slug):
 
 
 @login_required
+def review_create(request, slug):
+    center = get_object_or_404(ServiceCenter, slug=slug, is_active=True)
+    from bookings.models import Booking
+
+    has_done_booking = Booking.objects.filter(user=request.user, center=center, status=Booking.STATUS_DONE).exists()
+    if not has_done_booking:
+        messages.error(request, 'Poți lăsa o recenzie doar după o programare finalizată.')
+        return redirect(center.get_absolute_url())
+
+    if Review.objects.filter(center=center, user=request.user).exists():
+        messages.info(request, 'Ai lăsat deja o recenzie pentru acest service.')
+        return redirect(center.get_absolute_url())
+
+    if request.method != 'POST':
+        return redirect(center.get_absolute_url())
+
+    form = ReviewForm(request.POST, request.FILES)
+    if form.is_valid():
+        review = form.save(commit=False)
+        review.center = center
+        review.user = request.user
+        review.full_clean()
+        review.save()
+        for image in request.FILES.getlist('images'):
+            ReviewImage.objects.create(review=review, image=image)
+        messages.success(request, 'Recenzia a fost adăugată cu succes.')
+    else:
+        messages.error(request, 'Recenzia nu a putut fi salvată. Verifică datele introduse.')
+    return redirect(center.get_absolute_url())
+
+
+@login_required
 def toggle_favorite(request, slug):
     center = get_object_or_404(ServiceCenter, slug=slug)
     fav, created = Favorite.objects.get_or_create(user=request.user, center=center)
