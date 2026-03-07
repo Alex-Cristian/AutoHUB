@@ -1,11 +1,10 @@
 import requests
-
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
-from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage
+from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage, Review
 
 
 def geocodeaza_adresa(address, city_display):
@@ -278,10 +277,13 @@ class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
 class ServiceGarageForm(forms.ModelForm):
     class Meta:
         model = ServiceGarage
-        fields = ['name', 'category']
+        fields = ['name', 'category', 'open_time', 'close_time', 'slot_minutes']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Elevator 1 / Garaj rapid'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
+            'open_time': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'close_time': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'slot_minutes': forms.NumberInput(attrs={'class': 'form-control', 'min': 15, 'step': 15}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -321,3 +323,33 @@ class ServiceGalleryImageForm(forms.ModelForm):
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'caption': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Recepție / Intrare / Atelier'}),
         }
+
+class MultiImageInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class ReviewForm(forms.ModelForm):
+    images = forms.FileField(
+        required=False,
+        widget=MultiImageInput(attrs={'class': 'form-control', 'multiple': True, 'accept': 'image/*'}),
+        help_text='Poți încărca până la 5 poze.'
+    )
+
+    class Meta:
+        model = Review
+        fields = ['rating', 'title', 'body']
+        widgets = {
+            'rating': forms.Select(attrs={'class': 'form-select'}),
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Titlu scurt pentru experiența ta'}),
+            'body': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Cum a fost experiența la acest service?'}),
+        }
+
+    def clean_images(self):
+        files = self.files.getlist('images')
+        if len(files) > 5:
+            raise forms.ValidationError('Poți încărca maximum 5 poze la o recenzie.')
+        for uploaded in files:
+            content_type = getattr(uploaded, 'content_type', '') or ''
+            if not content_type.startswith('image/'):
+                raise forms.ValidationError(f'{uploaded.name} nu este o imagine.')
+        return files

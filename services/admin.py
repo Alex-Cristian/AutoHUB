@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite, ServiceGarage, ServiceImage
+from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, ReviewImage, Favorite, ServiceGarage, ServiceImage
 
 
 class ServiceItemInline(admin.TabularInline):
@@ -13,7 +13,7 @@ class ServiceItemInline(admin.TabularInline):
 class ServiceGarageInline(admin.TabularInline):
     model = ServiceGarage
     extra = 1
-    fields = ('name', 'category')
+    fields = ('name', 'category', 'open_time', 'close_time', 'slot_minutes')
 
 
 class ServiceImageInline(admin.TabularInline):
@@ -139,3 +139,9 @@ class FavoriteAdmin(admin.ModelAdmin):
     list_display = ('user', 'center', 'created_at')
     list_filter = ('created_at',)
     search_fields = ('user__username', 'center__name')
+
+
+@admin.register(ReviewImage)
+class ReviewImageAdmin(admin.ModelAdmin):
+    list_display = ('review', 'uploaded_at')
+    search_fields = ('review__title', 'review__center__name', 'review__user__username')

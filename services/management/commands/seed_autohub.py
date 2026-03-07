@@ -14,6 +14,7 @@ from django.conf import settings
 from django.core.files import File
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
+from django.utils import timezone
 from PIL import Image, ImageDraw
 
 
@@ -514,12 +515,16 @@ class Command(BaseCommand):
         return image_path
 
     def handle(self, *args, **options):
-        from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review
+        from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review, ReviewImage
+        from bookings.models import Booking, BookingAttachment
 
         self.stdout.write(self.style.WARNING('🚀 Pornind seed AutoHub...'))
 
         self.stdout.write('🧹 Ștergere date anterioare...')
+        ReviewImage.objects.all().delete()
         Review.objects.all().delete()
+        BookingAttachment.objects.all().delete()
+        Booking.objects.all().delete()
         ServiceItem.objects.all().delete()
         ServiceGarage.objects.all().delete()
         ServiceImage.objects.all().delete()
@@ -578,7 +583,7 @@ class Command(BaseCommand):
                     ServiceImage.objects.create(center=center, caption=f'Zona {gallery_index} - {cats[slug].name}', image=File(fh, name=gallery_path.name))
 
             for garage_index, slug in enumerate(category_slugs, start=1):
-                ServiceGarage.objects.create(center=center, name=f'Garaj {garage_index}', category=cats[slug])
+                ServiceGarage.objects.create(center=center, name=f'Garaj {garage_index}', category=cats[slug], open_time='08:00', close_time='18:00', slot_minutes=random.choice([30, 60]))
 
             created_centers.append((center, cat_slug))
             self.stdout.write(f'  ✓ {center.name} ({center.get_city_display()}) - categorii: {", ".join(category_slugs)}')
@@ -595,19 +600,54 @@ class Command(BaseCommand):
                 pt = round(price_to * random.uniform(0.9, 1.1))
                 ServiceItem.objects.create(center=center, name=name, price_from=pf, price_to=pt, duration_minutes=duration, is_popular=(i in popular_indices))
 
+        self.stdout.write('📅 Creare programări demo...')
+        created_bookings = []
+        for center, cat_slug in created_centers:
+            garages = list(center.garages.all())
+            items = list(center.serviceitem_set.all())
+            for idx, user in enumerate(random.sample(mock_users, k=min(3, len(mock_users))), start=1):
+                garage = random.choice(garages) if garages else None
+                booking = Booking.objects.create(
+                    user=user,
+                    center=center,
+                    garage=garage,
+                    service_item=random.choice(items) if items else None,
+                    client_name=(user.get_full_name() or user.username),
+                    client_phone=f'07{random.randint(10000000, 99999999)}',
+                    client_email=user.email or f'{user.username}@example.ro',
+                    car_brand=random.choice(['Dacia', 'Volkswagen', 'BMW', 'Audi', 'Ford']),
+                    car_model=random.choice(['Logan', 'Golf', 'Seria 3', 'A4', 'Focus']),
+                    car_year=random.randint(2008, 2024),
+                    car_fuel=random.choice(['benzina', 'motorina', 'hibrid']),
+                    car_plate=f'B{random.randint(10,99)}AUT',
+                    problem_description='Programare demo generată automat pentru testare.',
+                    booking_date=timezone.now().date() + timezone.timedelta(days=random.randint(1, 7)),
+                    booking_time=garage.open_time if garage else timezone.datetime.strptime('09:00', '%H:%M').time(),
+                    status=random.choice([Booking.STATUS_PENDING, Booking.STATUS_CONFIRMED, Booking.STATUS_DONE]),
+                )
+                created_bookings.append(booking)
+
+                if idx == 1:
+                    attach_path = self._generate_seed_image(f'booking_{center.slug}_{user.username}', f'Problemă {center.name}', cats[cat_slug].color)
+                    with attach_path.open('rb') as fh:
+                        BookingAttachment.objects.create(booking=booking, file=File(fh, name=attach_path.name), media_kind='image')
+
         self.stdout.write('⭐ Creare recenzii...')
-        for center, _ in created_centers:
-            n_reviews = random.randint(1, 3)
-            users_to_review = random.sample(mock_users, k=min(n_reviews, len(mock_users)))
-            for user in users_to_review:
+        for center, cat_slug in created_centers:
+            done_bookings = list(Booking.objects.filter(center=center, status=Booking.STATUS_DONE).select_related('user'))
+            for booking in done_bookings[:2]:
                 rating = random.choices([3, 4, 4, 5, 5, 5], k=1)[0]
-                Review.objects.create(center=center, user=user, rating=rating, title=random.choice(REVIEW_TITLES), body=random.choice(REVIEW_BODIES), is_approved=True)
+                review = Review.objects.create(center=center, user=booking.user, rating=rating, title=random.choice(REVIEW_TITLES), body=random.choice(REVIEW_BODIES), is_approved=True)
+                review_path = self._generate_seed_image(f'review_{center.slug}_{booking.user.username}', f'Review {center.name}', cats[cat_slug].color)
+                with review_path.open('rb') as fh:
+                    ReviewImage.objects.create(review=review, image=File(fh, name=review_path.name))
 
         if not User.objects.filter(username='admin').exists():
             User.objects.create_superuser(username='admin', email='admin@autohub.ro', password='admin123', first_name='Admin', last_name='AutoHub')
             self.stdout.write(self.style.SUCCESS('👑 Superuser creat: admin / admin123'))
 
-        from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review
+        from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review, ReviewImage
+        from bookings.models import Booking, BookingAttachment
         self.stdout.write('\n' + '='*50)
         self.stdout.write(self.style.SUCCESS('✅ Seed finalizat cu succes!'))
         self.stdout.write(f'  📂 Categorii:   {ServiceCategory.objects.count()}')
@@ -615,7 +655,10 @@ class Command(BaseCommand):
         self.stdout.write(f'  🏗️ Garaje:      {ServiceGarage.objects.count()}')
         self.stdout.write(f'  🖼️ Poze:        {ServiceImage.objects.count()} + {ServiceCenter.objects.exclude(card_image='').count()} poze de card')
         self.stdout.write(f'  🔧 Servicii:    {ServiceItem.objects.count()}')
+        self.stdout.write(f'  📅 Programări:  {Booking.objects.count()}')
+        self.stdout.write(f'  📎 Atașamente:  {BookingAttachment.objects.count()}')
         self.stdout.write(f'  ⭐ Recenzii:    {Review.objects.count()}')
+        self.stdout.write(f'  🖼️ Review imgs: {ReviewImage.objects.count()}')
         self.stdout.write(f'  👤 Utilizatori: {User.objects.count()}')
         self.stdout.write('='*50)
         self.stdout.write(self.style.SUCCESS('🌐 Pornește serverul: python manage.py runserver'))

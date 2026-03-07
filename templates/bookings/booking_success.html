@@ -20,7 +20,7 @@
           </div>
           <div class="col-6">
             <p class="text-muted-custom mb-0">Dată și oră:</p>
-            <p class="fw-bold mb-0">{{ booking.booking_date|date:"d M Y" }} la {{ booking.booking_time|time:"H:i" }}</p>
+            <p class="fw-bold mb-0">{{ booking.booking_date|date:"d M Y" }} la {{ booking.booking_time|time:"H:i" }}</p>{% if booking.garage %}<p class="small text-muted-custom mb-0">Garaj: {{ booking.garage.name }}</p>{% endif %}
           </div>
           <div class="col-6 mt-2">
             <p class="text-muted-custom mb-0">Client:</p>
