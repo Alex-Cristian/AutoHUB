@@ -90,7 +90,7 @@
       {% if center.latitude and center.longitude %}
       <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
         <h5 class="mb-3"><i class="bi bi-map me-2 text-red"></i>Locație</h5>
-        <div id="detailMap" style="height:220px;border-radius:10px;overflow:hidden;border:1px solid var(--ah-border);"></div>
+        <div id="detailMap" style="height:260px;border-radius:10px;overflow:hidden;border:1px solid var(--ah-border);"></div>
         <div class="mt-2 small text-muted-custom">
           <i class="bi bi-geo-alt text-red me-1"></i>{{ center.address }}, {{ center.get_city_display }}
         </div>
@@ -117,11 +117,23 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+<style>
+  /* Stiluri pentru ruta ORS pe harta */
+  .route-line {
+    stroke: #e63946;
+    stroke-width: 4;
+    stroke-opacity: 0.85;
+  }
+  /* Ascunde controalele urâte Leaflet Routing Machine dacă le folosim */
+  .leaflet-routing-container { display: none !important; }
+</style>
+
 <script>
-  // ===== HARTA DETAIL =====
   {% if center.latitude and center.longitude %}
   const serviceLat = {{ center.latitude|stringformat:'f' }};
   const serviceLng = {{ center.longitude|stringformat:'f' }};
+
+  const ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjZkZWJjMDU5ZGY2ZjQxYTU4ZDExOWE4NGQ1MjQzMzcxIiwiaCI6Im11cm11cjY0In0=";
 
   const detailMap = L.map('detailMap', { zoomControl: true, scrollWheelZoom: false })
     .setView([serviceLat, serviceLng], 15);
@@ -136,67 +148,158 @@
     className: '', iconSize: [36,36], iconAnchor: [18,36], popupAnchor: [0,-36]
   });
 
-  L.marker([serviceLat, serviceLng], { icon: serviceIcon })
+  const serviceMarker = L.marker([serviceLat, serviceLng], { icon: serviceIcon })
     .addTo(detailMap)
     .bindPopup(`<strong>{{ center.name|escapejs }}</strong><br><span style="color:#888;font-size:0.8rem;">{{ center.address|escapejs }}</span>`)
     .openPopup();
 
-  // Marker utilizator daca avem locatia salvata
-  const savedLoc = localStorage.getItem("user_loc");
-  if (savedLoc) {
-    const loc = JSON.parse(savedLoc);
+  let routeLayer = null;
+  let userMarkerDetail = null;
+
+  // ===== DESENEAZA RUTA REALA PE SOSELE =====
+  async function deseneazaRutaORS(userLat, userLng) {
+    try {
+      const resp = await fetch(
+        `https://api.openrouteservice.org/v2/directions/driving-car/geojson`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': ORS_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            coordinates: [
+              [userLng, userLat],   // start: utilizator [lng, lat]
+              [serviceLng, serviceLat]  // end: service [lng, lat]
+            ]
+          })
+        }
+      );
+
+      const data = await resp.json();
+
+      if (data.features && data.features.length > 0) {
+        // Sterge ruta veche daca exista
+        if (routeLayer) detailMap.removeLayer(routeLayer);
+
+        // Deseneaza ruta reala
+        routeLayer = L.geoJSON(data, {
+          style: {
+            color: '#e63946',
+            weight: 4,
+            opacity: 0.85,
+            lineJoin: 'round',
+            lineCap: 'round'
+          }
+        }).addTo(detailMap);
+
+        // Fit bounds sa se vada toata ruta
+        detailMap.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
+
+        // Distanta si durata
+        const summary = data.features[0].properties.summary;
+        const km = (summary.distance / 1000).toFixed(1);
+        const min = Math.round(summary.duration / 60);
+
+        const routeInfo = document.getElementById('routeInfo');
+        if (routeInfo) {
+          routeInfo.innerHTML = `<i class="bi bi-signpost-2 text-red me-1"></i><strong>${km} km</strong> pe șosele <span class="mx-2">·</span><i class="bi bi-car-front me-1"></i>~${min} min cu mașina`;
+        }
+
+      } else {
+        // Fallback la linie dreapta daca ORS esueaza
+        deseneazaLinieDirecta(userLat, userLng);
+      }
+
+    } catch(e) {
+      console.warn('ORS route failed, fallback to straight line:', e);
+      deseneazaLinieDirecta(userLat, userLng);
+    }
+  }
+
+  // Fallback — linie dreapta daca API esueaza
+  function deseneazaLinieDirecta(userLat, userLng) {
+    if (routeLayer) detailMap.removeLayer(routeLayer);
+    routeLayer = L.polyline([[userLat, userLng], [serviceLat, serviceLng]], {
+      color: '#e63946', weight: 2, dashArray: '6,6', opacity: 0.6
+    }).addTo(detailMap);
+    detailMap.fitBounds([[userLat, userLng], [serviceLat, serviceLng]], { padding: [30, 30] });
+  }
+
+  // Marker utilizator
+  function adaugaMarkerUser(lat, lng) {
+    if (userMarkerDetail) detailMap.removeLayer(userMarkerDetail);
     const userIcon = L.divIcon({
       html: `<div style="background:#4cc9f0;color:white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(76,201,240,0.5);border:2px solid white;">📍</div>`,
       className: '', iconSize: [30,30], iconAnchor: [15,30]
     });
-    L.marker([loc.lat, loc.lng], { icon: userIcon }).addTo(detailMap).bindPopup('<strong>Locația ta</strong>');
+    userMarkerDetail = L.marker([lat, lng], { icon: userIcon })
+      .addTo(detailMap)
+      .bindPopup('<strong>Locația ta</strong>');
+  }
 
-    // Linie intre utilizator si service
-    L.polyline([[loc.lat, loc.lng], [serviceLat, serviceLng]], {
-      color: '#e63946', weight: 2, dashArray: '6,6', opacity: 0.6
-    }).addTo(detailMap);
-
-    // Fit bounds sa se vada ambele puncte
-    detailMap.fitBounds([[loc.lat, loc.lng], [serviceLat, serviceLng]], { padding: [30, 30] });
+  // La incarcare — verifica localStorage
+  const savedLoc = localStorage.getItem("user_loc");
+  if (savedLoc) {
+    const loc = JSON.parse(savedLoc);
+    adaugaMarkerUser(loc.lat, loc.lng);
+    deseneazaRutaORS(loc.lat, loc.lng);
   }
   {% endif %}
 
-  // ===== DISTANTA CU ORS =====
+  // ===== DISTANTA CU ORS (header) =====
   const coordsEl = document.getElementById("centerCoords");
   const routeInfo = document.getElementById("routeInfo");
 
   if (coordsEl && routeInfo) {
     const sLat = parseFloat(coordsEl.dataset.lat);
     const sLng = parseFloat(coordsEl.dataset.lng);
-    const ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjZkZWJjMDU5ZGY2ZjQxYTU4ZDExOWE4NGQ1MjQzMzcxIiwiaCI6Im11cm11cjY0In0=";
 
     function getRouteDistance(userLat, userLng) {
-      fetch(`https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_KEY}&start=${userLng},${userLat}&end=${sLng},${sLat}`)
+      fetch(
+        `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_KEY}&start=${userLng},${userLat}&end=${sLng},${sLat}`
+      )
         .then(res => res.json())
         .then(data => {
           const summary = data.features[0].properties.summary;
           const km = (summary.distance / 1000).toFixed(1);
           const min = Math.round(summary.duration / 60);
-          routeInfo.innerHTML = `<i class="bi bi-signpost-2 text-red me-1"></i><strong>${km} km</strong> de tine <span class="mx-2">·</span><i class="bi bi-car-front"></i> ~${min} min cu mașina`;
+          routeInfo.innerHTML = `<i class="bi bi-signpost-2 text-red me-1"></i><strong>${km} km</strong> pe șosele <span class="mx-2">·</span><i class="bi bi-car-front me-1"></i>~${min} min cu mașina`;
         })
-        .catch(() => { routeInfo.innerHTML = "Nu am putut calcula ruta."; });
+        .catch(() => {
+          routeInfo.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Nu am putut calcula ruta.';
+        });
     }
 
     function getUserLocation() {
       const saved = localStorage.getItem("user_loc");
-      if (saved) { const loc = JSON.parse(saved); getRouteDistance(loc.lat, loc.lng); return; }
-      if (!navigator.geolocation) { routeInfo.innerHTML = "Nu putem detecta locația."; return; }
+      if (saved) {
+        const loc = JSON.parse(saved);
+        getRouteDistance(loc.lat, loc.lng);
+        return;
+      }
+      if (!navigator.geolocation) {
+        routeInfo.innerHTML = "Nu putem detecta locația.";
+        return;
+      }
       navigator.geolocation.getCurrentPosition(
         pos => {
           const lat = pos.coords.latitude, lng = pos.coords.longitude;
           localStorage.setItem("user_loc", JSON.stringify({ lat, lng }));
           getRouteDistance(lat, lng);
         },
-        () => { routeInfo.innerHTML = "Activează locația pentru a vedea distanța."; }
+        () => {
+          routeInfo.innerHTML = '<i class="bi bi-geo-alt text-muted me-1"></i>Activează locația pentru a vedea distanța.';
+        }
       );
     }
 
+    // Doar daca nu avem deja ruta din harta
+    {% if center.latitude and center.longitude %}
+    if (!savedLoc) getUserLocation();
+    {% else %}
     getUserLocation();
+    {% endif %}
   }
 </script>
 {% endblock %}

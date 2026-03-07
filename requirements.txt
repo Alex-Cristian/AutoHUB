@@ -1,3 +1,4 @@
+requests==2.32.5
 asgiref==3.9.2
 asttokens==3.0.1
 brotli==1.2.0
