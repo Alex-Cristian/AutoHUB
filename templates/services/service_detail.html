@@ -94,15 +94,15 @@
         <div class="mt-2 small text-muted-custom">
           <i class="bi bi-geo-alt text-red me-1"></i>{{ center.address }}, {{ center.get_city_display }}
         </div>
-        <a href="https://www.google.com/maps/dir/?api=1&destination={{ center.latitude }},{{ center.longitude }}"
+        <a href="https://www.google.com/maps/dir/?api=1&destination={{ center.latitude|stringformat:'f' }},{{ center.longitude|stringformat:'f' }}"
           target="_blank"
           class="btn btn-outline-secondary btn-sm w-100 mt-2">
           <i class="bi bi-signpost-2 me-1"></i>Deschide în Google Maps
         </a>
-        <a href="https://waze.com/ul?ll={{ center.latitude }},{{ center.longitude }}&navigate=yes"
+        <a href="https://waze.com/ul?ll={{ center.latitude|stringformat:'f' }},{{ center.longitude|stringformat:'f' }}&navigate=yes"
           target="_blank"
           class="btn btn-outline-secondary btn-sm w-100 mt-2">
-          🚗 Deschide în Waze 
+          🚗 Deschide în Waze
         </a>
       </div>
       {% endif %}
