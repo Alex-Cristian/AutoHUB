@@ -1,20 +1,31 @@
 {% extends 'base.html' %}
-{% block title %}Înregistrare service — AutoHub{% endblock %}
+{% block title %}Înregistrare firmă/service — AutoHub{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   #mapPreview {
-    height: 200px;
+    height: 260px;
     border-radius: 10px;
-    border: 1px solid var(--ah-border);
+    border: 2px solid var(--ah-border);
     display: none;
     margin-top: 10px;
+    cursor: crosshair;
   }
   #geocodeStatus {
     font-size: 0.82rem;
     margin-top: 6px;
     min-height: 20px;
+  }
+  #mapHint {
+    font-size: 0.78rem;
+    color: #aaa;
+    margin-top: 5px;
+    display: none;
+    padding: 5px 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 6px;
+    border-left: 3px solid var(--ah-red);
   }
 </style>
 {% endblock %}
@@ -25,86 +36,70 @@
     <div class="col-lg-10">
       <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
-          <h1 class="mb-1">Înregistrare service</h1>
-          <p class="text-muted-custom mb-0">Alege mai multe categorii, setează poza de card și pornești profilul service-ului.</p>
+          <h1 class="mb-1">Înregistrare firmă/service</h1>
+          <p class="text-muted-custom mb-0">Creezi contul proprietarului și alegi din start toate categoriile de care ai nevoie.</p>
         </div>
-        <a href="{% url 'services:list' %}" class="btn btn-outline-light rounded-xl">
-          <i class="bi bi-arrow-left me-1"></i>Înapoi
-        </a>
+        <a href="{% url 'services:list' %}" class="btn btn-outline-light rounded-xl"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
       </div>
 
       <div class="row g-4">
         <div class="col-lg-7">
           <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
-            <h4 class="mb-3"><i class="bi bi-building me-2 text-red"></i>Date service</h4>
             <form method="post" enctype="multipart/form-data" novalidate>
               {% csrf_token %}
+              <h4 class="mb-3"><i class="bi bi-person-badge me-2 text-orange"></i>Date cont proprietar</h4>
+              <div class="row g-3 mb-4">
+                <div class="col-md-6"><label class="form-label">{{ form.owner_first_name.label }}</label>{{ form.owner_first_name }}{% for err in form.owner_first_name.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}</div>
+                <div class="col-md-6"><label class="form-label">{{ form.owner_last_name.label }}</label>{{ form.owner_last_name }}{% for err in form.owner_last_name.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}</div>
+                <div class="col-12"><label class="form-label">{{ form.owner_email.label }}</label>{{ form.owner_email }}{% for err in form.owner_email.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}</div>
+                <div class="col-md-6"><label class="form-label">{{ form.password1.label }}</label>{{ form.password1 }}{% for err in form.password1.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}</div>
+                <div class="col-md-6"><label class="form-label">{{ form.password2.label }}</label>{{ form.password2 }}{% for err in form.password2.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}</div>
+              </div>
+
+              <h4 class="mb-3"><i class="bi bi-building me-2 text-red"></i>Date service</h4>
               <div class="row g-3">
                 {% for field in form %}
-                  {% if field.name == 'address' %}
-                  <div class="col-12" id="wrap_{{ field.name }}">
-                    <label class="form-label">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                    {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                  {% if field.name != 'owner_first_name' and field.name != 'owner_last_name' and field.name != 'owner_email' and field.name != 'password1' and field.name != 'password2' %}
+                    {% if field.name == 'address' %}
+                    <div class="col-12" id="wrap_{{ field.name }}">
+                      <label class="form-label">{{ field.label }}</label>
+                      {{ field }}
+                      {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
 
-                    <!-- Status geocoding -->
-                    <div id="geocodeStatus" class="text-muted-custom">
-                      <i class="bi bi-info-circle me-1"></i>
-                      Coordonatele GPS vor fi detectate automat după adresă și oraș.
+                      <div id="geocodeStatus" class="text-muted-custom">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Coordonatele GPS vor fi detectate automat după adresă și oraș.
+                      </div>
+                      <div id="mapPreview"></div>
+                      <div id="mapHint">
+                        <i class="bi bi-arrows-move me-1"></i><strong>Trage markerul</strong> sau apasă pe hartă pentru a seta locația exactă a clădirii tale.
+                      </div>
                     </div>
-
-                    <!-- Miniharta preview -->
-                    <div id="mapPreview"></div>
-                  </div>
-
-                  {% elif field.name == 'latitude' or field.name == 'longitude' %}
-                    {# campuri hidden — randate dar nu afisate #}
-                    {{ field }}
-
-                  {% else %}
-                  <div class="col-12" id="wrap_{{ field.name }}">
-                    <label class="form-label">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                    {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
-                  </div>
+                    {% elif field.name == 'latitude' or field.name == 'longitude' %}
+                      {{ field }}
+                    {% else %}
+                    <div class="col-12" id="wrap_{{ field.name }}">
+                      <label class="form-label">{{ field.label }}</label>
+                      {{ field }}
+                      {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                    </div>
+                    {% endif %}
                   {% endif %}
                 {% endfor %}
               </div>
-
-              <div class="d-flex gap-2 mt-4">
-                <button class="btn btn-nav-cta" type="submit">
-                  <i class="bi bi-check2-circle me-1"></i>Înregistrează service
-                </button>
-                <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}">Mergi la dashboard</a>
-              </div>
+              <button class="btn btn-nav-cta mt-4" type="submit"><i class="bi bi-check2-circle me-1"></i>Creează contul și service-ul</button>
             </form>
           </div>
         </div>
 
         <div class="col-lg-5">
           <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
-            <h5 class="mb-3"><i class="bi bi-stars me-2 text-orange"></i>Ce poți face acum</h5>
-            <ul class="small text-muted-custom mb-0">
-              <li>Alegi mai multe categorii sau direct <b>Toate categoriile</b></li>
-              <li>Încarci o imagine specială pentru cardul service-ului</li>
-              <li>Din profil adaugi ulterior garaje și galerie foto</li>
-              <li class="mt-1"><i class="bi bi-geo-alt text-red me-1"></i>Locația GPS e <b>detectată automat</b> după adresă</li>
-            </ul>
-
-            {% if existing_centers %}
-              <hr class="border-secondary">
-              <h6 class="text-white mb-2">Service-urile tale</h6>
-              <div class="d-grid gap-2">
-                {% for c in existing_centers %}
-                  <a class="btn btn-outline-light text-start" href="{% url 'services:manage_profile' c.pk %}">
-                    <div class="fw-semibold">{{ c.name }}</div>
-                    <div class="small text-muted-custom">{{ c.get_city_display }} • {{ c.display_categories|join:', ' }}</div>
-                  </a>
-                {% endfor %}
-              </div>
-            {% endif %}
+            <h5 class="mb-3">După înregistrare</h5>
+            <p class="small text-muted-custom mb-0">În dashboard vei avea o pagină de profil pentru service unde poți adăuga garaje, galerie foto și poza de card.</p>
+            <hr class="border-secondary">
+            <p class="small text-muted-custom mb-0">
+              <i class="bi bi-geo-alt text-red me-1"></i>Locația e detectată automat după adresă — <strong>trage markerul</strong> pe hartă pentru a seta locația exactă a clădirii.
+            </p>
           </div>
         </div>
       </div>
@@ -114,44 +109,35 @@
 
 <style>
   input, select, textarea {
-    background: var(--ah-dark3) !important;
-    border: 1px solid var(--ah-border) !important;
-    color: #fff !important;
-    border-radius: 10px !important;
-    padding: 0.6rem 0.8rem !important;
+    background: var(--ah-dark3) !important;border: 1px solid var(--ah-border) !important;color: #fff !important;border-radius: 10px !important;padding: 0.6rem 0.8rem !important;
   }
   input:focus, select:focus, textarea:focus {
     box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.35) !important;
     border-color: var(--ah-red) !important;
   }
-  #id_categories, #profile-id_categories { display:grid; grid-template-columns:1fr 1fr; gap:.5rem 1rem; }
-  #id_categories label, #profile-id_categories label { display:flex; align-items:center; gap:.45rem; color:#fff; }
+  #id_categories {display:grid;grid-template-columns:1fr 1fr;gap:.5rem 1rem;}
+  #id_categories label {display:flex;align-items:center;gap:.45rem;color:#fff;}
 </style>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
-  // ===== Ascunde legal_document initial =====
-  const legalIds = ['id_legal_name', 'id_headquarters', 'id_fiscal_code', 'id_trade_register_no'];
-  const docWrap = document.getElementById('wrap_legal_document');
-  function shouldShowDoc() {
-    return legalIds.some(id => { const el = document.getElementById(id); return el && (el.value || '').trim().length > 0; });
-  }
-  function refresh() { if (docWrap) docWrap.style.display = shouldShowDoc() ? '' : 'none'; }
-  legalIds.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', refresh); });
-  refresh();
-
-  // ===== GEOCODING PREVIEW =====
   let previewMap = null;
   let previewMarker = null;
   let geocodeTimer = null;
 
-  const addrInput = document.getElementById('id_address');
+  const addrInput  = document.getElementById('id_address');
   const citySelect = document.getElementById('id_city');
   const latInput   = document.getElementById('id_latitude');
   const lngInput   = document.getElementById('id_longitude');
   const statusEl   = document.getElementById('geocodeStatus');
   const mapEl      = document.getElementById('mapPreview');
+  const hintEl     = document.getElementById('mapHint');
+
+  const markerIcon = L.divIcon({
+    html: `<div style="background:#e63946;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 12px rgba(230,57,70,0.6);border:3px solid white;cursor:grab;">📍</div>`,
+    className: '', iconSize: [36,36], iconAnchor: [18,36], popupAnchor: [0,-36]
+  });
 
   function getCityText() {
     if (!citySelect) return '';
@@ -159,27 +145,65 @@
     return opt ? opt.text : '';
   }
 
+  function salveazaCoordonate(lat, lng) {
+    if (latInput) latInput.value = lat.toFixed(7);
+    if (lngInput) lngInput.value = lng.toFixed(7);
+  }
+
+  function updateStatus(lat, lng) {
+    if (statusEl) {
+      statusEl.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Locație setată: <strong>${lat.toFixed(5)}, ${lng.toFixed(5)}</strong> — <span style="color:#aaa">trage markerul dacă e nevoie</span>`;
+      statusEl.className = '';
+    }
+  }
+
+  function plasezaMarker(lat, lng) {
+    if (previewMarker) previewMap.removeLayer(previewMarker);
+
+    previewMarker = L.marker([lat, lng], {
+      icon: markerIcon,
+      draggable: true  // ← DRAG ACTIVAT
+    }).addTo(previewMap);
+
+    previewMarker.bindPopup(
+      '<div style="text-align:center"><strong>📍 Locația service-ului</strong><br><small style="color:#888">Trage-mă pe clădirea exactă</small></div>'
+    ).openPopup();
+
+    previewMarker.on('drag', function(e) {
+      salveazaCoordonate(e.target.getLatLng().lat, e.target.getLatLng().lng);
+    });
+
+    previewMarker.on('dragend', function(e) {
+      const { lat, lng } = e.target.getLatLng();
+      salveazaCoordonate(lat, lng);
+      updateStatus(lat, lng);
+      previewMarker.openPopup();
+    });
+
+    salveazaCoordonate(lat, lng);
+  }
+
   function initPreviewMap(lat, lng) {
     mapEl.style.display = 'block';
+    if (hintEl) hintEl.style.display = 'block';
+
     if (!previewMap) {
-      previewMap = L.map('mapPreview', { zoomControl: true, scrollWheelZoom: false })
-        .setView([lat, lng], 15);
+      previewMap = L.map('mapPreview', { zoomControl: true, scrollWheelZoom: true })
+        .setView([lat, lng], 17);
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
       }).addTo(previewMap);
+
+      // Click pe hartă = mută markerul
+      previewMap.on('click', function(e) {
+        plasezaMarker(e.latlng.lat, e.latlng.lng);
+        updateStatus(e.latlng.lat, e.latlng.lng);
+      });
     } else {
-      previewMap.setView([lat, lng], 15);
+      previewMap.setView([lat, lng], 17);
     }
 
-    if (previewMarker) previewMap.removeLayer(previewMarker);
-    previewMarker = L.marker([lat, lng], {
-      icon: L.divIcon({
-        html: `<div style="background:#e63946;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.5);border:2px solid white;">📍</div>`,
-        className: '', iconSize: [32,32], iconAnchor: [16,32]
-      })
-    }).addTo(previewMap).bindPopup('<strong>Locația service-ului</strong>').openPopup();
-
-    // Fix Leaflet render in hidden container
+    plasezaMarker(lat, lng);
     setTimeout(() => { if (previewMap) previewMap.invalidateSize(); }, 100);
   }
 
@@ -188,13 +212,17 @@
     const city = getCityText();
 
     if (!address || !city || city === '---------') {
-      statusEl.innerHTML = '<i class="bi bi-info-circle me-1"></i>Coordonatele GPS vor fi detectate automat după adresă și oraș.';
-      statusEl.className = 'text-muted-custom';
+      if (statusEl) {
+        statusEl.innerHTML = '<i class="bi bi-info-circle me-1"></i>Coordonatele GPS vor fi detectate automat după adresă și oraș.';
+        statusEl.className = 'text-muted-custom';
+      }
       return;
     }
 
-    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Se detectează locația...';
-    statusEl.className = 'text-muted-custom';
+    if (statusEl) {
+      statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Se detectează locația...';
+      statusEl.className = 'text-muted-custom';
+    }
 
     try {
       const query = `${address}, ${city}, Romania`;
@@ -207,29 +235,29 @@
       if (results && results.length > 0) {
         const lat = parseFloat(results[0].lat);
         const lng = parseFloat(results[0].lon);
-
-        // Salvam in campurile hidden
-        if (latInput) latInput.value = lat;
-        if (lngInput) lngInput.value = lng;
-
-        statusEl.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Locație găsită: <strong>${results[0].display_name.split(',').slice(0,2).join(',')}</strong>`;
-        statusEl.className = 'text-success';
-
+        if (statusEl) {
+          statusEl.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Locație găsită — <strong>trage markerul</strong> exact pe clădire dacă poziția nu e precisă`;
+          statusEl.className = '';
+        }
         initPreviewMap(lat, lng);
       } else {
         if (latInput) latInput.value = '';
         if (lngInput) lngInput.value = '';
-        statusEl.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Adresa nu a putut fi localizată. Verifică adresa introdusă.';
-        statusEl.className = 'text-warning';
-        mapEl.style.display = 'none';
+        if (statusEl) {
+          statusEl.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Adresa nu a putut fi localizată. Verifică adresa introdusă.';
+          statusEl.className = 'text-warning';
+        }
+        if (mapEl) mapEl.style.display = 'none';
+        if (hintEl) hintEl.style.display = 'none';
       }
     } catch (e) {
-      statusEl.innerHTML = '<i class="bi bi-x-circle text-danger me-1"></i>Eroare la detectarea locației.';
-      statusEl.className = 'text-danger';
+      if (statusEl) {
+        statusEl.innerHTML = '<i class="bi bi-x-circle text-danger me-1"></i>Eroare la detectarea locației.';
+        statusEl.className = 'text-danger';
+      }
     }
   }
 
-  // Declanseaza geocoding dupa ce utilizatorul termina de scris (debounce 800ms)
   function scheduleGeocode() {
     clearTimeout(geocodeTimer);
     geocodeTimer = setTimeout(geocodeaza, 800);
@@ -238,13 +266,13 @@
   if (addrInput) addrInput.addEventListener('input', scheduleGeocode);
   if (citySelect) citySelect.addEventListener('change', scheduleGeocode);
 
-  // Daca avem deja lat/lng salvate (editare), afisam harta
   window.addEventListener('DOMContentLoaded', () => {
     const existingLat = latInput ? parseFloat(latInput.value) : null;
     const existingLng = lngInput ? parseFloat(lngInput.value) : null;
     if (existingLat && existingLng && !isNaN(existingLat) && !isNaN(existingLng)) {
-      statusEl.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Locație salvată.`;
-      statusEl.className = 'text-success';
+      if (statusEl) {
+        statusEl.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Locație salvată — trage markerul pentru a ajusta.`;
+      }
       initPreviewMap(existingLat, existingLng);
     }
   });

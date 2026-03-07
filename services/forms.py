@@ -3,13 +3,15 @@ from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from decimal import Decimal, ROUND_HALF_UP
 
 from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage, Review
 
 
 def geocodeaza_adresa(address, city_display):
     """
-    Apeleaza Nominatim (OpenStreetMap, gratuit) si returneaza (lat, lng) sau (None, None).
+    Apeleaza Nominatim (OpenStreetMap, gratuit) si returneaza (Decimal, Decimal) sau (None, None).
+    Coordonatele sunt intotdeauna cu PUNCT ca separator zecimal.
     """
     try:
         query = f"{address}, {city_display}, Romania"
@@ -21,7 +23,10 @@ def geocodeaza_adresa(address, city_display):
         )
         results = resp.json()
         if results:
-            return results[0]["lat"], results[0]["lon"]
+            # float() garanteaza punct indiferent de locala sistemului
+            lat = Decimal(str(float(results[0]["lat"]))).quantize(Decimal('0.0000001'), rounding=ROUND_HALF_UP)
+            lng = Decimal(str(float(results[0]["lon"]))).quantize(Decimal('0.0000001'), rounding=ROUND_HALF_UP)
+            return lat, lng
     except Exception:
         pass
     return None, None
@@ -44,22 +49,10 @@ class ServiceCenterRegisterForm(forms.ModelForm):
     class Meta:
         model = ServiceCenter
         fields = [
-            'name',
-            'description',
-            'address',
-            'city',
-            'phone',
-            'email',
-            'website',
-            'schedule',
-            'card_image',
-            'legal_name',
-            'headquarters',
-            'fiscal_code',
-            'trade_register_no',
-            'legal_document',
-            'latitude',
-            'longitude',
+            'name', 'description', 'address', 'city', 'phone', 'email',
+            'website', 'schedule', 'card_image', 'legal_name', 'headquarters',
+            'fiscal_code', 'trade_register_no', 'legal_document',
+            'latitude', 'longitude',
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Service Auto X'}),
@@ -81,7 +74,6 @@ class ServiceCenterRegisterForm(forms.ModelForm):
             'fiscal_code': forms.TextInput(attrs={'class': 'form-control'}),
             'trade_register_no': forms.TextInput(attrs={'class': 'form-control'}),
             'legal_document': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-            # Ascunse — completate automat prin geocoding
             'latitude': forms.HiddenInput(),
             'longitude': forms.HiddenInput(),
         }
@@ -106,15 +98,14 @@ class ServiceCenterRegisterForm(forms.ModelForm):
     def clean_latitude(self):
         val = self.cleaned_data.get('latitude')
         if val is not None:
-            from decimal import Decimal, ROUND_HALF_UP
-            return Decimal(str(val)).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+            # float() + str() = garantat punct ca separator, indiferent de locala
+            return Decimal(str(float(val))).quantize(Decimal('0.0000001'), rounding=ROUND_HALF_UP)
         return val
 
     def clean_longitude(self):
         val = self.cleaned_data.get('longitude')
         if val is not None:
-            from decimal import Decimal, ROUND_HALF_UP
-            return Decimal(str(val)).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+            return Decimal(str(float(val))).quantize(Decimal('0.0000001'), rounding=ROUND_HALF_UP)
         return val
 
     def clean(self):
@@ -153,8 +144,7 @@ class ServiceCenterRegisterForm(forms.ModelForm):
             center.verification_status = 'not_required'
             center.is_active = True
 
-        # ===== GEOCODING AUTOMAT =====
-        # Daca nu avem coordonate deja (sau s-a schimbat adresa), le calculam
+        # Geocoding automat — fallback daca harta nu a setat coordonatele
         if not center.latitude or not center.longitude:
             lat, lng = geocodeaza_adresa(center.address, center.get_city_display())
             if lat and lng:
@@ -259,7 +249,7 @@ class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
             center.verification_status = 'not_required'
             center.is_active = True
 
-        # ===== GEOCODING AUTOMAT =====
+        # Geocoding automat — fallback
         if not center.latitude or not center.longitude:
             lat, lng = geocodeaza_adresa(center.address, center.get_city_display())
             if lat and lng:
