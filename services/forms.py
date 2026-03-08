@@ -6,6 +6,9 @@ from django.core.exceptions import ValidationError
 from decimal import Decimal, ROUND_HALF_UP
 
 from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage, Review
+from bookings.forms import BookingForm
+from bookings.models import Booking
+from accounts.models import Car
 
 
 def geocodeaza_adresa(address, city_display):
@@ -343,3 +346,66 @@ class ReviewForm(forms.ModelForm):
             if not content_type.startswith('image/'):
                 raise forms.ValidationError(f'{uploaded.name} nu este o imagine.')
         return files
+
+
+class ServiceOwnerBookingForm(BookingForm):
+    duration_minutes = forms.TypedChoiceField(
+        label='Durată blocare garaj',
+        coerce=int,
+        choices=[
+            (30, '30 min'),
+            (60, '1 oră'),
+            (90, '1:30'),
+            (120, '2 ore'),
+            (150, '2:30'),
+            (180, '3 ore'),
+            (210, '3:30'),
+            (240, '4 ore'),
+            (270, '4:30'),
+            (300, '5 ore'),
+            (330, '5:30'),
+            (360, '6 ore'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=True,
+    )
+
+    class Meta(BookingForm.Meta):
+        fields = [
+            'client_name', 'client_phone', 'client_email',
+            'car_brand', 'car_model', 'car_year', 'car_fuel', 'car_plate',
+            'service_item', 'garage', 'problem_description',
+            'booking_date', 'booking_time', 'duration_minutes',
+        ]
+
+    def __init__(self, center=None, user=None, *args, **kwargs):
+        super().__init__(center=center, user=user, *args, **kwargs)
+        self.fields['saved_car'].queryset = Car.objects.select_related('owner').order_by(
+            'plate_number', 'make', 'model', 'owner__username'
+        )
+        self.fields['saved_car'].empty_label = '— Alege o mașină din baza de date (opțional) —'
+        self.fields['saved_car'].widget = forms.Select(attrs={'class': 'form-select', 'id': 'id_saved_car'})
+        self.fields['attachments'].help_text = 'Poți încărca poze și video și când programarea este introdusă din dashboard.'
+
+    def clean(self):
+        cleaned = super().clean()
+        garage = cleaned.get('garage')
+        booking_date = cleaned.get('booking_date')
+        booking_time = cleaned.get('booking_time')
+        duration_minutes = cleaned.get('duration_minutes')
+        saved_car = cleaned.get('saved_car')
+
+        if saved_car and not (cleaned.get('client_name') or '').strip():
+            cleaned['client_name'] = saved_car.owner.get_full_name() or saved_car.owner.username
+        if saved_car and not (cleaned.get('client_email') or '').strip():
+            cleaned['client_email'] = saved_car.owner.email
+
+        if garage and booking_date and booking_time and duration_minutes and not garage.is_time_available(
+            booking_date,
+            booking_time,
+            duration_minutes=duration_minutes,
+            booking_status=Booking.STATUS_CONFIRMED,
+        ):
+            self.add_error('booking_time', 'Intervalul ales nu mai este disponibil pentru garajul selectat.')
+
+        return cleaned

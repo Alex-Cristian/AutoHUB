@@ -45,8 +45,9 @@
             <div class="border rounded-xl p-3" style="border-color:var(--ah-border);">
               <div class="fw-semibold">{{ c.name }}</div>
               <div class="small text-muted-custom mb-2">{{ c.get_city_display }} • {{ c.display_categories|join:', ' }}</div>
-              <div class="d-flex gap-2">
+              <div class="d-flex gap-2 flex-wrap">
                 <a class="btn btn-sm btn-outline-light" href="{% url 'services:detail' c.slug %}">Vezi</a>
+                <a class="btn btn-sm btn-outline-warning" href="{% url 'services:owner_booking_create' c.pk %}">Programare nouă</a>
                 <a class="btn btn-sm btn-nav-cta" href="{% url 'services:manage_profile' c.pk %}">Editează profilul</a>
               </div>
             </div>

@@ -11,8 +11,9 @@ from .forms import (
     ServiceCenterPublicRegisterForm,
     ServiceGarageForm,
     ServiceGalleryImageForm,
+    ServiceOwnerBookingForm,
 )
-from bookings.models import Booking, BookingNotification
+from bookings.models import Booking, BookingNotification, BookingAttachment
 
 
 def category_list(request):
@@ -296,6 +297,55 @@ def service_dashboard(request):
         'unread_count': unread_count,
         'latest_notifications': latest_notifications,
         'pending_verifications': pending_verifications,
+    })
+
+
+@login_required
+def owner_booking_create(request, pk):
+    center = _owner_center_or_404(request, pk)
+    if center is None:
+        return redirect('core:home')
+
+    if request.method == 'POST':
+        form = ServiceOwnerBookingForm(center=center, user=request.user, data=request.POST, files=request.FILES)
+        if form.is_valid():
+            booking = form.save(commit=False)
+            booking.center = center
+            booking.status = Booking.STATUS_CONFIRMED
+            booking.duration_minutes = form.cleaned_data['duration_minutes']
+            saved_car = form.cleaned_data.get('saved_car')
+            if saved_car:
+                booking.user = saved_car.owner
+            booking.full_clean()
+            booking.save()
+
+            for uploaded in request.FILES.getlist('attachments'):
+                content_type = getattr(uploaded, 'content_type', '') or ''
+                media_kind = 'video' if content_type.startswith('video/') else 'image'
+                BookingAttachment.objects.create(booking=booking, file=uploaded, media_kind=media_kind)
+
+            if booking.user:
+                BookingNotification.objects.create(
+                    recipient=booking.user,
+                    booking=booking,
+                    kind=BookingNotification.KIND_STATUS_UPDATE,
+                    title=f"Service-ul a înregistrat programarea #{booking.pk} ✅",
+                    message=(
+                        f"{booking.center.name} a înregistrat direct o programare pentru {booking.booking_date} la "
+                        f"{booking.booking_time.strftime('%H:%M')} în {booking.garage.name if booking.garage_id else 'service'}."
+                    ),
+                )
+
+            messages.success(request, f'✅ Programarea #{booking.pk} a fost adăugată direct și confirmată.')
+            return redirect('services:dashboard')
+    else:
+        form = ServiceOwnerBookingForm(center=center, user=request.user)
+
+    cars = form.fields['saved_car'].queryset
+    return render(request, 'services/owner_booking_create.html', {
+        'center': center,
+        'form': form,
+        'cars': cars,
     })
 
 
