@@ -13,6 +13,6 @@ urlpatterns = [
     path('masini/', views.car_list, name='cars'),
     path('masini/adauga/', views.car_create, name='car_create'),
     path('masini/<int:pk>/editeaza/', views.car_update, name='car_update'),
+    path('masini/<int:pk>/calendar-expirari/', views.car_calendar, name='car_calendar'),
     path('masini/<int:pk>/sterge/', views.car_delete, name='car_delete'),
-    path('masini/<int:pk>/calendar-expirari/', views.car_expiry_calendar, name='car_calendar'),
 ]

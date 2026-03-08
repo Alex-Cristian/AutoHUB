@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Programare confirmată — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-6 text-center">
+      <div style="font-size:5rem;">✅</div>
+      <h1 class="section-title mt-3 mb-2">Programare înregistrată!</h1>
+      <p class="text-muted-custom fs-5 mb-4">
+        Vei fi contactat de service pentru confirmare finală.
+      </p>
+
+      <div class="rounded-xl p-4 text-start mb-4" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <h5 class="fw-bold mb-3">Detalii programare #{{ booking.pk }}</h5>
+        <div class="row g-2 small">
+          <div class="col-6">
+            <p class="text-muted-custom mb-0">Service:</p>
+            <p class="fw-bold mb-0">{{ booking.center.name }}</p>
+          </div>
+          <div class="col-6">
+            <p class="text-muted-custom mb-0">Dată și oră:</p>
+            <p class="fw-bold mb-0">{{ booking.booking_date|date:"d M Y" }} la {{ booking.booking_time|time:"H:i" }}</p>{% if booking.garage %}<p class="small text-muted-custom mb-0">Garaj: {{ booking.garage.name }}</p>{% endif %}
+          </div>
+          <div class="col-6 mt-2">
+            <p class="text-muted-custom mb-0">Client:</p>
+            <p class="fw-bold mb-0">{{ booking.client_name }}</p>
+          </div>
+          <div class="col-6 mt-2">
+            <p class="text-muted-custom mb-0">Mașină:</p>
+            <p class="fw-bold mb-0">{{ booking.car_brand }} {{ booking.car_model }} ({{ booking.car_year }})</p>
+          </div>
+          <div class="col-12 mt-2">
+            <p class="text-muted-custom mb-0">Status:</p>
+            <span class="badge bg-{{ booking.get_status_badge }} mt-1">
+              {{ booking.get_status_icon }} {{ booking.get_status_display }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-3 justify-content-center flex-wrap">
+        <a href="{{ booking.center.get_absolute_url }}" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Înapoi la service
+        </a>
+        {% if user.is_authenticated %}
+        <a href="{% url 'bookings:my_bookings' %}" class="btn btn-primary">
+          <i class="bi bi-calendar-check me-1"></i>Programările mele
+        </a>
+        {% endif %}
+        <a href="{% url 'core:home' %}" class="btn btn-outline-primary">
+          <i class="bi bi-house me-1"></i>Acasă
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

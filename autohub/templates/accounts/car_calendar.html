@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% block title %}Calendar expirări — {{ car.make }} {{ car.model }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="section-title mb-1"><i class="bi bi-stars me-2 text-red"></i>Calendar expirări</h2>
+      <p class="text-muted-custom mb-0">Gestionare opțională pentru ITP, RCA, rovinietă, trusă și extinctor.</p>
+    </div>
+    <a class="text-decoration-none text-red" href="{% url 'accounts:profile' %}">
+      <i class="bi bi-arrow-left me-1"></i>Înapoi la profil
+    </a>
+  </div>
+
+  <div class="rounded-xl p-4 p-lg-5" style="background:var(--ah-dark2);border:1px solid var(--ah-border);overflow:hidden;">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+          <h3 class="mb-0">{{ car.make }} {{ car.model }}{% if car.year %} {{ car.year }}{% endif %}</h3>
+          <span class="badge text-bg-dark" style="border:1px solid var(--ah-border);">{{ car.plate_number }}</span>
+        </div>
+        <p class="text-muted-custom mb-0">Ai completat {{ completion_count }}/5 date. Poți lăsa orice câmp gol.</p>
+      </div>
+      {% if nearest_expiry %}
+      <div class="text-lg-end">
+        <p class="small text-muted-custom mb-1">Cea mai apropiată expirare</p>
+        <p class="fw-bold mb-1">{{ nearest_expiry.label }} · {{ nearest_expiry.date|date:"d.m.Y" }}</p>
+        <span class="badge bg-{{ nearest_expiry.badge_class }}">{{ nearest_expiry.status_label }}</span>
+      </div>
+      {% else %}
+      <div class="text-lg-end">
+        <p class="small text-muted-custom mb-1">Calendar gol momentan</p>
+        <span class="badge bg-secondary">Nicio dată setată</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="row g-4 align-items-center">
+      <div class="col-xl-6">
+        <div class="expiry-star mx-auto">
+          <div class="star-core">
+            <i class="bi bi-car-front-fill"></i>
+            <span>{{ car.make }}</span>
+          </div>
+
+          {% for item in items %}
+          <div class="star-node node-{{ forloop.counter }} status-{{ item.status }}">
+            <div class="node-bubble">
+              <i class="bi {{ item.icon }}"></i>
+            </div>
+            <div class="node-text">
+              <strong>{{ item.label }}</strong>
+              {% if item.date %}
+                <span>{{ item.date|date:"d.m.Y" }}</span>
+              {% else %}
+                <span>Nesetat</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="col-xl-6">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="row g-3">
+            {% for field in form %}
+            <div class="col-md-6">
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="small text-muted-custom mt-1">{{ field.help_text }}</div>{% endif %}
+              {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors|join:" " }}</div>{% endif %}
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 mt-4">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-floppy me-1"></i>Salvează datele
+            </button>
+            <a class="btn btn-outline-secondary" href="{% url 'accounts:car_update' car.id %}?next={% url 'accounts:car_calendar' car.id %}">
+              <i class="bi bi-pencil-square me-1"></i>Editează mașina
+            </a>
+          </div>
+        </form>
+
+        <div class="mt-4 rounded-3 p-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+          <h5 class="mb-3">Rezumat rapid</h5>
+          <div class="row g-2">
+            {% for item in items %}
+            <div class="col-sm-6">
+              <div class="rounded-3 p-2 h-100" style="background:var(--ah-dark4);border:1px solid var(--ah-border);">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div class="small fw-bold">{{ item.label }}</div>
+                    <div class="small text-muted-custom">{% if item.date %}{{ item.date|date:"d.m.Y" }}{% else %}Nesetat{% endif %}</div>
+                  </div>
+                  <span class="badge bg-{{ item.badge_class }}">{{ item.status_label }}</span>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.expiry-star {
+  position: relative;
+  width: min(100%, 520px);
+  aspect-ratio: 1 / 1;
+}
+.expiry-star::before {
+  content: "";
+  position: absolute;
+  inset: 17% 17%;
+  background:
+    linear-gradient(72deg, transparent 49.2%, rgba(230,57,70,.42) 49.4%, rgba(230,57,70,.42) 50.6%, transparent 50.8%),
+    linear-gradient(-72deg, transparent 49.2%, rgba(244,162,97,.22) 49.4%, rgba(244,162,97,.22) 50.6%, transparent 50.8%);
+  opacity: .9;
+  pointer-events: none;
+}
+.star-core {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 156px; height: 156px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(244,162,97,.2), rgba(230,57,70,.12) 45%, var(--ah-dark3) 75%);
+  border: 1px solid rgba(230,57,70,.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 0 36px rgba(230,57,70,.12);
+}
+.star-core i { font-size: 2.4rem; color: var(--ah-red); line-height: 1; }
+.star-core span { font-weight: 700; margin-top: .45rem; }
+.star-node {
+  position: absolute;
+  width: 148px;
+  text-align: center;
+}
+.node-bubble {
+  width: 66px; height: 66px;
+  border-radius: 22px;
+  margin: 0 auto .6rem;
+  display:flex; align-items:center; justify-content:center;
+  background: var(--ah-dark3);
+  border:1px solid var(--ah-border);
+  box-shadow: 0 12px 24px rgba(0,0,0,.22);
+  font-size: 1.45rem;
+}
+.node-text strong, .node-text span { display:block; }
+.node-text span { color: var(--ah-muted); font-size: .9rem; }
+.node-1 { top: 0; left: 50%; transform: translateX(-50%); }
+.node-2 { top: 23%; right: 0; }
+.node-3 { bottom: 3%; right: 10%; }
+.node-4 { bottom: 3%; left: 10%; }
+.node-5 { top: 23%; left: 0; }
+.status-expired .node-bubble { border-color: rgba(220,53,69,.85); box-shadow: 0 0 0 3px rgba(220,53,69,.18); }
+.status-soon .node-bubble { border-color: rgba(255,193,7,.85); box-shadow: 0 0 0 3px rgba(255,193,7,.16); }
+.status-ok .node-bubble { border-color: rgba(25,135,84,.85); box-shadow: 0 0 0 3px rgba(25,135,84,.12); }
+.status-missing .node-bubble { border-style: dashed; }
+@media (max-width: 575.98px) {
+  .expiry-star { width: 100%; max-width: 360px; }
+  .star-core { width: 120px; height: 120px; }
+  .star-node { width: 112px; }
+  .node-bubble { width: 54px; height: 54px; border-radius: 18px; margin-bottom: .35rem; }
+  .node-text strong { font-size: .88rem; }
+  .node-text span { font-size: .76rem; }
+  .node-2, .node-5 { top: 25%; }
+  .node-3, .node-4 { bottom: 6%; }
+}
+</style>
+{% endblock %}

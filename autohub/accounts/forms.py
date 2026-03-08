@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 
-from .models import Car, CarExpiryProfile
+from .models import Car, CarExpiryCalendar
 
 
 class RegisterForm(UserCreationForm):
@@ -83,15 +83,25 @@ class CarForm(forms.ModelForm):
         return plate
 
 
-class CarExpiryProfileForm(forms.ModelForm):
+
+class CarExpiryCalendarForm(forms.ModelForm):
     class Meta:
-        model = CarExpiryProfile
-        fields = ['itp_expiry', 'rca_expiry', 'rovinieta_expiry', 'casco_expiry', 'trusa_expiry', 'extinctor_expiry']
+        model = CarExpiryCalendar
+        fields = ['itp_expiry', 'rca_expiry', 'rovinieta_expiry', 'trusa_expiry', 'extinctor_expiry']
         widgets = {
             'itp_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'rca_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'rovinieta_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'casco_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'trusa_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'extinctor_expiry': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        }
+        labels = {
+            'itp_expiry': 'ITP',
+            'rca_expiry': 'RCA',
+            'rovinieta_expiry': 'Rovinietă',
+            'trusa_expiry': 'Trusă auto',
+            'extinctor_expiry': 'Extinctor',
+        }
+        help_texts = {
+            'itp_expiry': 'Lasă gol dacă nu vrei să o setezi acum.',
         }

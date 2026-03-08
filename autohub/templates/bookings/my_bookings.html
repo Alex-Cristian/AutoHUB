@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Programările mele — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="section-title mb-1">
+    <i class="bi bi-calendar-check me-2 text-red"></i>Programările mele
+  </h2>
+  <p class="text-muted-custom mb-4">{{ bookings.count }} programări</p>
+
+  {% if bookings %}
+  <div class="row g-3">
+    {% for b in bookings %}
+    <div class="col-12">
+      <div class="rounded-xl p-4" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+          <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <h6 class="fw-bold mb-0">{{ b.center.name }}</h6>
+              <span class="badge bg-{{ b.get_status_badge }} small">
+                {{ b.get_status_icon }} {{ b.get_status_display }}
+              </span>
+            </div>
+            <p class="text-muted-custom small mb-1">
+              <i class="bi bi-calendar me-1 text-red"></i>
+              <strong>{{ b.booking_date|date:"d M Y" }}</strong> la {{ b.booking_time|time:"H:i" }}
+              <span class="mx-2">·</span>
+              <i class="bi bi-geo-alt me-1"></i>{{ b.center.get_city_display }}
+            </p>
+            <p class="text-muted-custom small mb-0">
+              <i class="bi bi-car-front me-1 text-red"></i>
+              {{ b.car_brand }} {{ b.car_model }} ({{ b.car_year }}) · {{ b.car_plate }}
+            </p>
+          </div>
+          <div class="text-end">
+            <p class="text-muted-custom x-small mb-1" style="font-size:0.75rem;">
+              Înregistrat: {{ b.created_at|date:"d.m.Y H:i" }}
+            </p>
+            <a href="{{ b.center.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-shop me-1"></i>Detalii service
+            </a>
+          </div>
+        </div>
+        {% if b.problem_description %}
+        <div class="mt-3 p-2 rounded-3 small text-muted-custom" style="background:var(--ah-dark3);">
+          <i class="bi bi-chat-text me-1"></i>{{ b.problem_description|truncatewords:30 }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5">
+    <div style="font-size:4rem;opacity:0.2;">📅</div>
+    <h4 class="fw-bold mt-3">Nu ai nicio programare</h4>
+    <p class="text-muted-custom">Găsește un service și fă prima ta programare online.</p>
+    <a href="{% url 'services:list' %}" class="btn btn-primary">
+      <i class="bi bi-search me-1"></i>Caută service-uri
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
