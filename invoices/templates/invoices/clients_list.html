@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Clienți — Facturi{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="mb-1">Clienți</h1>
+      <p class="text-muted-custom mb-0">Din programările tale. De aici poți emite rapid o factură.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+      <a class="btn btn-nav-cta" href="{% url 'invoices:create' %}"><i class="bi bi-receipt me-1"></i>Factură nouă</a>
+    </div>
+  </div>
+
+  <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+    {% if clients %}
+      <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Contact</th>
+              <th>Ultima programare</th>
+              <th>Service</th>
+              <th class="text-end">Acțiuni</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in clients %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ c.name }}</div>
+                  <div class="small text-muted-custom">{{ c.count }} programări</div>
+                </td>
+                <td>
+                  <div class="small">{{ c.email|default:"—" }}</div>
+                  <div class="small text-muted-custom">{{ c.phone|default:"—" }}</div>
+                </td>
+                <td>
+                  <div class="fw-semibold">#{{ c.last_booking.pk }}</div>
+                  <div class="small text-muted-custom">{{ c.last_booking.booking_date }} {{ c.last_booking.booking_time }}</div>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ c.center.name }}</div>
+                  <div class="small text-muted-custom">{{ c.center.get_city_display }}</div>
+                </td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-success" href="{% url 'invoices:create' %}?booking={{ c.last_booking.pk }}">
+                    <i class="bi bi-file-earmark-plus me-1"></i>Emite factură
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted-custom">Nu ai încă clienți (nu există programări).</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

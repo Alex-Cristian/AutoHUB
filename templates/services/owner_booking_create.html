@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+{% block title %}Programare nouă — {{ center.name }} — AutoEMG{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'core:home' %}" class="text-red text-decoration-none">Acasă</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'services:dashboard' %}" class="text-red text-decoration-none">Dashboard service</a></li>
+      <li class="breadcrumb-item active text-muted-custom">Programare nouă</li>
+    </ol>
+  </nav>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="rounded-xl p-4" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <h2 class="section-title mb-1"><i class="bi bi-calendar-plus me-2 text-red"></i>Înregistrează o programare</h2>
+        <p class="text-muted-custom mb-4">Programarea este creată direct ca <strong>acceptată</strong> pentru <strong>{{ center.name }}</strong>.</p>
+
+        <form method="post" enctype="multipart/form-data" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">1</span>
+              <h5 class="fw-bold mb-0">Client</h5>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">Nume complet <span class="text-red">*</span></label>{{ form.client_name }}{% if form.client_name.errors %}<div class="text-danger small mt-1">{{ form.client_name.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Telefon <span class="text-red">*</span></label>{{ form.client_phone }}{% if form.client_phone.errors %}<div class="text-danger small mt-1">{{ form.client_phone.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-12"><label class="form-label">Email <span class="text-red">*</span></label>{{ form.client_email }}{% if form.client_email.errors %}<div class="text-danger small mt-1">{{ form.client_email.errors|join:" " }}</div>{% endif %}</div>
+            </div>
+          </div>
+
+          <hr style="border-color:var(--ah-border);">
+
+          <div class="mb-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">2</span>
+              <h5 class="fw-bold mb-0">Mașina</h5>
+            </div>
+
+            <div class="p-3 rounded-3 mb-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div>
+                  <p class="fw-bold mb-0"><i class="bi bi-car-front me-2 text-red"></i>Alege o mașină din baza de date</p>
+                  <p class="text-muted-custom small mb-0">Selectarea mașinii completează automat datele vehiculului. Programarea se leagă și de contul acelui client.</p>
+                </div>
+              </div>
+
+              <div class="row g-2 align-items-end">
+                <div class="col-md-6"><label class="form-label">Caută rapid</label><input type="text" class="form-control" id="carSearch" placeholder="ex: B 123 ABC / Golf / client"></div>
+                <div class="col-md-6">
+                  <label class="form-label" for="id_saved_car">Mașină salvată</label>
+                  <select name="saved_car" class="form-select" id="id_saved_car">
+                    <option value="">— Alege o mașină din baza de date (opțional) —</option>
+                    {% for c in cars %}
+                    <option value="{{ c.id }}" data-make="{{ c.make|escape }}" data-model="{{ c.model|escape }}" data-year="{{ c.year|default:'' }}" data-fuel="{{ c.fuel|default:'' }}" data-plate="{{ c.plate_number|escape }}" data-owner="{{ c.owner.get_full_name|default:c.owner.username|escape }}" data-email="{{ c.owner.email|default:''|escape }}" {% if form.saved_car.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>{{ c.plate_number }} · {{ c.make }} {{ c.model }}{% if c.year %} {{ c.year }}{% endif %} · {{ c.owner.get_full_name|default:c.owner.username }}</option>
+                    {% endfor %}
+                  </select>
+                  {% if form.saved_car.errors %}<div class="text-danger small mt-1">{{ form.saved_car.errors|join:" " }}</div>{% endif %}
+                </div>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="clearCarBtn"><i class="bi bi-x-circle me-1"></i>Golește selecția</button>
+                <span class="text-muted-custom small">Poți edita manual datele dacă ai nevoie.</span>
+              </div>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-4"><label class="form-label">Marcă <span class="text-red">*</span></label>{{ form.car_brand }}{% if form.car_brand.errors %}<div class="text-danger small mt-1">{{ form.car_brand.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-md-4"><label class="form-label">Model <span class="text-red">*</span></label>{{ form.car_model }}{% if form.car_model.errors %}<div class="text-danger small mt-1">{{ form.car_model.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-md-4"><label class="form-label">An fabricație <span class="text-red">*</span></label>{{ form.car_year }}{% if form.car_year.errors %}<div class="text-danger small mt-1">{{ form.car_year.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Combustibil <span class="text-red">*</span></label>{{ form.car_fuel }}{% if form.car_fuel.errors %}<div class="text-danger small mt-1">{{ form.car_fuel.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Nr. înmatriculare <span class="text-red">*</span></label>{{ form.car_plate }}{% if form.car_plate.errors %}<div class="text-danger small mt-1">{{ form.car_plate.errors|join:" " }}</div>{% endif %}</div>
+            </div>
+          </div>
+
+          <hr style="border-color:var(--ah-border);">
+
+          <div class="mb-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">3</span>
+              <h5 class="fw-bold mb-0">Serviciu</h5>
+            </div>
+            <div class="row g-3">
+              <div class="col-12"><label class="form-label">Serviciu (opțional)</label>{{ form.service_item }}{% if form.service_item.errors %}<div class="text-danger small mt-1">{{ form.service_item.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-12"><label class="form-label">Descriere problemă / lucrare <span class="text-red">*</span></label>{{ form.problem_description }}{% if form.problem_description.errors %}<div class="text-danger small mt-1">{{ form.problem_description.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-12"><label class="form-label">Poze / video</label>{{ form.attachments }}{% if form.attachments.errors %}<div class="text-danger small mt-1">{{ form.attachments.errors|join:" " }}</div>{% endif %}</div>
+            </div>
+          </div>
+
+          <hr style="border-color:var(--ah-border);">
+
+          <div class="mb-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px;background:var(--ah-red);font-weight:700;font-size:0.85rem;">4</span>
+              <h5 class="fw-bold mb-0">Garaj + durată + oră</h5>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Garaj <span class="text-red">*</span></label>
+                {{ form.garage }}
+                {% if form.garage.errors %}<div class="text-danger small mt-1">{{ form.garage.errors|join:" " }}</div>{% endif %}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Data <span class="text-red">*</span></label>
+                {{ form.booking_date }}
+                {% if form.booking_date.errors %}<div class="text-danger small mt-1">{{ form.booking_date.errors|join:" " }}</div>{% endif %}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Durată <span class="text-red">*</span></label>
+                {{ form.duration_minutes }}
+                {% if form.duration_minutes.errors %}<div class="text-danger small mt-1">{{ form.duration_minutes.errors|join:" " }}</div>{% endif %}
+              </div>
+            </div>
+
+            {{ form.booking_time }}
+            <div class="mt-3 p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="d-flex justify-content-between flex-wrap gap-2 align-items-center mb-2">
+                <div>
+                  <div class="fw-semibold">Calendar garaj</div>
+                  <div class="small text-muted-custom" id="slotHelp">Alege garajul, data și durata. Apoi selectează o oră liberă.</div>
+                </div>
+                <span class="badge text-bg-dark" id="slotMeta">{{ center.schedule }}</span>
+              </div>
+              <div id="slotGrid" class="d-flex flex-wrap gap-2"></div>
+              {% if form.booking_time.errors %}<div class="text-danger small mt-2">{{ form.booking_time.errors|join:" " }}</div>{% endif %}
+            </div>
+          </div>
+
+          {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+          <button type="submit" class="btn btn-primary btn-lg w-100"><i class="bi bi-check2-circle me-2"></i>Salvează programarea direct</button>
+          <p class="text-muted-custom small text-center mt-2 mb-0">Programarea se salvează deja confirmată și blochează garajul pe durata aleasă.</p>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="rounded-xl p-4" style="background:var(--ah-dark2);border:1px solid var(--ah-border);position:sticky;top:80px;">
+        <div class="text-center mb-3"><div style="font-size:3rem;">{{ center.category.icon }}</div></div>
+        <h5 class="fw-bold text-center mb-1">{{ center.name }}</h5>
+        <p class="text-muted-custom small text-center mb-3"><i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}</p>
+        <hr style="border-color:var(--ah-border);">
+        <ul class="list-unstyled small mb-0">
+          <li class="mb-2"><i class="bi bi-clock text-red me-2"></i>{{ center.schedule }}</li>
+          {% if center.phone %}<li class="mb-2"><i class="bi bi-telephone text-red me-2"></i>{{ center.phone }}</li>{% endif %}
+          <li class="mb-2"><i class="bi bi-building-gear text-red me-2"></i>{{ center.garages.count }} garaje configurate</li>
+          <li><i class="bi bi-patch-check text-red me-2"></i>Programările create aici sunt confirmate automat</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const garageSelect = document.getElementById('id_garage');
+  const dateInput = document.getElementById('id_booking_date');
+  const durationInput = document.getElementById('id_duration_minutes');
+  const timeInput = document.getElementById('id_booking_time');
+  const slotGrid = document.getElementById('slotGrid');
+  const slotHelp = document.getElementById('slotHelp');
+  const slotMeta = document.getElementById('slotMeta');
+  const initialTime = timeInput ? timeInput.value : '';
+
+  function renderSlotButton(value, active) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm ' + (active ? 'btn-primary' : 'btn-outline-secondary');
+    btn.textContent = value;
+    btn.dataset.time = value;
+    btn.addEventListener('click', function() {
+      timeInput.value = value;
+      [...slotGrid.querySelectorAll('button')].forEach(b => b.className = 'btn btn-sm btn-outline-secondary');
+      btn.className = 'btn btn-sm btn-primary';
+    });
+    return btn;
+  }
+
+  async function loadSlots() {
+    slotGrid.innerHTML = '';
+    timeInput.value = '';
+    if (!garageSelect.value || !dateInput.value || !durationInput.value) {
+      slotHelp.textContent = 'Alege garajul, data și durata. Apoi selectează o oră liberă.';
+      return;
+    }
+    slotHelp.textContent = 'Se încarcă orele disponibile...';
+    try {
+      const url = `{% url 'bookings:garage_slots' center.slug %}?garage=${garageSelect.value}&date=${dateInput.value}&duration=${durationInput.value}`;
+      const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      const data = await response.json();
+      slotMeta.textContent = `${data.garage} · ${data.open_time}–${data.close_time} · blocare ${data.duration_minutes} min`;
+      if (!data.slots || !data.slots.length) {
+        slotHelp.textContent = 'Nu există ore libere pentru combinația selectată.';
+        return;
+      }
+      slotHelp.textContent = 'Selectează o oră liberă pentru garajul ales.';
+      data.slots.forEach(slot => slotGrid.appendChild(renderSlotButton(slot, slot === initialTime)));
+      if (initialTime && data.slots.includes(initialTime)) {
+        timeInput.value = initialTime;
+      }
+    } catch (err) {
+      slotHelp.textContent = 'Nu am putut încărca sloturile acum.';
+    }
+  }
+
+  if (garageSelect && dateInput && durationInput && timeInput) {
+    garageSelect.addEventListener('change', loadSlots);
+    dateInput.addEventListener('change', loadSlots);
+    durationInput.addEventListener('change', loadSlots);
+    if (garageSelect.value && dateInput.value && durationInput.value) loadSlots();
+  }
+})();
+</script>
+
+<script>
+(function() {
+  const search = document.getElementById('carSearch');
+  const select = document.getElementById('id_saved_car');
+  const clearBtn = document.getElementById('clearCarBtn');
+  const clientName = document.getElementById('id_client_name');
+  const clientEmail = document.getElementById('id_client_email');
+  const brand = document.getElementById('id_car_brand');
+  const model = document.getElementById('id_car_model');
+  const year  = document.getElementById('id_car_year');
+  const fuel  = document.getElementById('id_car_fuel');
+  const plate = document.getElementById('id_car_plate');
+  if (!select) return;
+  const originalOptions = Array.from(select.options).map(o => ({ value: o.value, text: o.text, selected: o.selected, dataset: {...o.dataset} }));
+
+  function repopulate(options) {
+    const currentValue = select.value;
+    select.innerHTML = '';
+    options.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.text;
+      Object.entries(opt.dataset).forEach(([k, v]) => o.dataset[k] = v);
+      if (opt.value === currentValue) o.selected = true;
+      select.appendChild(o);
+    });
+    if (!select.value && currentValue) {
+      const fallback = options.find(opt => opt.value === currentValue);
+      if (fallback) select.value = currentValue;
+    }
+  }
+
+  function filterOptions(q) {
+    const query = (q || '').trim().toLowerCase();
+    if (!query) {
+      repopulate(originalOptions);
+      return;
+    }
+    const filtered = originalOptions.filter(opt => {
+      const blob = [opt.text, opt.dataset.plate, opt.dataset.make, opt.dataset.model, opt.dataset.owner, opt.dataset.email].join(' ').toLowerCase();
+      return blob.includes(query);
+    });
+    repopulate(filtered.length ? filtered : [originalOptions[0]]);
+  }
+
+  function fillFromSelected() {
+    const opt = select.options[select.selectedIndex];
+    if (!opt || !opt.value) return;
+    if (brand) brand.value = opt.dataset.make || '';
+    if (model) model.value = opt.dataset.model || '';
+    if (year) year.value = opt.dataset.year || '';
+    if (fuel) fuel.value = opt.dataset.fuel || '';
+    if (plate) plate.value = opt.dataset.plate || '';
+    if (clientName && !clientName.value.trim()) clientName.value = opt.dataset.owner || '';
+    if (clientEmail && !clientEmail.value.trim()) clientEmail.value = opt.dataset.email || '';
+  }
+
+  if (search) search.addEventListener('input', e => filterOptions(e.target.value));
+  select.addEventListener('change', fillFromSelected);
+  if (clearBtn) clearBtn.addEventListener('click', function() {
+    if (search) search.value = '';
+    repopulate(originalOptions);
+    select.value = '';
+  });
+  if (select.value) fillFromSelected();
+})();
+</script>
+{% endblock %}

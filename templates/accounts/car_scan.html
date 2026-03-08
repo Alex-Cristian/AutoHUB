@@ -1,0 +1,298 @@
+{% extends 'base.html' %}
+{% block title %}Scanează document — {{ car.make }} {{ car.model }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'accounts:profile' %}">Profil</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'accounts:cars' %}">Mașinile mele</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'accounts:car_calendar' car.pk %}">Calendar expirări</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Scanează document</li>
+        </ol>
+      </nav>
+      <h2 class="section-title mb-1"><i class="bi bi-camera me-2"></i>Încarcă document</h2>
+      <p class="text-muted-custom mb-0">{{ car.make }} {{ car.model }}{% if car.year %} {{ car.year }}{% endif %} · {{ car.plate_number }}</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'accounts:car_calendar' car.pk %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Înapoi la calendar
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="card bg-dark border-secondary h-100">
+        <div class="card-body p-4">
+          <h5 class="mb-3">1. Alege documentul</h5>
+
+          <div class="mb-3">
+            <label for="docType" class="form-label">Tip document</label>
+            <select id="docType" class="form-select">
+              <option value="">Detectează automat</option>
+              <option value="ITP">ITP</option>
+              <option value="RCA">RCA</option>
+              <option value="ROVINIETA">Rovinietă</option>
+              <option value="CASCO">CASCO</option>
+              <option value="TRUSA">Trusă auto</option>
+              <option value="EXTINCTOR">Extinctor</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="documentInput" class="form-label">Poză document</label>
+            <input type="file" id="documentInput" class="form-control" accept="image/*">
+            <div class="form-text">Ideal: fotografie clară, document complet, lumină bună.</div>
+          </div>
+
+          <div class="ratio ratio-4x3 rounded overflow-hidden border border-secondary bg-black mb-3">
+            <img id="previewImage" alt="Preview document" class="w-100 h-100 object-fit-contain d-none">
+            <div id="previewPlaceholder" class="d-flex align-items-center justify-content-center text-muted">
+              <div class="text-center px-3">
+                <i class="bi bi-image fs-1 d-block mb-2"></i>
+                Preview-ul documentului va apărea aici
+              </div>
+            </div>
+          </div>
+
+          <div class="d-grid gap-2">
+            <button id="scanBtn" class="btn btn-primary" disabled>
+              <i class="bi bi-search me-1"></i>Scanează documentul
+            </button>
+            <button id="saveBtn" class="btn btn-success" disabled>
+              <i class="bi bi-check2-circle me-1"></i>Salvează datele detectate
+            </button>
+          </div>
+
+          <div id="messageBox" class="alert mt-3 d-none" role="alert"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card bg-dark border-secondary h-100">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">2. Date detectate</h5>
+            <span id="confidenceBadge" class="badge text-bg-secondary">fără scanare</span>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Tip document</label>
+              <input id="resultTip" type="text" class="form-control" placeholder="—">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Data expirării</label>
+              <input id="resultExpiry" type="date" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Număr înmatriculare</label>
+              <input id="resultPlate" type="text" class="form-control" placeholder="—">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">VIN</label>
+              <input id="resultVin" type="text" class="form-control" placeholder="—">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Marcă</label>
+              <input id="resultMake" type="text" class="form-control" placeholder="—">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Asigurator</label>
+              <input id="resultAsigurator" type="text" class="form-control" placeholder="—">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Text detectat</label>
+              <textarea id="resultRaw" class="form-control" rows="8" placeholder="După scanare, aici apare textul extras din document."></textarea>
+            </div>
+          </div>
+
+          <hr class="border-secondary my-4">
+
+          <h6 class="mb-3">Date existente în calendar</h6>
+          <div class="row g-3 small">
+            <div class="col-md-6"><div class="p-3 rounded border border-secondary h-100"><strong>ITP:</strong> {{ expiry_profile.itp_expiry|default:"—" }}</div></div>
+            <div class="col-md-6"><div class="p-3 rounded border border-secondary h-100"><strong>RCA:</strong> {{ expiry_profile.rca_expiry|default:"—" }}</div></div>
+            <div class="col-md-6"><div class="p-3 rounded border border-secondary h-100"><strong>Rovinietă:</strong> {{ expiry_profile.rovinieta_expiry|default:"—" }}</div></div>
+            <div class="col-md-6"><div class="p-3 rounded border border-secondary h-100"><strong>CASCO:</strong> {{ expiry_profile.casco_expiry|default:"—" }}</div></div>
+            <div class="col-md-6"><div class="p-3 rounded border border-secondary h-100"><strong>Trusă:</strong> {{ expiry_profile.trusa_expiry|default:"—" }}</div></div>
+            <div class="col-md-6"><div class="p-3 rounded border border-secondary h-100"><strong>Extinctor:</strong> {{ expiry_profile.extinctor_expiry|default:"—" }}</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const input = document.getElementById('documentInput');
+  const preview = document.getElementById('previewImage');
+  const previewPlaceholder = document.getElementById('previewPlaceholder');
+  const scanBtn = document.getElementById('scanBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const docType = document.getElementById('docType');
+  const messageBox = document.getElementById('messageBox');
+  const confidenceBadge = document.getElementById('confidenceBadge');
+
+  const fields = {
+    tip_document: document.getElementById('resultTip'),
+    expiry_date: document.getElementById('resultExpiry'),
+    plate_number: document.getElementById('resultPlate'),
+    vin: document.getElementById('resultVin'),
+    make: document.getElementById('resultMake'),
+    asigurator: document.getElementById('resultAsigurator'),
+    raw_text: document.getElementById('resultRaw'),
+  };
+
+  let base64Image = '';
+  let lastScanData = null;
+
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+
+  function showMessage(text, type='info') {
+    messageBox.className = `alert alert-${type} mt-3`;
+    messageBox.textContent = text;
+    messageBox.classList.remove('d-none');
+  }
+
+  function clearMessage() {
+    messageBox.classList.add('d-none');
+    messageBox.textContent = '';
+  }
+
+  function setConfidence(level='secondary') {
+    const map = {
+      high: ['text-bg-success', 'ridicată'],
+      medium: ['text-bg-warning', 'medie'],
+      low: ['text-bg-secondary', 'scăzută'],
+      none: ['text-bg-secondary', 'fără scanare'],
+    };
+    const [klass, label] = map[level] || map.none;
+    confidenceBadge.className = `badge ${klass}`;
+    confidenceBadge.textContent = `încredere ${label}`;
+  }
+
+  function fillFields(data = {}) {
+    fields.tip_document.value = data.tip_document || '';
+    fields.expiry_date.value = data.expiry_date || '';
+    fields.plate_number.value = data.plate_number || '';
+    fields.vin.value = data.vin || '';
+    fields.make.value = data.make || '';
+    fields.asigurator.value = data.asigurator || '';
+    fields.raw_text.value = data.raw_text || '';
+    setConfidence(data.confidence || 'none');
+  }
+
+  input.addEventListener('change', (event) => {
+    clearMessage();
+    saveBtn.disabled = true;
+    lastScanData = null;
+
+    const file = event.target.files?.[0];
+    if (!file) {
+      base64Image = '';
+      scanBtn.disabled = true;
+      preview.classList.add('d-none');
+      previewPlaceholder.classList.remove('d-none');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      base64Image = reader.result;
+      preview.src = reader.result;
+      preview.classList.remove('d-none');
+      previewPlaceholder.classList.add('d-none');
+      scanBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  scanBtn.addEventListener('click', async () => {
+    if (!base64Image) return;
+
+    scanBtn.disabled = true;
+    saveBtn.disabled = true;
+    showMessage('Scanez documentul... te rog așteaptă puțin.', 'info');
+
+    try {
+      const response = await fetch('{% url "accounts:car_scan_api" car.pk %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify({
+          image: base64Image,
+          hint_type: docType.value || null,
+        })
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        const details = payload.raw_output || payload.details?.error?.message || payload.details?.raw || '';
+        throw new Error((payload.error || 'A apărut o eroare la scanare.') + (details ? ` Detalii: ${details}` : ''));
+      }
+
+      lastScanData = payload.data || {};
+      fillFields(lastScanData);
+      saveBtn.disabled = false;
+      showMessage(payload.warning || 'Scanare completă. Verifică datele și apasă pe salvare.', payload.warning ? 'warning' : 'success');
+    } catch (error) {
+      showMessage(error.message || 'Nu am putut scana documentul.', 'danger');
+    } finally {
+      scanBtn.disabled = false;
+    }
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const data = {
+      tip_document: fields.tip_document.value,
+      expiry_date: fields.expiry_date.value,
+      plate_number: fields.plate_number.value,
+      vin: fields.vin.value,
+      make: fields.make.value,
+      asigurator: fields.asigurator.value,
+    };
+
+    saveBtn.disabled = true;
+    showMessage('Salvez datele detectate...', 'info');
+
+    try {
+      const response = await fetch('{% url "accounts:car_scan_save" car.pk %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify(data)
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'A apărut o eroare la salvare.');
+      }
+
+      showMessage(payload.message || 'Date salvate cu succes.', 'success');
+      lastScanData = data;
+    } catch (error) {
+      showMessage(error.message || 'Nu am putut salva datele.', 'danger');
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+
+  fillFields();
+})();
+</script>
+{% endblock %}
