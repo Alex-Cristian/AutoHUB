@@ -282,7 +282,7 @@ def service_dashboard(request):
     if centers is None:
         return redirect('services:register_service')
 
-    bookings_qs = Booking.objects.filter(center__in=centers).select_related('center', 'service_item', 'user').order_by('-created_at')
+    bookings_qs = Booking.objects.filter(center__in=centers).select_related('center', 'service_item', 'user', 'garage').order_by('-created_at')
     pending = bookings_qs.filter(status=Booking.STATUS_PENDING)
     active = bookings_qs.exclude(status=Booking.STATUS_CANCELLED)[:50]
     unread_count = BookingNotification.objects.filter(recipient=request.user, is_read=False).count()
@@ -375,17 +375,47 @@ def booking_accept(request, pk):
         if booking.status != Booking.STATUS_PENDING:
             messages.info(request, 'Această programare nu mai este în așteptare.')
             return redirect('services:dashboard')
+
+        raw_duration = (request.POST.get('duration_minutes') or '').strip()
+        if not raw_duration:
+            messages.error(request, 'Selectează durata care blochează garajul înainte să accepți programarea.')
+            return redirect('services:dashboard')
+        try:
+            duration_minutes = int(raw_duration)
+        except ValueError:
+            messages.error(request, 'Durata selectată nu este validă.')
+            return redirect('services:dashboard')
+
+        allowed_durations = {30 * step for step in range(1, 17)}
+        if duration_minutes not in allowed_durations:
+            messages.error(request, 'Durata trebuie să fie selectată din 30 în 30 de minute.')
+            return redirect('services:dashboard')
+
+        if booking.garage_id and not booking.garage.is_time_available(
+            booking.booking_date,
+            booking.booking_time,
+            duration_minutes=duration_minutes,
+            exclude_booking_id=booking.pk,
+            booking_status=Booking.STATUS_CONFIRMED,
+        ):
+            messages.error(request, 'Garajul nu mai este disponibil pe tot intervalul selectat.')
+            return redirect('services:dashboard')
+
         booking.status = Booking.STATUS_CONFIRMED
-        booking.save(update_fields=['status', 'updated_at'])
+        booking.duration_minutes = duration_minutes
+        booking.save(update_fields=['status', 'duration_minutes', 'updated_at'])
         if booking.user:
             BookingNotification.objects.create(
                 recipient=booking.user,
                 booking=booking,
                 kind=BookingNotification.KIND_STATUS_UPDATE,
                 title=f"Programarea #{booking.pk} a fost acceptată ✅",
-                message=f"Service-ul {booking.center.name} ți-a confirmat programarea pentru {booking.booking_date} la {booking.booking_time}.",
+                message=(
+                    f"Service-ul {booking.center.name} ți-a confirmat programarea pentru {booking.booking_date} la "
+                    f"{booking.booking_time.strftime('%H:%M')} și a rezervat garajul pentru {booking.get_duration_display()}."
+                ),
             )
-        messages.success(request, f'✅ Ai acceptat programarea #{booking.pk}.')
+        messages.success(request, f'✅ Ai acceptat programarea #{booking.pk} pentru {booking.get_duration_display()}.')
     return redirect('services:dashboard')
 
 

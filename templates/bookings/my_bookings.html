@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Programările mele — AutoHub{% endblock %}
+{% block title %}Programările mele — AutoEMG{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -24,6 +24,7 @@
             <p class="text-muted-custom small mb-1">
               <i class="bi bi-calendar me-1 text-red"></i>
               <strong>{{ b.booking_date|date:"d M Y" }}</strong> la {{ b.booking_time|time:"H:i" }}
+              {% if b.duration_minutes %}<span class="mx-2">·</span><span>durată: {{ b.get_duration_display }}</span>{% endif %}
               <span class="mx-2">·</span>
               <i class="bi bi-geo-alt me-1"></i>{{ b.center.get_city_display }}
             </p>

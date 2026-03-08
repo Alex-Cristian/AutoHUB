@@ -493,7 +493,7 @@ REVIEW_BODIES = [
 
 
 class Command(BaseCommand):
-    help = 'Populează baza de date cu date demo pentru AutoHub'
+    help = 'Populează baza de date cu date demo pentru AutoEMG'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -510,7 +510,7 @@ class Command(BaseCommand):
         draw = ImageDraw.Draw(img)
         draw.rounded_rectangle((40, 40, 1160, 760), radius=36, outline='white', width=6)
         draw.text((90, 120), title[:28], fill='white')
-        draw.text((90, 190), 'AutoHub demo image', fill='white')
+        draw.text((90, 190), 'AutoEMG demo image', fill='white')
         img.save(image_path)
         return image_path
 
@@ -518,7 +518,7 @@ class Command(BaseCommand):
         from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review, ReviewImage
         from bookings.models import Booking, BookingAttachment
 
-        self.stdout.write(self.style.WARNING('🚀 Pornind seed AutoHub...'))
+        self.stdout.write(self.style.WARNING('🚀 Pornind seed AutoEMG...'))
 
         self.stdout.write('🧹 Ștergere date anterioare...')
         ReviewImage.objects.all().delete()
@@ -643,7 +643,7 @@ class Command(BaseCommand):
                     ReviewImage.objects.create(review=review, image=File(fh, name=review_path.name))
 
         if not User.objects.filter(username='admin').exists():
-            User.objects.create_superuser(username='admin', email='admin@autohub.ro', password='admin123', first_name='Admin', last_name='AutoHub')
+            User.objects.create_superuser(username='admin', email='admin@autohub.ro', password='admin123', first_name='Admin', last_name='AutoEMG')
             self.stdout.write(self.style.SUCCESS('👑 Superuser creat: admin / admin123'))
 
         from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review, ReviewImage

@@ -196,26 +196,39 @@ class ServiceGarage(models.Model):
         if self.close_time <= self.open_time:
             raise ValidationError({'close_time': 'Ora de închidere trebuie să fie după ora de deschidere.'})
 
-    def available_slots_for_date(self, booking_date):
+    def available_slots_for_date(self, booking_date, duration_minutes=None):
         if not booking_date:
             return []
+        requested_duration = max(duration_minutes or 30, 30)
         slots = []
         start_dt = datetime.combine(booking_date, self.open_time)
         end_dt = datetime.combine(booking_date, self.close_time)
-        step = timedelta(minutes=max(self.slot_minutes, 15))
+        step = timedelta(minutes=30)
         current = start_dt
-        while current + step <= end_dt:
+        while current + timedelta(minutes=requested_duration) <= end_dt:
             slot_time = current.time().replace(second=0, microsecond=0)
-            if self.is_time_available(booking_date, slot_time):
+            if self.is_time_available(booking_date, slot_time, duration_minutes=requested_duration):
                 slots.append(slot_time.strftime('%H:%M'))
             current += step
         return slots
 
-    def is_time_available(self, booking_date, booking_time, exclude_booking_id=None):
-        qs = self.bookings.filter(booking_date=booking_date).exclude(status='cancelled')
+    def is_time_available(self, booking_date, booking_time, duration_minutes=None, exclude_booking_id=None, booking_status=None):
+        requested_duration = max(duration_minutes or 60, 30)
+        requested_start = datetime.combine(booking_date, booking_time)
+        requested_end = requested_start + timedelta(minutes=requested_duration)
+
+        blocked_statuses = ['confirmed', 'in_progress']
+        qs = self.bookings.filter(booking_date=booking_date, status__in=blocked_statuses)
         if exclude_booking_id:
             qs = qs.exclude(pk=exclude_booking_id)
-        return not qs.filter(booking_time=booking_time).exists()
+
+        for booking in qs.select_related('service_item'):
+            existing_start = datetime.combine(booking.booking_date, booking.booking_time)
+            existing_duration = booking.duration_minutes or getattr(booking.service_item, 'duration_minutes', None) or self.slot_minutes or 60
+            existing_end = existing_start + timedelta(minutes=max(existing_duration, 30))
+            if requested_start < existing_end and requested_end > existing_start:
+                return False
+        return True
 
 
 class ServiceImage(models.Model):
