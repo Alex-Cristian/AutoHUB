@@ -1,4 +1,4 @@
-# 🚗 AutoHub — Marketplace Service Auto
+# 🚗 AutoEMG — Marketplace Service Auto
 
 Marketplace Django pentru service-uri auto din România.
 

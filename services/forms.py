@@ -18,7 +18,7 @@ def geocodeaza_adresa(address, city_display):
         resp = requests.get(
             "https://nominatim.openstreetmap.org/search",
             params={"q": query, "format": "json", "limit": 1},
-            headers={"User-Agent": "AutoHub/1.0"},
+            headers={"User-Agent": "AutoEMG/1.0"},
             timeout=5,
         )
         results = resp.json()

@@ -82,7 +82,9 @@ class BookingForm(forms.ModelForm):
         if self.center and garage and garage.center_id != self.center.id:
             self.add_error('garage', 'Garajul selectat nu aparține acestui service.')
 
-        if garage and booking_date and booking_time and not garage.is_time_available(booking_date, booking_time):
+        if garage and booking_date and booking_time and not garage.is_time_available(
+            booking_date, booking_time, duration_minutes=30, booking_status=Booking.STATUS_PENDING
+        ):
             self.add_error('booking_time', 'Ora aleasă nu mai este disponibilă pentru garajul selectat.')
 
         attachments = self.files.getlist('attachments')

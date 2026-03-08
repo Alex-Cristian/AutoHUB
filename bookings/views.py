@@ -80,11 +80,17 @@ def garage_slots(request, slug):
     except ValueError:
         return JsonResponse({'slots': [], 'error': 'Data nu este validă.'}, status=400)
 
-    slots = garage.available_slots_for_date(booking_date)
+    try:
+        duration_minutes = max(int(request.GET.get('duration') or 30), 30)
+    except ValueError:
+        duration_minutes = 30
+
+    slots = garage.available_slots_for_date(booking_date, duration_minutes=duration_minutes)
     return JsonResponse({
         'garage': garage.name,
         'open_time': garage.open_time.strftime('%H:%M'),
         'close_time': garage.close_time.strftime('%H:%M'),
-        'slot_minutes': garage.slot_minutes,
+        'slot_minutes': 30,
+        'duration_minutes': duration_minutes,
         'slots': slots,
     })
