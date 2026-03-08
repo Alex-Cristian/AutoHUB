@@ -4,6 +4,7 @@
 {% block content %}
 <div class="container py-4">
   <div class="row g-4">
+    <!-- Sidebar profil -->
     <div class="col-lg-3">
       <div class="rounded-xl p-4 text-center" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
         <div class="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold mb-3"
@@ -12,7 +13,9 @@
         </div>
         <h5 class="fw-bold">{{ user.get_full_name|default:user.username }}</h5>
         <p class="text-muted-custom small">{{ user.email }}</p>
-        <p class="text-muted-custom small">Membru din {{ user.date_joined|date:"M Y" }}</p>
+        <p class="text-muted-custom small">
+          Membru din {{ user.date_joined|date:"M Y" }}
+        </p>
         <hr style="border-color:var(--ah-border);">
         <div class="d-flex justify-content-around text-center">
           <div>
@@ -30,7 +33,10 @@
       </div>
     </div>
 
+    <!-- Main content -->
     <div class="col-lg-9">
+
+      <!-- Mașinile mele -->
       <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <h4 class="fw-bold mb-0">
@@ -38,7 +44,7 @@
           </h4>
           <div class="d-flex gap-2">
             <a href="{% url 'accounts:cars' %}" class="btn btn-outline-secondary btn-sm">
-              Vezi toate ({{ cars|length }})
+              Vezi toate ({{ cars.count }})
             </a>
             <a href="{% url 'accounts:car_create' %}?next={% url 'accounts:profile' %}" class="btn btn-primary btn-sm">
               <i class="bi bi-plus-lg me-1"></i>Adaugă
@@ -47,26 +53,18 @@
         </div>
 
         {% if cars %}
-        <div class="row g-3">
+        <div class="row g-2">
           {% for c in cars|slice:":3" %}
           <div class="col-md-4">
-            <div class="p-3 rounded-3 h-100 d-flex flex-column" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
-              <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                <div>
-                  <p class="fw-bold small mb-1">{{ c.make }} {{ c.model }}{% if c.year %} {{ c.year }}{% endif %}</p>
-                  <p class="text-muted-custom small mb-0"><i class="bi bi-upc-scan me-1"></i>{{ c.plate_number }}</p>
-                </div>
-                <span class="badge text-bg-{{ c.expiry_badge.class }}">
-                  <i class="bi {{ c.expiry_badge.icon }} me-1"></i>{{ c.expiry_badge.label }}
-                </span>
-              </div>
-
-              <div class="mt-auto d-grid gap-2">
-                <a class="btn btn-outline-secondary btn-sm" href="{% url 'accounts:car_update' c.id %}?next={% url 'accounts:profile' %}">
+            <div class="p-3 rounded-3" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+              <p class="fw-bold small mb-1">{{ c.make }} {{ c.model }}{% if c.year %} {{ c.year }}{% endif %}</p>
+              <p class="text-muted-custom small mb-2"><i class="bi bi-upc-scan me-1"></i>{{ c.plate_number }}</p>
+              <div class="d-grid gap-2">
+                <a class="btn btn-outline-secondary btn-sm w-100" href="{% url 'accounts:car_update' c.id %}?next={% url 'accounts:profile' %}">
                   <i class="bi bi-pencil-square me-1"></i>Editează
                 </a>
-                <a class="btn btn-outline-danger btn-sm" href="{% url 'accounts:car_calendar' c.id %}">
-                  <i class="bi bi-stars me-1"></i>Calendar expirări
+                <a class="btn btn-outline-warning btn-sm w-100" href="{% url 'accounts:car_calendar' c.id %}?next={% url 'accounts:profile' %}">
+                  <i class="bi bi-stars me-1"></i>Expirări
                 </a>
               </div>
             </div>
@@ -83,6 +81,7 @@
         {% endif %}
       </div>
 
+      <!-- Programări recente -->
       <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h4 class="fw-bold mb-0">
@@ -118,6 +117,7 @@
         {% endif %}
       </div>
 
+      <!-- Favorite -->
       <div>
         <h4 class="fw-bold mb-3">
           <i class="bi bi-heart me-2 text-red"></i>Service-uri favorite
@@ -137,7 +137,8 @@
                 <a href="{{ fav.center.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">
                   <i class="bi bi-eye"></i>
                 </a>
-                <a href="{% url 'services:toggle_favorite' fav.center.slug %}" class="btn btn-outline-danger btn-sm">
+                <a href="{% url 'services:toggle_favorite' fav.center.slug %}"
+                   class="btn btn-outline-danger btn-sm">
                   <i class="bi bi-heart-fill"></i>
                 </a>
               </div>

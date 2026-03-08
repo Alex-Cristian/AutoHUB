@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Înregistrare firmă/service — AutoHub{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+          <h1 class="mb-1">Înregistrare firmă/service</h1>
+          <p class="text-muted-custom mb-0">Creezi contul proprietarului și alegi din start toate categoriile de care ai nevoie.</p>
+        </div>
+        <a href="{% url 'services:list' %}" class="btn btn-outline-light rounded-xl"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-lg-7">
+          <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+            <form method="post" enctype="multipart/form-data" novalidate>
+              {% csrf_token %}
+              <h4 class="mb-3"><i class="bi bi-person-badge me-2 text-orange"></i>Date cont proprietar</h4>
+              <div class="row g-3 mb-4">
+                <div class="col-md-6"><label class="form-label">{{ form.owner_first_name.label }}</label>{{ form.owner_first_name }}{% for err in form.owner_first_name.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}</div>
+                <div class="col-md-6"><label class="form-label">{{ form.owner_last_name.label }}</label>{{ form.owner_last_name }}{% for err in form.owner_last_name.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}</div>
+                <div class="col-12"><label class="form-label">{{ form.owner_email.label }}</label>{{ form.owner_email }}{% for err in form.owner_email.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}</div>
+                <div class="col-md-6"><label class="form-label">{{ form.password1.label }}</label>{{ form.password1 }}{% for err in form.password1.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}</div>
+                <div class="col-md-6"><label class="form-label">{{ form.password2.label }}</label>{{ form.password2 }}{% for err in form.password2.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}</div>
+              </div>
+
+              <h4 class="mb-3"><i class="bi bi-building me-2 text-red"></i>Date service</h4>
+              <div class="row g-3">
+                {% for field in form %}
+                  {% if field.name != 'owner_first_name' and field.name != 'owner_last_name' and field.name != 'owner_email' and field.name != 'password1' and field.name != 'password2' %}
+                    <div class="col-12" id="wrap_{{ field.name }}">
+                      <label class="form-label">{{ field.label }}</label>
+                      {{ field }}
+                      {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                    </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+              <button class="btn btn-nav-cta mt-4" type="submit"><i class="bi bi-check2-circle me-1"></i>Creează contul și service-ul</button>
+            </form>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+            <h5 class="mb-3">După înregistrare</h5>
+            <p class="small text-muted-custom mb-0">În dashboard vei avea o pagină de profil pentru service unde poți adăuga garaje, galerie foto și poza de card.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  input, select, textarea {
+    background: var(--ah-dark3) !important;border: 1px solid var(--ah-border) !important;color: #fff !important;border-radius: 10px !important;padding: 0.6rem 0.8rem !important;
+  }
+  #id_categories {display:grid;grid-template-columns:1fr 1fr;gap:.5rem 1rem;}
+  #id_categories label {display:flex;align-items:center;gap:.45rem;color:#fff;}
+</style>
+{% endblock %}

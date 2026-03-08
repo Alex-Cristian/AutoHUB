@@ -1,0 +1,457 @@
+{% extends 'base.html' %}
+{% block title %}Calendar expirări — {{ car.make }} {{ car.model }}{% endblock %}
+
+{% block content %}
+<style>
+  .expiry-shell {
+    background: linear-gradient(180deg, rgba(18,18,18,0.98), rgba(11,11,11,0.98));
+    border: 1px solid var(--ah-border);
+    border-radius: 26px;
+    padding: 1.25rem;
+    overflow: hidden;
+  }
+  .expiry-hero {
+    position: relative;
+    min-height: 700px;
+    border-radius: 24px;
+    border: 1px solid rgba(255,255,255,0.05);
+    background:
+      radial-gradient(circle at 50% 44%, rgba(230,57,70,0.18) 0, rgba(230,57,70,0.08) 18%, transparent 40%),
+      linear-gradient(180deg, rgba(22,22,22,0.96), rgba(10,10,10,0.98));
+    overflow: hidden;
+  }
+  .expiry-board {
+    position: relative;
+    width: min(100%, 980px);
+    height: 660px;
+    margin: 0 auto;
+    padding-top: .5rem;
+  }
+  .expiry-star-wrap {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .expiry-star-svg {
+    width: min(48vw, 430px);
+    max-width: 430px;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    opacity: .92;
+    filter: drop-shadow(0 0 36px rgba(230,57,70,.14));
+  }
+  .expiry-star-outline {
+    fill: rgba(255,255,255,0.02);
+    stroke: rgba(255,255,255,0.12);
+    stroke-width: 7;
+  }
+  .expiry-star-glow {
+    fill: rgba(230,57,70,0.12);
+  }
+  .expiry-center-core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 170px;
+    height: 170px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(230,57,70,0.98), rgba(255,132,84,0.92));
+    box-shadow: 0 16px 40px rgba(0,0,0,0.36), 0 0 36px rgba(230,57,70,0.2);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 1rem;
+    z-index: 2;
+  }
+  .expiry-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: clamp(150px, 16vw, 190px);
+    min-height: 138px;
+    background: rgba(15,15,15,0.9);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px;
+    padding: 0.9rem;
+    box-shadow: 0 18px 35px rgba(0,0,0,0.28);
+    backdrop-filter: blur(6px);
+    z-index: 3;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    cursor: pointer;
+  }
+  .expiry-node:hover,
+  .expiry-node:focus-visible,
+  .expiry-node.active {
+    transform: translate(-50%, -50%) scale(1.03);
+    box-shadow: 0 20px 42px rgba(0,0,0,0.34);
+    border-color: rgba(230,57,70,0.58);
+    outline: none;
+  }
+  .expiry-node.status-expired { border-color: rgba(220,53,69,0.72); }
+  .expiry-node.status-soon { border-color: rgba(255,193,7,0.72); }
+  .expiry-node.status-ok { border-color: rgba(25,135,84,0.72); }
+  .expiry-node.status-missing { border-style: dashed; }
+  .expiry-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .24rem .58rem;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+  .expiry-status-pill.status-expired { background: rgba(220,53,69,0.18); color: #ff9aa4; }
+  .expiry-status-pill.status-soon { background: rgba(255,193,7,0.18); color: #ffd75e; }
+  .expiry-status-pill.status-ok { background: rgba(25,135,84,0.18); color: #89e8b1; }
+  .expiry-status-pill.status-missing { background: rgba(255,255,255,0.08); color: #d2d2d2; }
+  .expiry-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .45rem;
+    margin-top: .55rem;
+  }
+  .expiry-summary-box {
+    border-radius: 14px;
+    padding: .45rem .55rem;
+    background: rgba(255,255,255,0.04);
+    text-align: center;
+  }
+  .expiry-panel {
+    margin-top: 1.1rem;
+    border-radius: 24px;
+    background: rgba(15,15,15,0.92);
+    border: 1px solid var(--ah-border);
+    padding: 1.25rem;
+  }
+  .expiry-panel[hidden] { display: none !important; }
+  .expiry-field-group[hidden] { display: none !important; }
+  .expiry-mini-status {
+    border-radius: 14px;
+    padding: .75rem .85rem;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .expiry-hint {
+    border-radius: 18px;
+    padding: 1rem 1.1rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px dashed rgba(255,255,255,0.08);
+  }
+
+  @media (max-width: 1199.98px) {
+    .expiry-hero { min-height: 660px; }
+    .expiry-board { height: 640px; }
+  }
+
+  @media (max-width: 991.98px) {
+    .expiry-shell { padding: 1rem; }
+    .expiry-hero {
+      min-height: auto;
+      padding: 1rem;
+    }
+    .expiry-board {
+      width: 100%;
+      height: auto;
+    }
+    .expiry-star-wrap,
+    .expiry-center-core {
+      display: none;
+    }
+    .expiry-node {
+      position: static;
+      transform: none;
+      width: 100%;
+      min-height: auto;
+      margin-bottom: .85rem;
+    }
+    .expiry-node:hover,
+    .expiry-node:focus-visible,
+    .expiry-node.active {
+      transform: none;
+    }
+  }
+</style>
+
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'accounts:profile' %}" class="text-red text-decoration-none">Profil</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'accounts:cars' %}" class="text-red text-decoration-none">Mașinile mele</a></li>
+          <li class="breadcrumb-item active text-muted-custom" aria-current="page">Calendar expirări</li>
+        </ol>
+      </nav>
+      <h2 class="section-title mb-1"><i class="bi bi-stars me-2 text-red"></i>Calendar expirări</h2>
+      <p class="text-muted-custom mb-0">{{ car.make }} {{ car.model }}{% if car.year %} {{ car.year }}{% endif %} · {{ car.plate_number }}</p>
+    </div>
+    <a href="{% url 'accounts:cars' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Înapoi la mașini
+    </a>
+  </div>
+
+  <div class="expiry-shell">
+    <div class="expiry-hero">
+      <div class="expiry-board">
+      <div class="expiry-star-wrap" aria-hidden="true">
+        <svg viewBox="0 0 1000 1000" class="expiry-star-svg" role="presentation">
+          <polygon class="expiry-star-glow" points="500,70 612,355 918,355 670,535 764,835 500,655 236,835 330,535 82,355 388,355"></polygon>
+          <polygon class="expiry-star-outline" points="500,70 612,355 918,355 670,535 764,835 500,655 236,835 330,535 82,355 388,355"></polygon>
+        </svg>
+      </div>
+
+      <div class="expiry-center-core">
+        <div class="small text-white-50 mb-1">calendar auto</div>
+        <div class="fw-bold fs-5">{{ car.make }} {{ car.model }}</div>
+        <div class="small mb-2">{{ car.plate_number }}</div>
+        <div class="d-flex flex-wrap justify-content-center gap-2">
+          <span class="badge text-bg-danger">{{ status_counts.expired }} expirate</span>
+          <span class="badge text-bg-warning text-dark">{{ status_counts.soon }} curând</span>
+          <span class="badge text-bg-success">{{ status_counts.ok }} ok</span>
+        </div>
+      </div>
+
+      {% for item in star_nodes %}
+      <button
+        type="button"
+        class="expiry-node status-{{ item.status }} {% if active_section == item.key %}active{% endif %}"
+        style="top: {{ item.top }}; left: {{ item.left }};"
+        data-section="{{ item.key }}"
+        data-label="{{ item.label }}"
+        data-description="{{ item.description }}"
+      >
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+          <div class="text-start">
+            <div class="fw-bold">{{ item.label }}</div>
+            <div class="text-muted-custom small"><i class="bi {{ item.icon }} me-1"></i>Apasă pentru setare</div>
+          </div>
+          <span class="expiry-status-pill status-{{ item.status }}">
+            {% if item.status == 'expired' %}Expirat{% elif item.status == 'soon' %}Curând{% elif item.status == 'ok' %}OK{% else %}Nesetat{% endif %}
+          </span>
+        </div>
+
+        {% if item.key == 'siguranta_auto' %}
+          <div class="text-start small text-muted-custom mb-1">Trusă + extinctor</div>
+          {% for subitem in item.subitems %}
+            <div class="d-flex justify-content-between align-items-center small mb-1">
+              <span>{{ subitem.label }}</span>
+              <span class="text-white">{% if subitem.date %}{{ subitem.date|date:"d.m.Y" }}{% else %}—{% endif %}</span>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-start">
+            {% if item.date %}
+              <div class="fw-semibold">{{ item.date|date:"d.m.Y" }}</div>
+              <div class="text-muted-custom small mt-1">
+                {% if item.days_left < 0 %}
+                  Expirat de {{ item.days_overdue }} zile
+                {% elif item.days_left == 0 %}
+                  Expiră azi
+                {% elif item.days_left == 1 %}
+                  Expiră mâine
+                {% else %}
+                  Mai sunt {{ item.days_left }} zile
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="text-muted-custom small">Nu ai setat încă data de expirare.</div>
+            {% endif %}
+          </div>
+        {% endif %}
+      </button>
+      {% endfor %}
+      </div>
+    </div>
+
+    <div id="expirySelectionHint" class="expiry-hint mt-3 {% if active_section %}d-none{% endif %}">
+      <div class="fw-semibold mb-1">Alege o categorie din stea</div>
+      <div class="text-muted-custom small mb-0">Formularul de setare apare doar după click pe categoria dorită.</div>
+    </div>
+
+    <div id="expiryFormPanel" class="expiry-panel {% if not active_section %}d-none{% endif %}">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div>
+          <h4 id="panelTitle" class="fw-bold mb-1">
+            {% for item in star_nodes %}{% if item.key == active_section %}{{ item.label }}{% endif %}{% endfor %}
+          </h4>
+          <p id="panelDescription" class="text-muted-custom small mb-0">
+            {% for item in star_nodes %}{% if item.key == active_section %}{{ item.description }}{% endif %}{% endfor %}
+          </p>
+        </div>
+        <button type="button" id="closePanelBtn" class="btn btn-outline-secondary btn-sm {% if not active_section %}d-none{% endif %}">
+          <i class="bi bi-x-lg me-1"></i>Închide
+        </button>
+      </div>
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="active_section" id="activeSectionInput" value="{{ active_section }}">
+
+        <div id="group-itp" class="expiry-field-group" {% if active_section != 'itp' %}hidden{% endif %}>
+          <div class="row g-3 align-items-end">
+            <div class="col-lg-4">
+              <label class="form-label">Data expirării ITP</label>
+              {{ form.itp_expiry }}
+            </div>
+            <div class="col-lg-8">
+              <div class="expiry-mini-status h-100">
+                <div class="small text-muted-custom">Pont</div>
+                <div class="fw-semibold">Pune data exactă de pe act, ca să poți vedea ușor dacă expiră curând.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="group-rca" class="expiry-field-group" {% if active_section != 'rca' %}hidden{% endif %}>
+          <div class="row g-3 align-items-end">
+            <div class="col-lg-4">
+              <label class="form-label">Data expirării RCA</label>
+              {{ form.rca_expiry }}
+            </div>
+            <div class="col-lg-8">
+              <div class="expiry-mini-status h-100">
+                <div class="small text-muted-custom">Pont</div>
+                <div class="fw-semibold">RCA-ul merită verificat din timp, ca să nu rămâi fără acoperire.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="group-rovinieta" class="expiry-field-group" {% if active_section != 'rovinieta' %}hidden{% endif %}>
+          <div class="row g-3 align-items-end">
+            <div class="col-lg-4">
+              <label class="form-label">Data expirării rovinietei</label>
+              {{ form.rovinieta_expiry }}
+            </div>
+            <div class="col-lg-8">
+              <div class="expiry-mini-status h-100">
+                <div class="small text-muted-custom">Pont</div>
+                <div class="fw-semibold">Ideal e să o ai salvată ca să vezi rapid când se apropie termenul.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="group-casco" class="expiry-field-group" {% if active_section != 'casco' %}hidden{% endif %}>
+          <div class="row g-3 align-items-end">
+            <div class="col-lg-4">
+              <label class="form-label">Data expirării CASCO</label>
+              {{ form.casco_expiry }}
+            </div>
+            <div class="col-lg-8">
+              <div class="expiry-mini-status h-100">
+                <div class="small text-muted-custom">Pont</div>
+                <div class="fw-semibold">Dacă ai CASCO, salvează data aici ca să știi din timp când trebuie reînnoit.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="group-siguranta_auto" class="expiry-field-group" {% if active_section != 'siguranta_auto' %}hidden{% endif %}>
+          <div class="row g-3">
+            <div class="col-lg-4">
+              <label class="form-label">Data expirării trusei auto</label>
+              {{ form.trusa_expiry }}
+            </div>
+            <div class="col-lg-4">
+              <label class="form-label">Data expirării extinctorului</label>
+              {{ form.extinctor_expiry }}
+            </div>
+            <div class="col-lg-4">
+              <div class="expiry-mini-status h-100">
+                <div class="small text-muted-custom">Siguranță auto</div>
+                <div class="fw-semibold mb-2">Aici setezi împreună trusa și extinctorul.</div>
+                <div class="small text-muted-custom">Am păstrat totul în aceeași categorie, exact cum ai cerut.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="panelActions" class="d-flex gap-2 mt-4 {% if not active_section %}d-none{% endif %}">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>Salvează
+          </button>
+          <a href="{% url 'accounts:profile' %}" class="btn btn-outline-secondary">Înapoi la profil</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const nodes = document.querySelectorAll('.expiry-node[data-section]');
+    const panel = document.getElementById('expiryFormPanel');
+    const hint = document.getElementById('expirySelectionHint');
+    const title = document.getElementById('panelTitle');
+    const description = document.getElementById('panelDescription');
+    const activeInput = document.getElementById('activeSectionInput');
+    const closeBtn = document.getElementById('closePanelBtn');
+    const actions = document.getElementById('panelActions');
+
+    function syncDisabledFields() {
+      document.querySelectorAll('.expiry-field-group').forEach((group) => {
+        const isHidden = group.hidden;
+        group.querySelectorAll('input, select, textarea').forEach((field) => {
+          field.disabled = isHidden;
+        });
+      });
+    }
+
+    function setActive(section, label, text) {
+      nodes.forEach((node) => node.classList.toggle('active', node.dataset.section === section));
+      document.querySelectorAll('.expiry-field-group').forEach((group) => {
+        group.hidden = group.id !== `group-${section}`;
+      });
+      syncDisabledFields();
+
+      if (panel) panel.classList.remove('d-none');
+      if (hint) hint.classList.add('d-none');
+      if (title) title.textContent = label || '';
+      if (description) description.textContent = text || '';
+      if (activeInput) activeInput.value = section || '';
+      if (closeBtn) closeBtn.classList.remove('d-none');
+      if (actions) {
+        actions.classList.toggle('d-none', !section);
+      }
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    nodes.forEach((node) => {
+      node.addEventListener('click', function () {
+        setActive(this.dataset.section, this.dataset.label, this.dataset.description);
+      });
+    });
+
+    if (activeInput && activeInput.value) {
+      syncDisabledFields();
+    } else {
+      document.querySelectorAll('.expiry-field-group').forEach((group) => {
+        group.querySelectorAll('input, select, textarea').forEach((field) => {
+          field.disabled = true;
+        });
+      });
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        nodes.forEach((node) => node.classList.remove('active'));
+        document.querySelectorAll('.expiry-field-group').forEach((group) => { group.hidden = true; });
+        syncDisabledFields();
+        panel.classList.add('d-none');
+        hint.classList.remove('d-none');
+        activeInput.value = '';
+        actions.classList.add('d-none');
+        closeBtn.classList.add('d-none');
+      });
+    }
+    syncDisabledFields();
+  })();
+</script>
+{% endblock %}

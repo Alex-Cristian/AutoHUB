@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Înregistrare — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-sm-10 col-md-7 col-lg-5">
+      <div class="rounded-xl p-4 p-md-5" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <div class="text-center mb-4">
+          <a href="{% url 'core:home' %}" class="text-decoration-none">
+            <h3 class="fw-bold text-white">
+              <i class="bi bi-tools me-1 text-red"></i>Auto<span class="text-red">Hub</span>
+            </h3>
+          </a>
+          <p class="text-muted-custom">Creează-ți contul gratuit</p>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">Prenume</label>
+              {{ form.first_name }}
+              {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors|join:" " }}</div>{% endif %}
+            </div>
+            <div class="col-6">
+              <label class="form-label">Nume</label>
+              {{ form.last_name }}
+              {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors|join:" " }}</div>{% endif %}
+            </div>
+            <div class="col-12">
+              <label class="form-label">Email</label>
+              {{ form.email }}
+              {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors|join:" " }}</div>{% endif %}
+            </div>
+            <div class="col-12">
+              <label class="form-label">Nume utilizator</label>
+              {{ form.username }}
+              {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors|join:" " }}</div>{% endif %}
+            </div>
+            <div class="col-12">
+              <label class="form-label">Parolă</label>
+              {{ form.password1 }}
+              {% if form.password1.errors %}<div class="text-danger small">{{ form.password1.errors|join:" " }}</div>{% endif %}
+            </div>
+            <div class="col-12">
+              <label class="form-label">Confirmă parola</label>
+              {{ form.password2 }}
+              {% if form.password2.errors %}<div class="text-danger small">{{ form.password2.errors|join:" " }}</div>{% endif %}
+            </div>
+          </div>
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <button type="submit" class="btn btn-primary w-100 btn-lg mt-4">
+            <i class="bi bi-person-plus me-2"></i>Creează cont
+          </button>
+        </form>
+
+        <hr style="border-color:var(--ah-border);margin:1.5rem 0;">
+        <p class="text-center text-muted-custom small mb-0">
+          Ai deja cont?
+          <a href="{% url 'accounts:login' %}" class="text-red text-decoration-none fw-bold">
+            Autentifică-te
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

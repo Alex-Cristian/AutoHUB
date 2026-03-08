@@ -17,7 +17,7 @@
   <div class="row g-3">
     {% for car in cars %}
     <div class="col-md-6 col-lg-4">
-      <div class="p-3 rounded-3 h-100 d-flex flex-column" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+      <div class="p-3 rounded-3 h-100" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
             <p class="fw-bold mb-1" style="font-size:1.05rem;">
@@ -26,9 +26,6 @@
             <div class="d-flex flex-wrap gap-2 align-items-center">
               <span class="badge" style="background:var(--ah-dark4);border:1px solid var(--ah-border);">
                 <i class="bi bi-upc-scan me-1"></i>{{ car.plate_number }}
-              </span>
-              <span class="badge text-bg-{{ car.expiry_badge.class }}">
-                <i class="bi {{ car.expiry_badge.icon }} me-1"></i>{{ car.expiry_badge.label }}
               </span>
               {% if car.fuel %}
               <span class="badge" style="background:var(--ah-dark4);border:1px solid var(--ah-border);color:#ccc;">
@@ -47,18 +44,16 @@
 
         <hr style="border-color:var(--ah-border);" class="my-3">
 
-        <div class="mt-auto d-grid gap-2">
-          <a class="btn btn-outline-danger btn-sm" href="{% url 'accounts:car_calendar' car.id %}">
-            <i class="bi bi-stars me-1"></i>Calendar expirări
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-outline-secondary btn-sm flex-grow-1" href="{% url 'accounts:car_update' car.id %}">
+            <i class="bi bi-pencil-square me-1"></i>Editează
           </a>
-          <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary btn-sm flex-grow-1" href="{% url 'accounts:car_update' car.id %}">
-              <i class="bi bi-pencil-square me-1"></i>Editează
-            </a>
-            <a class="btn btn-outline-danger btn-sm" href="{% url 'accounts:car_delete' car.id %}">
-              <i class="bi bi-trash"></i>
-            </a>
-          </div>
+          <a class="btn btn-outline-warning btn-sm flex-grow-1" href="{% url 'accounts:car_calendar' car.id %}">
+            <i class="bi bi-stars me-1"></i>Expirări
+          </a>
+          <a class="btn btn-outline-danger btn-sm" href="{% url 'accounts:car_delete' car.id %}">
+            <i class="bi bi-trash"></i>
+          </a>
         </div>
       </div>
     </div>

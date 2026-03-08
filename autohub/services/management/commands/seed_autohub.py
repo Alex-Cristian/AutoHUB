@@ -16,7 +16,6 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.utils import timezone
 from PIL import Image, ImageDraw
-from datetime import timedelta
 
 
 CATEGORIES = [
@@ -518,7 +517,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review, ReviewImage
         from bookings.models import Booking, BookingAttachment
-        from accounts.models import Car, CarExpiryProfile
 
         self.stdout.write(self.style.WARNING('🚀 Pornind seed AutoHub...'))
 
@@ -558,38 +556,6 @@ class Command(BaseCommand):
             user.save()
             mock_users.append(user)
 
-        customer_username = 'client_demo'
-        customer_password = 'client1234'
-        customer_user, _ = User.objects.get_or_create(
-            username=customer_username,
-            defaults={
-                'first_name': 'Client',
-                'last_name': 'Demo',
-                'email': 'client.demo@autohub.ro',
-            },
-        )
-        customer_user.first_name = 'Client'
-        customer_user.last_name = 'Demo'
-        customer_user.email = 'client.demo@autohub.ro'
-        customer_user.set_password(customer_password)
-        customer_user.save()
-
-        service_username = 'service_demo'
-        service_password = 'service1234'
-        service_user, _ = User.objects.get_or_create(
-            username=service_username,
-            defaults={
-                'first_name': 'Service',
-                'last_name': 'Demo',
-                'email': 'service.demo@autohub.ro',
-            },
-        )
-        service_user.first_name = 'Service'
-        service_user.last_name = 'Demo'
-        service_user.email = 'service.demo@autohub.ro'
-        service_user.set_password(service_password)
-        service_user.save()
-
         self.stdout.write(f'🏢 Creare {len(CENTERS_DATA)} service-uri...')
         created_centers = []
         all_slugs = [c['slug'] for c in CATEGORIES]
@@ -604,8 +570,7 @@ class Command(BaseCommand):
             random.shuffle(extra_slugs)
             category_slugs = [cat_slug] + extra_slugs[:random.randint(1, 2)]
 
-            center_owner = service_user if idx == 0 else None
-            center = ServiceCenter.objects.create(category=cats[cat_slug], is_featured=featured, latitude=lat, longitude=lng, owner=center_owner, **data)
+            center = ServiceCenter.objects.create(category=cats[cat_slug], is_featured=featured, latitude=lat, longitude=lng, **data)
             center.categories.set([cats[slug] for slug in category_slugs])
 
             card_path = self._generate_seed_image(f'card_{center.slug}', center.name, cats[cat_slug].color)
@@ -677,36 +642,6 @@ class Command(BaseCommand):
                 with review_path.open('rb') as fh:
                     ReviewImage.objects.create(review=review, image=File(fh, name=review_path.name))
 
-        demo_car, _ = Car.objects.get_or_create(
-            owner=customer_user,
-            plate_number='B 123 HUB',
-            defaults={
-                'make': 'BMW',
-                'model': '320d',
-                'year': 2018,
-                'fuel': 'motorina',
-                'vin': 'WBA8D11020K123456',
-            },
-        )
-        demo_car.make = 'BMW'
-        demo_car.model = '320d'
-        demo_car.year = 2018
-        demo_car.fuel = 'motorina'
-        demo_car.vin = 'WBA8D11020K123456'
-        demo_car.save()
-
-        CarExpiryProfile.objects.update_or_create(
-            car=demo_car,
-            defaults={
-                'itp_expiry': timezone.localdate() + timedelta(days=90),
-                'rca_expiry': timezone.localdate() + timedelta(days=45),
-                'rovinieta_expiry': timezone.localdate() + timedelta(days=20),
-                'casco_expiry': timezone.localdate() + timedelta(days=120),
-                'trusa_expiry': timezone.localdate() + timedelta(days=180),
-                'extinctor_expiry': timezone.localdate() + timedelta(days=150),
-            }
-        )
-
         if not User.objects.filter(username='admin').exists():
             User.objects.create_superuser(username='admin', email='admin@autohub.ro', password='admin123', first_name='Admin', last_name='AutoHub')
             self.stdout.write(self.style.SUCCESS('👑 Superuser creat: admin / admin123'))
@@ -726,8 +661,5 @@ class Command(BaseCommand):
         self.stdout.write(f'  🖼️ Review imgs: {ReviewImage.objects.count()}')
         self.stdout.write(f'  👤 Utilizatori: {User.objects.count()}')
         self.stdout.write('='*50)
-        self.stdout.write(self.style.SUCCESS('Conturi demo create automat:'))
-        self.stdout.write(f'  👤 Client:  {customer_username} / {customer_password}  (are mașină înregistrată: {demo_car.make} {demo_car.model} - {demo_car.plate_number})')
-        self.stdout.write(f'  🏢 Service: {service_username} / {service_password}  (are service înregistrat: {ServiceCenter.objects.filter(owner=service_user).first().name})')
         self.stdout.write(self.style.SUCCESS('🌐 Pornește serverul: python manage.py runserver'))
         self.stdout.write(self.style.SUCCESS('🔑 Admin: http://127.0.0.1:8000/admin/ (admin/admin123)'))

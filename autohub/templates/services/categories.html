@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Categorii Service Auto — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="--bs-breadcrumb-divider-color:#555;">
+      <li class="breadcrumb-item"><a href="{% url 'core:home' %}" class="text-red text-decoration-none">Acasă</a></li>
+      <li class="breadcrumb-item active text-muted-custom">Categorii</li>
+    </ol>
+  </nav>
+
+  <p class="section-label"><i class="bi bi-grid me-1"></i>Servicii disponibile</p>
+  <h1 class="section-title mb-2">Toate categoriile</h1>
+  <div class="divider-red"></div>
+  <p class="text-muted-custom mb-5">
+    Alege tipul de serviciu de care ai nevoie pentru mașina ta.
+  </p>
+
+  <div class="row g-4">
+    {% for cat in categories %}
+    <div class="col-sm-6 col-md-4 col-lg-4">
+      <a href="{{ cat.get_absolute_url }}" class="cat-card" style="padding:2.5rem 1.5rem;">
+        <span class="cat-icon" style="font-size:3.5rem;">{{ cat.icon }}</span>
+        <h4 class="cat-name fw-bold mb-2">{{ cat.name }}</h4>
+        <p class="cat-count mb-3">{{ cat.center_count }} service-uri disponibile</p>
+        {% if cat.description %}
+        <p class="small text-muted-custom mb-0">{{ cat.description }}</p>
+        {% endif %}
+      </a>
+    </div>
+    {% empty %}
+    <div class="col-12 text-center py-5">
+      <p class="text-muted-custom">Nu există categorii înregistrate.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

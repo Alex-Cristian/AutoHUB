@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard service — AutoHub{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="mb-1">Dashboard service</h1>
+      <p class="text-muted-custom mb-0">Gestionează programările, profilul, garajele și pozele service-urilor tale.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-light" href="{% url 'invoices:clients' %}">
+        <i class="bi bi-receipt me-1"></i>Facturi
+      </a>
+      <a class="btn btn-outline-light" href="{% url 'services:notifications' %}">
+        <i class="bi bi-bell me-1"></i>Notificări
+        {% if unread_count %}
+          <span class="badge bg-danger ms-1">{{ unread_count }}</span>
+        {% endif %}
+      </a>
+      <a class="btn btn-nav-cta" href="{% url 'services:register_service' %}">
+        <i class="bi bi-plus-circle me-1"></i>Adaugă service
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-8">
+      <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h4 class="mb-0"><i class="bi bi-clock-history me-2 text-orange"></i>Programări în așteptare</h4>
+          <span class="text-muted-custom small">{{ pending_bookings|length }} în așteptare</span>
+        </div>
+        {% if pending_bookings %}
+        <div class="table-responsive"><table class="table table-dark table-hover align-middle mb-0"><thead><tr><th>#</th><th>Client</th><th>Data/Ora</th><th>Mașină</th><th>Service</th><th class="text-end">Acțiuni</th></tr></thead><tbody>{% for b in pending_bookings %}<tr><td class="fw-semibold">#{{ b.pk }}</td><td><div class="fw-semibold">{{ b.client_name }}</div><div class="small text-muted-custom">{{ b.client_phone }} • {{ b.client_email }}</div></td><td><div class="fw-semibold">{{ b.booking_date }}</div><div class="small text-muted-custom">{{ b.booking_time }}</div></td><td><div class="fw-semibold">{{ b.car_brand }} {{ b.car_model }}</div><div class="small text-muted-custom">{{ b.car_plate }} • {{ b.car_year }}</div></td><td><div class="fw-semibold">{{ b.center.name }}</div><div class="small text-muted-custom">{{ b.center.get_city_display }}</div></td><td class="text-end"><div class="d-flex justify-content-end gap-2"><form method="post" action="{% url 'services:booking_accept' b.pk %}">{% csrf_token %}<button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check2 me-1"></i>Acceptă</button></form><form method="post" action="{% url 'services:booking_reject' b.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-lg me-1"></i>Respinge</button></form></div></td></tr>{% endfor %}</tbody></table></div>
+        {% else %}<div class="text-muted-custom">Nicio programare în așteptare.</div>{% endif %}
+        {% if user.is_staff %}<a class="btn btn-outline-warning mt-3" href="{% url 'services:verification_list' %}"><i class="bi bi-shield-check me-1"></i>Verificare servicii</a>{% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+        <h5 class="mb-3"><i class="bi bi-building me-2 text-red"></i>Service-urile tale</h5>
+        <div class="d-grid gap-2">
+          {% for c in centers %}
+            <div class="border rounded-xl p-3" style="border-color:var(--ah-border);">
+              <div class="fw-semibold">{{ c.name }}</div>
+              <div class="small text-muted-custom mb-2">{{ c.get_city_display }} • {{ c.display_categories|join:', ' }}</div>
+              <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-outline-light" href="{% url 'services:detail' c.slug %}">Vezi</a>
+                <a class="btn btn-sm btn-nav-cta" href="{% url 'services:manage_profile' c.pk %}">Editează profilul</a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+        <hr class="border-secondary my-4">
+        <h6 class="text-white mb-2"><i class="bi bi-bell me-2 text-orange"></i>Ultimele notificări</h6>
+        {% if latest_notifications %}
+          <div class="list-group list-group-flush">{% for n in latest_notifications %}<div class="list-group-item bg-transparent border-secondary px-0"><div class="d-flex align-items-start justify-content-between"><div><div class="fw-semibold {% if not n.is_read %}text-white{% else %}text-muted-custom{% endif %}">{{ n.title }}</div><div class="small text-muted-custom">{{ n.created_at|date:"d M Y, H:i" }}</div></div>{% if not n.is_read %}<a class="btn btn-sm btn-outline-light" href="{% url 'services:notification_read' n.pk %}">Citește</a>{% endif %}</div></div>{% endfor %}</div>
+        {% else %}<div class="text-muted-custom">Nicio notificare încă.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+    <div class="d-flex align-items-center justify-content-between mb-3"><h4 class="mb-0"><i class="bi bi-list-check me-2 text-red"></i>Ultimele programări</h4><span class="text-muted-custom small">max 50</span></div>
+    {% if bookings %}
+      <div class="table-responsive"><table class="table table-dark table-hover align-middle mb-0"><thead><tr><th>#</th><th>Client</th><th>Service</th><th>Data/Ora</th><th>Status</th></tr></thead><tbody>{% for b in bookings %}<tr><td class="fw-semibold">#{{ b.pk }}</td><td><div class="fw-semibold">{{ b.client_name }}</div><div class="small text-muted-custom">{{ b.client_phone }}</div></td><td><div class="fw-semibold">{{ b.center.name }}</div><div class="small text-muted-custom">{{ b.center.get_city_display }}</div></td><td><div class="fw-semibold">{{ b.booking_date }}</div><div class="small text-muted-custom">{{ b.booking_time }}</div></td><td><span class="badge bg-{{ b.get_status_badge }}">{{ b.get_status_icon }} {{ b.get_status_display }}</span></td></tr>{% endfor %}</tbody></table></div>
+    {% else %}<div class="text-muted-custom">Nu există programări încă.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

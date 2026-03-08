@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Notificări — AutoHub{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h1 class="mb-1">Notificări</h1>
+      <p class="text-muted-custom mb-0">Programări noi și actualizări de status.</p>
+    </div>
+    <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}">
+      <i class="bi bi-speedometer2 me-1"></i>Dashboard
+    </a>
+  </div>
+
+  <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+    {% if notifications %}
+      <div class="list-group list-group-flush">
+        {% for n in notifications %}
+          <div class="list-group-item bg-transparent border-secondary">
+            <div class="d-flex align-items-start justify-content-between gap-3">
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge {% if n.is_read %}bg-secondary{% else %}bg-danger{% endif %}">
+                    {% if n.is_read %}Citit{% else %}Nou{% endif %}
+                  </span>
+                  <div class="fw-semibold">{{ n.title }}</div>
+                </div>
+                {% if n.message %}
+                  <pre class="small text-muted-custom mt-2 mb-0" style="white-space:pre-wrap;">{{ n.message }}</pre>
+                {% endif %}
+                <div class="small text-muted-custom mt-2">{{ n.created_at|date:"d M Y, H:i" }}</div>
+              </div>
+              {% if not n.is_read %}
+                <a class="btn btn-sm btn-outline-light" href="{% url 'services:notification_read' n.pk %}">
+                  Marchează citit
+                </a>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-muted-custom">Nicio notificare încă.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
