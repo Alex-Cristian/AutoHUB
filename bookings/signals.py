@@ -42,7 +42,7 @@ def create_notification_on_new_booking(sender, instance: Booking, created: bool,
 
         # Optional email notification to the owner
         _safe_send_mail(
-            subject=f"[AutoHub] Programare nouă #{instance.pk}",
+            subject=f"[AutoEMG] Programare nouă #{instance.pk}",
             message=(
                 f"Ai o programare nouă pentru {instance.center.name}.\n\n"
                 f"Client: {instance.client_name}\n"
