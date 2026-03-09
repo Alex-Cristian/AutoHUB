@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.utils.dateparse import parse_date
 from django.conf import settings
 from django.http import JsonResponse
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 import json
@@ -25,7 +26,7 @@ STAR_POSITIONS = [
     {'key': 'siguranta_auto', 'top': '33%', 'left': '23%'},
 ]
 
-ALLOWED_DOCUMENT_TYPES = {'ITP', 'RCA', 'ROVINIETA', 'CASCO', 'TRUSA', 'EXTINCTOR', 'NECUNOSCUT'}
+ALLOWED_DOCUMENT_TYPES = {'ITP', 'RCA', 'ROVINIETA', 'CASCO', 'TRUSA', 'EXTINCTOR', 'TALON', 'NECUNOSCUT'}
 ALLOWED_CONFIDENCE = {'high', 'medium', 'low'}
 
 
@@ -300,6 +301,8 @@ def car_expiry_calendar(request, pk):
 
 def _detecteaza_tip_document(text):
     t = text.upper()
+    if any(x in t for x in ['CERTIFICAT DE INMATRICULARE', 'CERTIFICATUL DE ÎNMATRICULARE', 'AUTOTURISM M1', 'NUMAR DE INMATRICULARE', 'NUMĂR DE ÎNMATRICULARE']):
+        return 'TALON'
     if any(x in t for x in ['INSPECTIE TEHNICA', 'ITP', 'INSPECȚIE TEHNICĂ']):
         return 'ITP'
     if any(x in t for x in ['ASIGURARE OBLIGATORIE', 'RCA', 'RASPUNDERE CIVILA', 'RĂSPUNDERE CIVILĂ', 'POLITA', 'POLIȚĂ']):
@@ -448,9 +451,47 @@ def _normalize_document_type(value, hint_type=None, raw_text=''):
     return _detecteaza_tip_document(raw_text or '')
 
 
-def _normalize_expiry_date(value, raw_text=''):
+def _extract_itp_date_from_talon(text):
+    text = text or ''
+    if not text:
+        return None
+
+    candidates = []
+    for match in re.finditer(r'\b(\d{2})[./\-](\d{2})[./\-](\d{4})\b', text):
+        context = text[max(0, match.start() - 24):match.start()].upper()
+        if re.search(r'(?:\bB\b|\bI\b|\bI\.1\b|\bH\b|\bL1\b|PRIMA\s+INMATRICULARE|EMITERII)', context):
+            continue
+        try:
+            parsed = parse_date(f"{match.group(3)}-{match.group(2)}-{match.group(1)}")
+        except Exception:
+            parsed = None
+        if parsed:
+            candidates.append(parsed)
+
+    if candidates:
+        return max(candidates).isoformat()
+    return None
+
+
+def _extract_contextual_expiry_date(raw_text='', hint_type=None, detected_doc_type=None):
+    text = raw_text or ''
+    hint_type = _clean_text_value(hint_type, upper=True, max_length=20)
+    detected_doc_type = _clean_text_value(detected_doc_type, upper=True, max_length=20)
+
+    if detected_doc_type == 'TALON':
+        if hint_type == 'ITP':
+            return _extract_itp_date_from_talon(text)
+        if hint_type in {'RCA', 'ROVINIETA', 'CASCO', 'TRUSA', 'EXTINCTOR', 'TALON'}:
+            return None
+        return None
+
+    return _extrage_data_expirare(text)
+
+
+def _normalize_expiry_date(value, raw_text='', hint_type=None, detected_doc_type=None):
     candidate = _clean_text_value(value, max_length=30)
-    candidates = [candidate, _extrage_data_expirare(raw_text)]
+    contextual = _extract_contextual_expiry_date(raw_text, hint_type=hint_type, detected_doc_type=detected_doc_type)
+    candidates = [candidate, contextual]
     for item in candidates:
         if not item:
             continue
@@ -484,13 +525,87 @@ def _normalize_vin(value, raw_text=''):
     return _extrage_vin(raw_text)
 
 
+def _normalize_fuel(value, raw_text=''):
+    candidate = _clean_text_value(value, upper=True, max_length=30)
+    mapping = {
+        'BENZINA': 'benzina',
+        'BENZINĂ': 'benzina',
+        'PETROL': 'benzina',
+        'MOTORINA': 'motorina',
+        'MOTORINĂ': 'motorina',
+        'DIESEL': 'motorina',
+        'HIBRID': 'hibrid',
+        'HYBRID': 'hibrid',
+        'ELECTRIC': 'electric',
+        'ELECTRICA': 'electric',
+        'ELECTRICĂ': 'electric',
+        'GPL': 'gpl',
+        'GAZ': 'gpl',
+    }
+
+    if candidate in mapping:
+        return mapping[candidate]
+
+    text = (raw_text or '').upper()
+    p3_match = re.search(r'P\.?3\s*[:\-]?\s*([A-ZĂÂÎȘȚ ]+)', text)
+    if p3_match:
+        p3_value = p3_match.group(1).strip()
+        for key, mapped in mapping.items():
+            if key in p3_value:
+                return mapped
+
+    for key, mapped in mapping.items():
+        if key in text:
+            return mapped
+    return None
+
+
+def _normalize_manufacture_year(value, raw_text=''):
+    if value is not None:
+        try:
+            year = int(value)
+            if 1950 <= year <= 2100:
+                return year
+        except (TypeError, ValueError):
+            pass
+
+    text = raw_text or ''
+    explicit_patterns = [
+        r'an(?:ul)?\s+fabrica(?:ț|t)iei\s*[:\-]?\s*(\d{4})',
+        r'fabrica(?:ț|t)ie\s*[:\-]?\s*(\d{4})',
+    ]
+    for pattern in explicit_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            year = int(match.group(1))
+            if 1950 <= year <= 2100:
+                return year
+
+    b_match = re.search(r'\bB\s+(\d{2})\.(\d{2})\.(\d{4})', text)
+    if b_match:
+        return int(b_match.group(3))
+    return None
+
+
+def _normalize_first_registration_date(value, raw_text=''):
+    date_value = _normalize_expiry_date(value, raw_text='')
+    if date_value:
+        return date_value
+
+    text = raw_text or ''
+    b_match = re.search(r'\bB\s+(\d{2})\.(\d{2})\.(\d{4})', text)
+    if b_match:
+        return f"{b_match.group(3)}-{b_match.group(2)}-{b_match.group(1)}"
+    return None
+
+
 def _normalize_confidence(value, normalized_data):
     candidate = _clean_text_value(value, upper=True, max_length=10)
     if candidate and candidate.lower() in ALLOWED_CONFIDENCE:
         return candidate.lower()
 
     score = sum(bool(normalized_data.get(field)) for field in [
-        'expiry_date', 'plate_number', 'vin', 'make', 'model', 'asigurator'
+        'expiry_date', 'plate_number', 'vin', 'make', 'model', 'fuel', 'manufacture_year', 'asigurator'
     ])
     if normalized_data.get('tip_document') and normalized_data['tip_document'] != 'NECUNOSCUT':
         score += 1
@@ -501,10 +616,11 @@ def _normalize_confidence(value, normalized_data):
     return 'low'
 
 
-def _build_fallback_from_text(raw_text, hint_type=None):
+def _build_fallback_from_text(raw_text, hint_type=None, detected_doc_type=None):
     parsed = _parseaza_text_ocr(raw_text or '', hint_type)
     parsed.setdefault('model', None)
     parsed.setdefault('asigurator', None)
+    parsed['expiry_date'] = _extract_contextual_expiry_date(raw_text or '', hint_type=hint_type, detected_doc_type=detected_doc_type or parsed.get('tip_document'))
     parsed['raw_text'] = (raw_text or '')[:1200]
     return parsed
 
@@ -515,22 +631,26 @@ def _validate_and_normalize_ai_data(model_data, raw_output, hint_type=None):
         max_length=1200,
     ) or ''
 
+    normalized_tip_document = _normalize_document_type(model_data.get('tip_document'), hint_type=hint_type, raw_text=raw_text)
     normalized = {
-        'tip_document': _normalize_document_type(model_data.get('tip_document'), hint_type=hint_type, raw_text=raw_text),
-        'expiry_date': _normalize_expiry_date(model_data.get('expiry_date'), raw_text=raw_text),
+        'tip_document': normalized_tip_document,
+        'expiry_date': _normalize_expiry_date(model_data.get('expiry_date'), raw_text=raw_text, hint_type=hint_type, detected_doc_type=normalized_tip_document),
         'plate_number': _normalize_plate_number(model_data.get('plate_number'), raw_text=raw_text),
         'vin': _normalize_vin(model_data.get('vin'), raw_text=raw_text),
         'make': _clean_text_value(model_data.get('make'), max_length=50),
         'model': _clean_text_value(model_data.get('model'), max_length=50),
+        'fuel': _normalize_fuel(model_data.get('fuel'), raw_text=raw_text),
+        'manufacture_year': _normalize_manufacture_year(model_data.get('manufacture_year'), raw_text=raw_text),
+        'first_registration_date': _normalize_first_registration_date(model_data.get('first_registration_date'), raw_text=raw_text),
         'asigurator': _clean_text_value(model_data.get('asigurator'), max_length=60),
         'raw_text': raw_text,
     }
     normalized['confidence'] = _normalize_confidence(model_data.get('confidence'), normalized)
 
-    fallback = _build_fallback_from_text(raw_text, hint_type)
+    fallback = _build_fallback_from_text(raw_text, hint_type, detected_doc_type=normalized_tip_document)
     warnings = []
 
-    for key in ['expiry_date', 'plate_number', 'vin', 'make', 'asigurator']:
+    for key in ['expiry_date', 'plate_number', 'vin', 'make', 'model', 'fuel', 'manufacture_year', 'asigurator']:
         if not normalized.get(key) and fallback.get(key):
             normalized[key] = fallback[key]
             warnings.append(f'{key} a fost completat automat din textul detectat.')
@@ -550,16 +670,199 @@ def _build_openai_prompt(hint_type=None):
         'Nu există sugestie de tip document de la utilizator.'
     )
     return (
-        'Analizează imaginea unui document auto din România. '\
-        + hint_line + ' '\
-        + 'Răspunde exclusiv cu un singur obiect JSON valid, fără text înainte sau după el. '\
-        + 'Cheile permise sunt exact acestea: tip_document, expiry_date, plate_number, vin, make, model, asigurator, confidence, raw_text. '\
-        + 'Reguli: tip_document trebuie să fie unul dintre ITP, RCA, ROVINIETA, CASCO, TRUSA, EXTINCTOR, NECUNOSCUT; '\
-        + 'expiry_date trebuie să fie în format YYYY-MM-DD sau null; '\
-        + 'confidence trebuie să fie high, medium sau low; '\
-        + 'raw_text trebuie să conțină doar un extras relevant din document, maxim 1200 caractere; '\
+        'Analizează un document auto din România (talon / certificat de înmatriculare, RCA, ITP, rovinietă, CASCO, trusă, extinctor). '
+        + hint_line + ' '
+        + 'Răspunde exclusiv cu un singur obiect JSON valid, fără text înainte sau după el. '
+        + 'Cheile permise sunt exact acestea: tip_document, expiry_date, plate_number, vin, make, model, fuel, manufacture_year, first_registration_date, asigurator, confidence, raw_text. '
+        + 'Reguli: '
+        + 'tip_document trebuie să fie unul dintre ITP, RCA, ROVINIETA, CASCO, TRUSA, EXTINCTOR, TALON, NECUNOSCUT; '
+        + 'expiry_date trebuie să fie în format YYYY-MM-DD sau null; '
+        + 'first_registration_date trebuie să fie în format YYYY-MM-DD sau null; '
+        + 'manufacture_year trebuie să fie număr întreg sau null; '
+        + 'fuel trebuie să fie una dintre valorile: benzina, motorina, hibrid, electric, gpl sau null; '
+        + 'La TALON extrage explicit combustibilul din câmpul P.3 dacă există. '
+        + 'La TALON, pentru anul de fabricație: dacă există explicit, folosește acel an; dacă nu există explicit, folosește anul din câmpul B ca fallback. '
+        + 'Dacă utilizatorul a sugerat ITP dar documentul este TALON, caută data ITP-ului din anexă / inspecția tehnică, nu folosi datele B, I sau I.1 ca expiry_date. '
+        + 'confidence trebuie să fie high, medium sau low; '
+        + 'raw_text trebuie să conțină doar un extras relevant din document, maxim 1200 caractere; '
         + 'dacă nu găsești o valoare, pune null; nu folosi markdown și nu explica nimic.'
     )
+
+
+SUPPORTED_SCAN_CONTENT_TYPES = {
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword', 'application/vnd.oasis.opendocument.text',
+    'application/rtf', 'text/rtf', 'text/plain',
+}
+
+
+def _guess_file_content_type(uploaded_file):
+    content_type = (getattr(uploaded_file, 'content_type', '') or '').strip().lower()
+    if content_type:
+        return content_type
+
+    name = (getattr(uploaded_file, 'name', '') or '').lower()
+    ext_map = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.webp': 'image/webp',
+        '.gif': 'image/gif',
+        '.pdf': 'application/pdf',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.doc': 'application/msword',
+        '.odt': 'application/vnd.oasis.opendocument.text',
+        '.rtf': 'application/rtf',
+        '.txt': 'text/plain',
+    }
+    for ext, mime in ext_map.items():
+        if name.endswith(ext):
+            return mime
+    return 'application/octet-stream'
+
+
+def _build_scan_content_items(*, image_source=None, uploaded_file=None):
+    content_items = []
+    if image_source:
+        media_type = _detect_media_type(image_source)
+        image_data = image_source.split(',', 1)[1] if ',' in image_source else image_source
+        content_items.append({
+            'type': 'input_image',
+            'image_url': f'data:{media_type};base64,{image_data}',
+            'detail': 'high',
+        })
+        return content_items
+
+    if not uploaded_file:
+        raise ValueError('Nu ai trimis nici imagine, nici document.')
+
+    content_type = _guess_file_content_type(uploaded_file)
+    if content_type not in SUPPORTED_SCAN_CONTENT_TYPES:
+        raise ValueError('Formatul documentului nu este acceptat. Încarcă JPG, PNG, WEBP, PDF, DOC, DOCX, ODT, RTF sau TXT.')
+
+    file_bytes = uploaded_file.read()
+    uploaded_file.seek(0)
+    if not file_bytes:
+        raise ValueError('Fișierul încărcat este gol.')
+
+    file_b64 = __import__('base64').b64encode(file_bytes).decode('ascii')
+    if content_type.startswith('image/'):
+        content_items.append({
+            'type': 'input_image',
+            'image_url': f'data:{content_type};base64,{file_b64}',
+            'detail': 'high',
+        })
+    else:
+        content_items.append({
+            'type': 'input_file',
+            'file_data': f'data:{content_type};base64,{file_b64}',
+            'filename': getattr(uploaded_file, 'name', 'document'),
+            'detail': 'high',
+        })
+    return content_items
+
+
+def _call_openai_document_scan(*, image_source=None, uploaded_file=None, hint_type=None):
+    api_key = getattr(settings, 'OPENAI_API_KEY', '')
+    if not api_key:
+        raise RuntimeError('OPENAI_API_KEY lipsește. Adaugă cheia în .env sau settings.py.')
+
+    content_items = _build_scan_content_items(image_source=image_source, uploaded_file=uploaded_file)
+    content_items.append({
+        'type': 'input_text',
+        'text': _build_openai_prompt(hint_type),
+    })
+
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    }
+    payload = {
+        'model': getattr(settings, 'OPENAI_MODEL', 'gpt-4.1-mini'),
+        'input': [
+            {
+                'role': 'developer',
+                'content': [
+                    {
+                        'type': 'input_text',
+                        'text': 'Răspunde exclusiv cu un singur obiect JSON valid, fără markdown și fără text suplimentar.',
+                    }
+                ],
+            },
+            {
+                'role': 'user',
+                'content': content_items,
+            },
+        ],
+        'max_output_tokens': 900,
+    }
+
+    resp = http_requests.post('https://api.openai.com/v1/responses', headers=headers, json=payload, timeout=45)
+    if resp.status_code != 200:
+        try:
+            error_data = resp.json()
+        except Exception:
+            error_data = {'raw': resp.text[:1000]}
+        error_message = None
+        if isinstance(error_data, dict):
+            error_message = error_data.get('error', {}).get('message') or error_data.get('message')
+        raise RuntimeError(error_message or 'OpenAI API a returnat o eroare.')
+
+    response_data = resp.json()
+    raw_output = (response_data.get('output_text') or '').strip()
+    if not raw_output:
+        output_items = response_data.get('output', []) or []
+        collected = []
+        for item in output_items:
+            for content_item in item.get('content', []) or []:
+                if content_item.get('type') == 'output_text' and content_item.get('text'):
+                    collected.append(content_item.get('text', ''))
+        raw_output = '\n'.join(collected).strip()
+    if not raw_output:
+        raise RuntimeError('OpenAI nu a returnat conținut text pentru scanare.')
+
+    try:
+        ai_json = _extract_json_object(raw_output)
+    except json.JSONDecodeError:
+        raise RuntimeError(f'Modelul a răspuns, dar nu cu JSON valid. Răspuns brut: {raw_output[:1200]}')
+
+    normalized, warnings = _validate_and_normalize_ai_data(ai_json, raw_output, hint_type=hint_type)
+    return normalized, warnings
+
+
+def _scan_request_payload(request):
+    hint_type = request.POST.get('hint_type') or None
+    uploaded_file = request.FILES.get('document')
+    image_source = ''
+    if request.content_type and 'application/json' in request.content_type:
+        body = json.loads(request.body or '{}')
+        image_source = body.get('image', '')
+        hint_type = body.get('hint_type') or hint_type
+    return image_source, uploaded_file, hint_type
+
+
+@login_required
+@require_POST
+def document_scan_api(request):
+    try:
+        image_source, uploaded_file, hint_type = _scan_request_payload(request)
+        if not image_source and not uploaded_file:
+            return JsonResponse({'error': 'Încarcă un document sau o imagine pentru scanare.'}, status=400)
+
+        normalized, warnings = _call_openai_document_scan(
+            image_source=image_source or None,
+            uploaded_file=uploaded_file,
+            hint_type=hint_type,
+        )
+        result = {'success': True, 'data': normalized}
+        if warnings:
+            result['warning'] = ' '.join(warnings)
+        return JsonResponse(result)
+    except http_requests.exceptions.RequestException as e:
+        return JsonResponse({'error': f'Eroare conexiune OpenAI: {str(e)}'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required
@@ -578,101 +881,23 @@ def car_scan_api(request, pk):
     get_object_or_404(Car, pk=pk, owner=request.user)
 
     try:
-        body = json.loads(request.body)
-        image_source = body.get('image', '')
-        hint_type = body.get('hint_type')
+        image_source, uploaded_file, hint_type = _scan_request_payload(request)
+        if not image_source and not uploaded_file:
+            return JsonResponse({'error': 'Încarcă un document sau o imagine pentru scanare.'}, status=400)
 
-        if not image_source:
-            return JsonResponse({'error': 'Lipsește imaginea.'}, status=400)
-
-        media_type = _detect_media_type(image_source)
-        image_data = image_source.split(',', 1)[1] if ',' in image_source else image_source
-
-        api_key = getattr(settings, 'OPENAI_API_KEY', '')
-        if not api_key:
-            return JsonResponse({'error': 'OPENAI_API_KEY lipsește. Adaugă cheia în .env sau settings.py.'}, status=500)
-
-        data_url = f'data:{media_type};base64,{image_data}'
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
-        }
-        payload = {
-            'model': getattr(settings, 'OPENAI_MODEL', 'gpt-4.1-mini'),
-            'input': [
-                {
-                    'role': 'developer',
-                    'content': [
-                        {
-                            'type': 'input_text',
-                            'text': 'Răspunde exclusiv cu un singur obiect JSON valid, fără markdown și fără text suplimentar.',
-                        }
-                    ],
-                },
-                {
-                    'role': 'user',
-                    'content': [
-                        {
-                            'type': 'input_image',
-                            'image_url': data_url,
-                            'detail': 'high',
-                        },
-                        {
-                            'type': 'input_text',
-                            'text': _build_openai_prompt(hint_type),
-                        },
-                    ],
-                },
-            ],
-            'max_output_tokens': 900,
-        }
-
-        resp = http_requests.post('https://api.openai.com/v1/responses', headers=headers, json=payload, timeout=45)
-        if resp.status_code != 200:
-            try:
-                error_data = resp.json()
-            except Exception:
-                error_data = {'raw': resp.text[:1000]}
-            error_message = None
-            if isinstance(error_data, dict):
-                error_message = error_data.get('error', {}).get('message') or error_data.get('message')
-            return JsonResponse({
-                'error': error_message or 'OpenAI API a returnat o eroare.',
-                'status_code': resp.status_code,
-                'details': error_data,
-            }, status=500)
-
-        response_data = resp.json()
-        raw_output = (response_data.get('output_text') or '').strip()
-        if not raw_output:
-            output_items = response_data.get('output', []) or []
-            collected = []
-            for item in output_items:
-                for content_item in item.get('content', []) or []:
-                    if content_item.get('type') == 'output_text' and content_item.get('text'):
-                        collected.append(content_item.get('text', ''))
-            raw_output = '\n'.join(collected).strip()
-        if not raw_output:
-            return JsonResponse({'error': 'OpenAI nu a returnat conținut text pentru scanare.'}, status=500)
-
-        try:
-            ai_json = _extract_json_object(raw_output)
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'error': 'Modelul a răspuns, dar nu cu JSON valid.',
-                'raw_output': raw_output[:1200],
-            }, status=500)
-
-        normalized, warnings = _validate_and_normalize_ai_data(ai_json, raw_output, hint_type=hint_type)
+        normalized, warnings = _call_openai_document_scan(
+            image_source=image_source or None,
+            uploaded_file=uploaded_file,
+            hint_type=hint_type,
+        )
         result = {'success': True, 'data': normalized}
         if warnings:
             result['warning'] = ' '.join(warnings)
         return JsonResponse(result)
-
     except http_requests.exceptions.RequestException as e:
         return JsonResponse({'error': f'Eroare conexiune OpenAI: {str(e)}'}, status=500)
     except Exception as e:
-        return JsonResponse({'error': f'Eroare: {str(e)}'}, status=500)
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required
@@ -682,22 +907,31 @@ def car_scan_save(request, pk):
 
     try:
         body = json.loads(request.body)
-        normalized_body, validation_warnings = _validate_and_normalize_ai_data(body, body.get('raw_text', ''), hint_type=body.get('tip_document'))
+        target_document = body.get('target_document') or body.get('hint_type') or body.get('tip_document')
+        normalized_body, validation_warnings = _validate_and_normalize_ai_data(body, body.get('raw_text', ''), hint_type=target_document)
         fields_updated = []
 
         car_changed = False
-        for field in ['make', 'model', 'vin', 'plate_number']:
-            val = (normalized_body.get(field) or '').strip()
+        for field in ['make', 'model', 'vin', 'plate_number', 'fuel']:
+            val = normalized_body.get(field)
+            if isinstance(val, str):
+                val = val.strip()
             if val and not getattr(car, field, ''):
                 setattr(car, field, val)
                 car_changed = True
                 fields_updated.append(field)
 
+        year_value = normalized_body.get('manufacture_year')
+        if year_value and not car.year:
+            car.year = year_value
+            car_changed = True
+            fields_updated.append('year')
+
         if car_changed:
             car.save()
 
         expiry_profile, _ = CarExpiryProfile.objects.get_or_create(car=car)
-        tip = (normalized_body.get('tip_document') or '').upper()
+        tip = _clean_text_value(target_document or normalized_body.get('tip_document'), upper=True, max_length=20) or ''
         expiry_date = parse_date((normalized_body.get('expiry_date') or '').strip())
 
         field_map = {
@@ -720,6 +954,8 @@ def car_scan_save(request, pk):
             'model': 'Model',
             'vin': 'VIN',
             'plate_number': 'Nr. înmatriculare',
+            'fuel': 'Combustibil',
+            'year': 'An fabricație',
             'itp_expiry': 'ITP',
             'rca_expiry': 'RCA',
             'rovinieta_expiry': 'Rovinietă',

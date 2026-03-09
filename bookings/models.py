@@ -58,6 +58,7 @@ class Booking(models.Model):
         max_length=20, choices=FUEL_CHOICES, verbose_name='Combustibil'
     )
     car_plate = models.CharField(max_length=20, verbose_name='Nr. înmatriculare')
+    car_vin = models.CharField(max_length=17, default='', verbose_name='Serie șasiu (VIN)')
 
     problem_description = models.TextField(
         verbose_name='Descriere problemă / serviciu dorit'
@@ -120,6 +121,14 @@ class Booking(models.Model):
             raise ValidationError({
                 'car_year': f'Anul mașinii trebuie să fie între 1950 și {current_year + 1}.'
             })
+        vin = ''.join(ch for ch in (self.car_vin or '').upper().strip() if ch.isalnum())
+        self.car_vin = vin
+        if not vin:
+            raise ValidationError({'car_vin': 'VIN-ul este obligatoriu.'})
+        if len(vin) != 17:
+            raise ValidationError({'car_vin': 'VIN-ul trebuie să aibă exact 17 caractere.'})
+        if any(ch in {'I', 'O', 'Q'} for ch in vin):
+            raise ValidationError({'car_vin': 'VIN-ul nu poate conține literele I, O sau Q.'})
         if self.garage_id and self.center_id and self.garage.center_id != self.center_id:
             raise ValidationError({'garage': 'Garajul selectat nu aparține service-ului ales.'})
         if self.garage_id and self.booking_date and self.booking_time:

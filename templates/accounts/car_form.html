@@ -3,7 +3,7 @@
 {% block title %}{% if mode == 'update' %}Editează mașina{% else %}Adaugă mașină{% endif %} — AutoEMG{% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 860px;">
+<div class="container py-4" style="max-width: 980px;">
   <nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{% url 'core:home' %}" class="text-red text-decoration-none">Acasă</a></li>
@@ -14,78 +14,279 @@
     </ol>
   </nav>
 
-  <div class="rounded-xl p-4" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
-    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
-      <div>
-        <h2 class="section-title mb-1">
-          <i class="bi bi-car-front me-2 text-red"></i>
-          {% if mode == 'update' %}Editează mașina{% else %}Adaugă o mașină{% endif %}
-        </h2>
-        <p class="text-muted-custom mb-0">Le vei putea selecta rapid la programări.</p>
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="rounded-xl p-4 h-100" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <h4 class="fw-bold mb-2"><i class="bi bi-upc-scan me-2 text-red"></i>Scanează talonul</h4>
+        <p class="text-muted-custom small mb-3">Încarcă talonul ca poză, PDF sau document și completăm automat marca, modelul, combustibilul, anul, numărul și VIN-ul.</p>
+
+        <div class="mb-3">
+          <label class="form-label" for="scanDocType">Tip document</label>
+          <select id="scanDocType" class="form-select">
+            <option value="TALON" selected>Talon / certificat de înmatriculare</option>
+            <option value="NECUNOSCUT">Detectează automat</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="scanDocumentInput">Document</label>
+          <input type="file" id="scanDocumentInput" class="form-control" accept="image/*,.pdf,.doc,.docx,.odt,.rtf,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,text/plain,text/rtf">
+          <div class="form-text">Formate acceptate: JPG, PNG, WEBP, PDF, DOC, DOCX, ODT, RTF, TXT.</div>
+        </div>
+
+        <div class="rounded-3 border border-secondary bg-black mb-3 overflow-hidden" style="min-height:240px;">
+          <img id="scanPreviewImage" alt="Preview document" class="w-100 h-100 object-fit-contain d-none" style="max-height:320px;">
+          <div id="scanPreviewPlaceholder" class="d-flex align-items-center justify-content-center text-muted h-100 p-4">
+            <div class="text-center">
+              <i class="bi bi-file-earmark-text fs-1 d-block mb-2"></i>
+              <div id="scanPreviewLabel">Preview-ul documentului va apărea aici</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button type="button" id="scanVehicleBtn" class="btn btn-primary" disabled>
+            <i class="bi bi-stars me-1"></i>Scanează documentul
+          </button>
+          <button type="button" id="applyVehicleScanBtn" class="btn btn-success" disabled>
+            <i class="bi bi-check2-circle me-1"></i>Completează formularul
+          </button>
+        </div>
+
+        <div class="alert mt-3 d-none" id="scanVehicleMessage" role="alert"></div>
+
+        <hr style="border-color:var(--ah-border);" class="my-4">
+
+        <div class="row g-3 small">
+          <div class="col-6"><div class="p-3 rounded border border-secondary h-100"><strong>Marcă:</strong> <span id="scanResMake">—</span></div></div>
+          <div class="col-6"><div class="p-3 rounded border border-secondary h-100"><strong>Model:</strong> <span id="scanResModel">—</span></div></div>
+          <div class="col-6"><div class="p-3 rounded border border-secondary h-100"><strong>An:</strong> <span id="scanResYear">—</span></div></div>
+          <div class="col-6"><div class="p-3 rounded border border-secondary h-100"><strong>Combustibil:</strong> <span id="scanResFuel">—</span></div></div>
+          <div class="col-6"><div class="p-3 rounded border border-secondary h-100"><strong>Nr.:</strong> <span id="scanResPlate">—</span></div></div>
+          <div class="col-6"><div class="p-3 rounded border border-secondary h-100"><strong>VIN:</strong> <span id="scanResVin">—</span></div></div>
+        </div>
       </div>
-      <a class="btn btn-outline-secondary" href="{% url 'accounts:cars' %}">
-        <i class="bi bi-x-lg me-1"></i>Anulează
-      </a>
     </div>
 
-    <form method="post" novalidate>
-      {% csrf_token %}
-
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">Marcă <span class="text-red">*</span></label>
-          {{ form.make }}
-          {% if form.make.errors %}<div class="text-danger small mt-1">{{ form.make.errors|join:" " }}</div>{% endif %}
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Model <span class="text-red">*</span></label>
-          {{ form.model }}
-          {% if form.model.errors %}<div class="text-danger small mt-1">{{ form.model.errors|join:" " }}</div>{% endif %}
-        </div>
-
-        <div class="col-md-4">
-          <label class="form-label">An fabricație</label>
-          {{ form.year }}
-          {% if form.year.errors %}<div class="text-danger small mt-1">{{ form.year.errors|join:" " }}</div>{% endif %}
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Combustibil</label>
-          {{ form.fuel }}
-          {% if form.fuel.errors %}<div class="text-danger small mt-1">{{ form.fuel.errors|join:" " }}</div>{% endif %}
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Nr. înmatriculare <span class="text-red">*</span></label>
-          {{ form.plate_number }}
-          {% if form.plate_number.errors %}<div class="text-danger small mt-1">{{ form.plate_number.errors|join:" " }}</div>{% endif %}
+    <div class="col-lg-7">
+      <div class="rounded-xl p-4" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+          <div>
+            <h2 class="section-title mb-1">
+              <i class="bi bi-car-front me-2 text-red"></i>
+              {% if mode == 'update' %}Editează mașina{% else %}Adaugă o mașină{% endif %}
+            </h2>
+            <p class="text-muted-custom mb-0">Le vei putea selecta rapid la programări.</p>
+          </div>
+          <a class="btn btn-outline-secondary" href="{% url 'accounts:cars' %}">
+            <i class="bi bi-x-lg me-1"></i>Anulează
+          </a>
         </div>
 
-        <div class="col-12">
-          <label class="form-label">Serie șasiu (VIN)</label>
-          {{ form.vin }}
-          {% if form.vin.errors %}<div class="text-danger small mt-1">{{ form.vin.errors|join:" " }}</div>{% endif %}
-        </div>
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Marcă <span class="text-red">*</span></label>
+              {{ form.make }}
+              {% if form.make.errors %}<div class="text-danger small mt-1">{{ form.make.errors|join:" " }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Model <span class="text-red">*</span></label>
+              {{ form.model }}
+              {% if form.model.errors %}<div class="text-danger small mt-1">{{ form.model.errors|join:" " }}</div>{% endif %}
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">An fabricație</label>
+              {{ form.year }}
+              {% if form.year.errors %}<div class="text-danger small mt-1">{{ form.year.errors|join:" " }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Combustibil</label>
+              {{ form.fuel }}
+              {% if form.fuel.errors %}<div class="text-danger small mt-1">{{ form.fuel.errors|join:" " }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Nr. înmatriculare <span class="text-red">*</span></label>
+              {{ form.plate_number }}
+              {% if form.plate_number.errors %}<div class="text-danger small mt-1">{{ form.plate_number.errors|join:" " }}</div>{% endif %}
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Serie șasiu (VIN)</label>
+              {{ form.vin }}
+              {% if form.vin.errors %}<div class="text-danger small mt-1">{{ form.vin.errors|join:" " }}</div>{% endif %}
+            </div>
+          </div>
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <div class="d-flex gap-2 mt-4 flex-wrap">
+            <button class="btn btn-primary" type="submit">
+              <i class="bi bi-check2-circle me-1"></i>
+              {% if mode == 'update' %}Salvează modificările{% else %}Adaugă mașina{% endif %}
+            </button>
+            {% if mode == 'update' %}
+            <a class="btn btn-outline-danger" href="{% url 'accounts:car_delete' car.id %}">
+              <i class="bi bi-trash me-1"></i>Șterge
+            </a>
+            {% endif %}
+          </div>
+        </form>
       </div>
 
-      {% if form.non_field_errors %}
-      <div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>
-      {% endif %}
-
-      <div class="d-flex gap-2 mt-4 flex-wrap">
-        <button class="btn btn-primary" type="submit">
-          <i class="bi bi-check2-circle me-1"></i>
-          {% if mode == 'update' %}Salvează modificările{% else %}Adaugă mașina{% endif %}
-        </button>
-        {% if mode == 'update' %}
-        <a class="btn btn-outline-danger" href="{% url 'accounts:car_delete' car.id %}">
-          <i class="bi bi-trash me-1"></i>Șterge
-        </a>
-        {% endif %}
-      </div>
-    </form>
+      <p class="text-muted-custom small mt-3 mb-0">
+        <i class="bi bi-shield-lock me-1"></i>Doar tu îți vezi mașinile.
+      </p>
+    </div>
   </div>
-
-  <p class="text-muted-custom small mt-3 mb-0">
-    <i class="bi bi-shield-lock me-1"></i>Doar tu îți vezi mașinile.
-  </p>
 </div>
+
+<script>
+(() => {
+  const documentInput = document.getElementById('scanDocumentInput');
+  const docType = document.getElementById('scanDocType');
+  const previewImage = document.getElementById('scanPreviewImage');
+  const previewPlaceholder = document.getElementById('scanPreviewPlaceholder');
+  const previewLabel = document.getElementById('scanPreviewLabel');
+  const scanBtn = document.getElementById('scanVehicleBtn');
+  const applyBtn = document.getElementById('applyVehicleScanBtn');
+  const messageBox = document.getElementById('scanVehicleMessage');
+
+  const resultNodes = {
+    make: document.getElementById('scanResMake'),
+    model: document.getElementById('scanResModel'),
+    manufacture_year: document.getElementById('scanResYear'),
+    fuel: document.getElementById('scanResFuel'),
+    plate_number: document.getElementById('scanResPlate'),
+    vin: document.getElementById('scanResVin'),
+  };
+
+  const formFields = {
+    make: document.getElementById('id_make'),
+    model: document.getElementById('id_model'),
+    year: document.getElementById('id_year'),
+    fuel: document.getElementById('id_fuel'),
+    plate_number: document.getElementById('id_plate_number'),
+    vin: document.getElementById('id_vin'),
+  };
+
+  let selectedFile = null;
+  let lastScanData = null;
+
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+
+  function showMessage(text, type='info') {
+    messageBox.className = `alert alert-${type} mt-3`;
+    messageBox.textContent = text;
+    messageBox.classList.remove('d-none');
+  }
+
+  function hideMessage() {
+    messageBox.classList.add('d-none');
+    messageBox.textContent = '';
+  }
+
+  function renderPreview(file) {
+    if (!file) {
+      previewImage.classList.add('d-none');
+      previewImage.removeAttribute('src');
+      previewPlaceholder.classList.remove('d-none');
+      previewLabel.textContent = 'Preview-ul documentului va apărea aici';
+      return;
+    }
+
+    if ((file.type || '').startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        previewImage.src = reader.result;
+        previewImage.classList.remove('d-none');
+        previewPlaceholder.classList.add('d-none');
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    previewImage.classList.add('d-none');
+    previewImage.removeAttribute('src');
+    previewPlaceholder.classList.remove('d-none');
+    previewLabel.textContent = `Fișier selectat: ${file.name}`;
+  }
+
+  function fillResultCards(data={}) {
+    resultNodes.make.textContent = data.make || '—';
+    resultNodes.model.textContent = data.model || '—';
+    resultNodes.manufacture_year.textContent = data.manufacture_year || '—';
+    resultNodes.fuel.textContent = data.fuel || '—';
+    resultNodes.plate_number.textContent = data.plate_number || '—';
+    resultNodes.vin.textContent = data.vin || '—';
+  }
+
+  documentInput.addEventListener('change', () => {
+    selectedFile = documentInput.files?.[0] || null;
+    lastScanData = null;
+    applyBtn.disabled = true;
+    scanBtn.disabled = !selectedFile;
+    hideMessage();
+    renderPreview(selectedFile);
+  });
+
+  scanBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append('document', selectedFile);
+    formData.append('hint_type', docType.value || 'TALON');
+
+    scanBtn.disabled = true;
+    applyBtn.disabled = true;
+    showMessage('Scanez documentul... te rog așteaptă puțin.', 'info');
+
+    try {
+      const response = await fetch('{% url "accounts:document_scan_api" %}', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: formData,
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'Nu am putut scana documentul.');
+      }
+
+      lastScanData = payload.data || {};
+      fillResultCards(lastScanData);
+      applyBtn.disabled = false;
+      showMessage(payload.warning || 'Scanare completă. Apasă pe „Completează formularul”.', payload.warning ? 'warning' : 'success');
+    } catch (error) {
+      showMessage(error.message || 'Nu am putut scana documentul.', 'danger');
+    } finally {
+      scanBtn.disabled = false;
+    }
+  });
+
+  applyBtn.addEventListener('click', () => {
+    if (!lastScanData) return;
+    if (lastScanData.make) formFields.make.value = lastScanData.make;
+    if (lastScanData.model) formFields.model.value = lastScanData.model;
+    if (lastScanData.manufacture_year) formFields.year.value = lastScanData.manufacture_year;
+    if (lastScanData.fuel) formFields.fuel.value = lastScanData.fuel;
+    if (lastScanData.plate_number) formFields.plate_number.value = lastScanData.plate_number;
+    if (lastScanData.vin) formFields.vin.value = lastScanData.vin;
+    showMessage('Am completat formularul cu datele detectate. Verifică-le și salvează mașina.', 'success');
+  });
+
+  fillResultCards();
+})();
+</script>
 {% endblock %}

@@ -9,6 +9,7 @@ from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage,
 from bookings.forms import BookingForm
 from bookings.models import Booking
 from accounts.models import Car
+import re
 
 
 def geocodeaza_adresa(address, city_display):
@@ -349,6 +350,18 @@ class ReviewForm(forms.ModelForm):
 
 
 class ServiceOwnerBookingForm(BookingForm):
+
+    car_vin = forms.CharField(
+        label="Serie șasiu (VIN)",
+        required=True,
+        max_length=17,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "ex: WVWZZZ1KZAW000001",
+            "style": "text-transform:uppercase"
+        })
+    )
+
     duration_minutes = forms.TypedChoiceField(
         label='Durată blocare garaj',
         coerce=int,
@@ -373,22 +386,44 @@ class ServiceOwnerBookingForm(BookingForm):
     class Meta(BookingForm.Meta):
         fields = [
             'client_name', 'client_phone', 'client_email',
-            'car_brand', 'car_model', 'car_year', 'car_fuel', 'car_plate',
+            'car_brand', 'car_model', 'car_year', 'car_fuel',
+            'car_plate', 'car_vin',
             'service_item', 'garage', 'problem_description',
             'booking_date', 'booking_time', 'duration_minutes',
         ]
 
     def __init__(self, center=None, user=None, *args, **kwargs):
         super().__init__(center=center, user=user, *args, **kwargs)
+
         self.fields['saved_car'].queryset = Car.objects.select_related('owner').order_by(
             'plate_number', 'make', 'model', 'owner__username'
         )
+
         self.fields['saved_car'].empty_label = '— Alege o mașină din baza de date (opțional) —'
-        self.fields['saved_car'].widget = forms.Select(attrs={'class': 'form-select', 'id': 'id_saved_car'})
-        self.fields['attachments'].help_text = 'Poți încărca poze și video și când programarea este introdusă din dashboard.'
+
+        self.fields['saved_car'].widget = forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_saved_car'
+        })
+
+        self.fields['attachments'].help_text = (
+            'Poți încărca poze și video și când programarea este introdusă din dashboard.'
+        )
+
+    def clean_car_vin(self):
+        vin = (self.cleaned_data.get("car_vin") or "").upper().strip()
+
+        if len(vin) != 17:
+            raise forms.ValidationError("VIN-ul trebuie să aibă exact 17 caractere.")
+
+        if re.search(r"[IOQ]", vin):
+            raise forms.ValidationError("VIN-ul nu poate conține literele I, O sau Q.")
+
+        return vin
 
     def clean(self):
         cleaned = super().clean()
+
         garage = cleaned.get('garage')
         booking_date = cleaned.get('booking_date')
         booking_time = cleaned.get('booking_time')
@@ -397,8 +432,12 @@ class ServiceOwnerBookingForm(BookingForm):
 
         if saved_car and not (cleaned.get('client_name') or '').strip():
             cleaned['client_name'] = saved_car.owner.get_full_name() or saved_car.owner.username
+
         if saved_car and not (cleaned.get('client_email') or '').strip():
             cleaned['client_email'] = saved_car.owner.email
+
+        if saved_car:
+            cleaned['car_vin'] = saved_car.vin
 
         if garage and booking_date and booking_time and duration_minutes and not garage.is_time_available(
             booking_date,

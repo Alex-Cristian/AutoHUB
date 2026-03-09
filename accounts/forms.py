@@ -75,12 +75,25 @@ class CarForm(forms.ModelForm):
             'plate_number': forms.TextInput(
                 attrs={'class': 'form-control', 'placeholder': 'ex: B 123 ABC', 'style': 'text-transform:uppercase'}
             ),
-            'vin': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'opțional'}),
+            'vin': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ex: UU1KSD0F554433221', 'style': 'text-transform:uppercase'}),
         }
 
     def clean_plate_number(self):
         plate = (self.cleaned_data.get('plate_number') or '').upper().strip()
         return plate
+
+
+    def clean_vin(self):
+        vin = (self.cleaned_data.get('vin') or '').upper().strip()
+        vin = ''.join(ch for ch in vin if ch.isalnum())
+        if not vin:
+            raise forms.ValidationError('VIN-ul este obligatoriu.')
+        if len(vin) != 17:
+            raise forms.ValidationError('VIN-ul trebuie să aibă exact 17 caractere.')
+        invalid = set('IOQ')
+        if any(ch in invalid for ch in vin):
+            raise forms.ValidationError('VIN-ul nu poate conține literele I, O sau Q.')
+        return vin
 
 
 class CarExpiryProfileForm(forms.ModelForm):

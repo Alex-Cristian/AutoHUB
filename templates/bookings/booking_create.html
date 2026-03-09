@@ -57,7 +57,7 @@
                   <select name="saved_car" class="form-select" id="id_saved_car">
                     <option value="">— Alege o mașină salvată (opțional) —</option>
                     {% for c in cars %}
-                    <option value="{{ c.id }}" data-make="{{ c.make|escape }}" data-model="{{ c.model|escape }}" data-year="{{ c.year|default:'' }}" data-fuel="{{ c.fuel|default:'' }}" data-plate="{{ c.plate_number|escape }}" {% if form.saved_car.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>{{ c.make }} {{ c.model }}{% if c.year %} {{ c.year }}{% endif %} · {{ c.plate_number }}</option>
+                    <option value="{{ c.id }}" data-make="{{ c.make|escape }}" data-model="{{ c.model|escape }}" data-year="{{ c.year|default:'' }}" data-fuel="{{ c.fuel|default:'' }}" data-plate="{{ c.plate_number|escape }}" data-vin="{{ c.vin|escape }}" {% if form.saved_car.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>{{ c.make }} {{ c.model }}{% if c.year %} {{ c.year }}{% endif %} · {{ c.plate_number }}</option>
                     {% endfor %}
                   </select>
                   {% if form.saved_car.errors %}<div class="text-danger small mt-1">{{ form.saved_car.errors|join:" " }}</div>{% endif %}
@@ -76,6 +76,7 @@
               <div class="col-md-4"><label class="form-label">An fabricație <span class="text-red">*</span></label>{{ form.car_year }}{% if form.car_year.errors %}<div class="text-danger small mt-1">{{ form.car_year.errors|join:" " }}</div>{% endif %}</div>
               <div class="col-md-6"><label class="form-label">Combustibil <span class="text-red">*</span></label>{{ form.car_fuel }}{% if form.car_fuel.errors %}<div class="text-danger small mt-1">{{ form.car_fuel.errors|join:" " }}</div>{% endif %}</div>
               <div class="col-md-6"><label class="form-label">Nr. înmatriculare <span class="text-red">*</span></label>{{ form.car_plate }}{% if form.car_plate.errors %}<div class="text-danger small mt-1">{{ form.car_plate.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-12"><label class="form-label">Serie șasiu (VIN) <span class="text-red">*</span></label>{{ form.car_vin }}{% if form.car_vin.errors %}<div class="text-danger small mt-1">{{ form.car_vin.errors|join:" " }}</div>{% endif %}</div>
             </div>
           </div>
 
@@ -222,6 +223,7 @@
     const year  = document.getElementById('id_car_year');
     const fuel  = document.getElementById('id_car_fuel');
     const plate = document.getElementById('id_car_plate');
+    const vin = document.getElementById('id_car_vin');
     if (!select) return;
     const originalOptions = Array.from(select.options).map(o => ({ value: o.value, text: o.text, selected: o.selected, dataset: {...o.dataset} }));
     function restoreOptions() {
@@ -252,6 +254,7 @@
       if (opt.dataset.year) year.value = opt.dataset.year;
       if (opt.dataset.fuel) fuel.value = opt.dataset.fuel;
       if (opt.dataset.plate) plate.value = opt.dataset.plate;
+      if (opt.dataset.vin) vin.value = opt.dataset.vin;
     }
     function clearSelectedCar() { select.value = ''; }
     if (search) search.addEventListener('input', e => filterOptions(e.target.value));
