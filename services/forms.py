@@ -5,7 +5,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from decimal import Decimal, ROUND_HALF_UP
 
-from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage, Review
+from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage, ServiceMechanic, Review
 from bookings.forms import BookingForm
 from bookings.models import Booking
 from accounts.models import Car
@@ -308,6 +308,18 @@ class ServiceGarageForm(forms.ModelForm):
 
         return cleaned
 
+
+
+
+class ServiceMechanicForm(forms.ModelForm):
+    class Meta:
+        model = ServiceMechanic
+        fields = ['name', 'email', 'phone']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Andrei Popescu'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Ex: andrei@service.ro'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 0722 123 456'}),
+        }
 
 class ServiceGalleryImageForm(forms.ModelForm):
     class Meta:

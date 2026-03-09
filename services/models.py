@@ -231,6 +231,23 @@ class ServiceGarage(models.Model):
         return True
 
 
+
+
+class ServiceMechanic(models.Model):
+    center = models.ForeignKey(ServiceCenter, on_delete=models.CASCADE, related_name='mechanics', verbose_name='Service')
+    name = models.CharField(max_length=160, verbose_name='Nume mecanic')
+    email = models.EmailField(blank=True, verbose_name='Email')
+    phone = models.CharField(max_length=20, blank=True, verbose_name='Telefon')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Mecanic service'
+        verbose_name_plural = 'Mecanici service'
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} - {self.center.name}"
+
 class ServiceImage(models.Model):
     center = models.ForeignKey(ServiceCenter, on_delete=models.CASCADE, related_name='gallery_images', verbose_name='Service')
     image = models.ImageField(upload_to='service_gallery/', verbose_name='Poză')
@@ -355,3 +372,29 @@ class Favorite(models.Model):
 
     def __str__(self):
         return f"{self.user.username} ♥ {self.center.name}"
+
+
+class ServiceContract(models.Model):
+    company_name = models.CharField(max_length=255, verbose_name='Nume companie / service')
+    contact_person = models.CharField(max_length=120, blank=True, verbose_name='Persoană contact')
+    contact_email = models.EmailField(blank=True, verbose_name='Email contact')
+    contact_phone = models.CharField(max_length=30, blank=True, verbose_name='Telefon contact')
+    notes = models.TextField(blank=True, verbose_name='Observații interne')
+    is_signed = models.BooleanField(default=False, verbose_name='Contract semnat')
+    signed_at = models.DateTimeField(null=True, blank=True, verbose_name='Semnat la')
+    access_token = models.CharField(max_length=64, unique=True, blank=True, verbose_name='Token acces')
+    access_token_created_at = models.DateTimeField(null=True, blank=True, verbose_name='Token generat la')
+    access_link_used_at = models.DateTimeField(null=True, blank=True, verbose_name='Link folosit la')
+    linked_owner = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='service_contracts', verbose_name='Proprietar cont legat')
+    linked_center = models.ForeignKey(ServiceCenter, null=True, blank=True, on_delete=models.SET_NULL, related_name='contracts', verbose_name='Service creat')
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='created_service_contracts', verbose_name='Creat de')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Contract service'
+        verbose_name_plural = 'Contracte service'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.company_name

@@ -1,9 +1,12 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.db.models import Avg, Count, Q
 from services.models import ServiceCategory, ServiceCenter, CITY_CHOICES
 
 
 def home(request):
+    if request.user.is_authenticated and ServiceCenter.objects.filter(owner=request.user).exists():
+        return redirect('services:dashboard')
+
     categories = ServiceCategory.objects.annotate(
         center_count=Count('servicecenter', filter=Q(servicecenter__is_active=True))
     ).order_by('order')
