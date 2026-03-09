@@ -55,7 +55,7 @@
                   <select name="saved_car" class="form-select" id="id_saved_car">
                     <option value="">— Alege o mașină din baza de date (opțional) —</option>
                     {% for c in cars %}
-                    <option value="{{ c.id }}" data-make="{{ c.make|escape }}" data-model="{{ c.model|escape }}" data-year="{{ c.year|default:'' }}" data-fuel="{{ c.fuel|default:'' }}" data-plate="{{ c.plate_number|escape }}" data-owner="{{ c.owner.get_full_name|default:c.owner.username|escape }}" data-email="{{ c.owner.email|default:''|escape }}" {% if form.saved_car.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>{{ c.plate_number }} · {{ c.make }} {{ c.model }}{% if c.year %} {{ c.year }}{% endif %} · {{ c.owner.get_full_name|default:c.owner.username }}</option>
+                    <option value="{{ c.id }}" data-make="{{ c.make|escape }}" data-model="{{ c.model|escape }}" data-year="{{ c.year|default:'' }}" data-fuel="{{ c.fuel|default:'' }}" data-plate="{{ c.plate_number|escape }}" data-owner="{{ c.owner.get_full_name|default:c.owner.username|escape }}" data-email="{{ c.owner.email|default:''|escape }}" data-vin="{{ c.vin|escape }}" {% if form.saved_car.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>{{ c.plate_number }} · {{ c.make }} {{ c.model }}{% if c.year %} {{ c.year }}{% endif %} · {{ c.owner.get_full_name|default:c.owner.username }}</option>
                     {% endfor %}
                   </select>
                   {% if form.saved_car.errors %}<div class="text-danger small mt-1">{{ form.saved_car.errors|join:" " }}</div>{% endif %}
@@ -67,12 +67,45 @@
               </div>
             </div>
 
+            <div class="p-3 rounded-3 mb-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div>
+                  <p class="fw-bold mb-0"><i class="bi bi-upc-scan me-2 text-red"></i>Scanează talonul pentru programarea din dashboard</p>
+                  <p class="text-muted-custom small mb-0">Ideal când clientul vine direct la service și vrei să completezi rapid datele mașinii.</p>
+                </div>
+                <span class="badge text-bg-dark" id="bookingScanConfidence">fără scanare</span>
+              </div>
+
+              <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                  <label class="form-label" for="bookingScanDocType">Tip document</label>
+                  <select id="bookingScanDocType" class="form-select">
+                    <option value="TALON" selected>Talon</option>
+                    <option value="NECUNOSCUT">Detectează automat</option>
+                  </select>
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label" for="bookingScanFile">Document</label>
+                  <input type="file" id="bookingScanFile" class="form-control" accept="image/*,.pdf,.doc,.docx,.odt,.rtf,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,text/plain,text/rtf">
+                </div>
+              </div>
+
+              <div class="d-flex gap-2 mt-3 flex-wrap">
+                <button class="btn btn-outline-primary btn-sm" type="button" id="bookingScanBtn" disabled><i class="bi bi-stars me-1"></i>Scanează</button>
+                <button class="btn btn-outline-success btn-sm" type="button" id="bookingApplyScanBtn" disabled><i class="bi bi-check2-circle me-1"></i>Completează datele mașinii</button>
+                <span class="text-muted-custom small align-self-center" id="bookingScanFileLabel">Niciun document selectat.</span>
+              </div>
+
+              <div id="bookingScanMessage" class="alert mt-3 d-none" role="alert"></div>
+            </div>
+
             <div class="row g-3">
               <div class="col-md-4"><label class="form-label">Marcă <span class="text-red">*</span></label>{{ form.car_brand }}{% if form.car_brand.errors %}<div class="text-danger small mt-1">{{ form.car_brand.errors|join:" " }}</div>{% endif %}</div>
               <div class="col-md-4"><label class="form-label">Model <span class="text-red">*</span></label>{{ form.car_model }}{% if form.car_model.errors %}<div class="text-danger small mt-1">{{ form.car_model.errors|join:" " }}</div>{% endif %}</div>
               <div class="col-md-4"><label class="form-label">An fabricație <span class="text-red">*</span></label>{{ form.car_year }}{% if form.car_year.errors %}<div class="text-danger small mt-1">{{ form.car_year.errors|join:" " }}</div>{% endif %}</div>
               <div class="col-md-6"><label class="form-label">Combustibil <span class="text-red">*</span></label>{{ form.car_fuel }}{% if form.car_fuel.errors %}<div class="text-danger small mt-1">{{ form.car_fuel.errors|join:" " }}</div>{% endif %}</div>
               <div class="col-md-6"><label class="form-label">Nr. înmatriculare <span class="text-red">*</span></label>{{ form.car_plate }}{% if form.car_plate.errors %}<div class="text-danger small mt-1">{{ form.car_plate.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-12"><label class="form-label">Serie șasiu (VIN) <span class="text-red">*</span></label>{{ form.car_vin }}{% if form.car_vin.errors %}<div class="text-danger small mt-1">{{ form.car_vin.errors|join:" " }}</div>{% endif %}</div>
             </div>
           </div>
 
@@ -227,6 +260,7 @@
   const year  = document.getElementById('id_car_year');
   const fuel  = document.getElementById('id_car_fuel');
   const plate = document.getElementById('id_car_plate');
+  const vin = document.getElementById('id_car_vin');
   if (!select) return;
   const originalOptions = Array.from(select.options).map(o => ({ value: o.value, text: o.text, selected: o.selected, dataset: {...o.dataset} }));
 
@@ -268,6 +302,7 @@
     if (year) year.value = opt.dataset.year || '';
     if (fuel) fuel.value = opt.dataset.fuel || '';
     if (plate) plate.value = opt.dataset.plate || '';
+    if (vin) vin.value = opt.dataset.vin || '';
     if (clientName && !clientName.value.trim()) clientName.value = opt.dataset.owner || '';
     if (clientEmail && !clientEmail.value.trim()) clientEmail.value = opt.dataset.email || '';
   }
@@ -280,6 +315,104 @@
     select.value = '';
   });
   if (select.value) fillFromSelected();
+})();
+</script>
+<script>
+(function() {
+  const fileInput = document.getElementById('bookingScanFile');
+  const docType = document.getElementById('bookingScanDocType');
+  const scanBtn = document.getElementById('bookingScanBtn');
+  const applyBtn = document.getElementById('bookingApplyScanBtn');
+  const messageBox = document.getElementById('bookingScanMessage');
+  const confidenceBadge = document.getElementById('bookingScanConfidence');
+  const fileLabel = document.getElementById('bookingScanFileLabel');
+  const brand = document.getElementById('id_car_brand');
+  const model = document.getElementById('id_car_model');
+  const year = document.getElementById('id_car_year');
+  const fuel = document.getElementById('id_car_fuel');
+  const plate = document.getElementById('id_car_plate');
+  const vin = document.getElementById('id_car_vin');
+  const savedCar = document.getElementById('id_saved_car');
+
+  let selectedFile = null;
+  let lastScanData = null;
+
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+
+  function setConfidence(level) {
+    const map = {
+      high: ['text-bg-success', 'încredere ridicată'],
+      medium: ['text-bg-warning', 'încredere medie'],
+      low: ['text-bg-secondary', 'încredere scăzută'],
+      none: ['text-bg-dark', 'fără scanare'],
+    };
+    const [klass, label] = map[level] || map.none;
+    confidenceBadge.className = `badge ${klass}`;
+    confidenceBadge.textContent = label;
+  }
+
+  function showMessage(text, type='info') {
+    messageBox.className = `alert alert-${type} mt-3`;
+    messageBox.textContent = text;
+    messageBox.classList.remove('d-none');
+  }
+
+  fileInput?.addEventListener('change', () => {
+    selectedFile = fileInput.files?.[0] || null;
+    lastScanData = null;
+    applyBtn.disabled = true;
+    scanBtn.disabled = !selectedFile;
+    fileLabel.textContent = selectedFile ? selectedFile.name : 'Niciun document selectat.';
+    if (!selectedFile) setConfidence('none');
+    messageBox.classList.add('d-none');
+  });
+
+  scanBtn?.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    const formData = new FormData();
+    formData.append('document', selectedFile);
+    formData.append('hint_type', docType.value || 'TALON');
+
+    scanBtn.disabled = true;
+    applyBtn.disabled = true;
+    showMessage('Scanez talonul...', 'info');
+
+    try {
+      const response = await fetch('{% url "accounts:document_scan_api" %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        body: formData,
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Nu am putut scana talonul.');
+      lastScanData = payload.data || {};
+      setConfidence(lastScanData.confidence || 'none');
+      applyBtn.disabled = false;
+      showMessage(payload.warning || 'Scanare completă. Poți completa direct datele mașinii.', payload.warning ? 'warning' : 'success');
+    } catch (error) {
+      setConfidence('none');
+      showMessage(error.message || 'Nu am putut scana talonul.', 'danger');
+    } finally {
+      scanBtn.disabled = false;
+    }
+  });
+
+  applyBtn?.addEventListener('click', () => {
+    if (!lastScanData) return;
+    if (savedCar) savedCar.value = '';
+    if (lastScanData.make) brand.value = lastScanData.make;
+    if (lastScanData.model) model.value = lastScanData.model;
+    if (lastScanData.manufacture_year) year.value = lastScanData.manufacture_year;
+    if (lastScanData.fuel) fuel.value = lastScanData.fuel;
+    if (lastScanData.plate_number) plate.value = lastScanData.plate_number;
+    if (lastScanData.vin) vin.value = lastScanData.vin;
+    showMessage('Am completat datele mașinii din talon. Verifică-le și salvează programarea.', 'success');
+  });
 })();
 </script>
 {% endblock %}

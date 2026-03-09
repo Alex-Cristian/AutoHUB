@@ -8,6 +8,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('register/', views.register_view, name='register'),
     path('profil/', views.profile, name='profile'),
+    path('scan-document/api/', views.document_scan_api, name='document_scan_api'),
 
     # Mașinile mele
     path('masini/', views.car_list, name='cars'),

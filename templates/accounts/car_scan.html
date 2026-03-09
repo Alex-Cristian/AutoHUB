@@ -39,13 +39,14 @@
               <option value="CASCO">CASCO</option>
               <option value="TRUSA">Trusă auto</option>
               <option value="EXTINCTOR">Extinctor</option>
+              <option value="TALON">Talon / certificat de înmatriculare</option>
             </select>
           </div>
 
           <div class="mb-3">
-            <label for="documentInput" class="form-label">Poză document</label>
-            <input type="file" id="documentInput" class="form-control" accept="image/*">
-            <div class="form-text">Ideal: fotografie clară, document complet, lumină bună.</div>
+            <label for="documentInput" class="form-label">Document</label>
+            <input type="file" id="documentInput" class="form-control" accept="image/*,.pdf,.doc,.docx,.odt,.rtf,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,text/plain,text/rtf">
+            <div class="form-text">Poți încărca poză, PDF sau document text. Ideal: document complet și cât mai clar.</div>
           </div>
 
           <div class="ratio ratio-4x3 rounded overflow-hidden border border-secondary bg-black mb-3">
@@ -102,6 +103,22 @@
               <input id="resultMake" type="text" class="form-control" placeholder="—">
             </div>
             <div class="col-md-6">
+              <label class="form-label">Model</label>
+              <input id="resultModel" type="text" class="form-control" placeholder="—">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Combustibil</label>
+              <input id="resultFuel" type="text" class="form-control" placeholder="—">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">An fabricație</label>
+              <input id="resultYear" type="number" class="form-control" placeholder="—">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Prima înmatriculare</label>
+              <input id="resultFirstRegistration" type="date" class="form-control">
+            </div>
+            <div class="col-md-6">
               <label class="form-label">Asigurator</label>
               <input id="resultAsigurator" type="text" class="form-control" placeholder="—">
             </div>
@@ -145,11 +162,15 @@
     plate_number: document.getElementById('resultPlate'),
     vin: document.getElementById('resultVin'),
     make: document.getElementById('resultMake'),
+    model: document.getElementById('resultModel'),
+    fuel: document.getElementById('resultFuel'),
+    manufacture_year: document.getElementById('resultYear'),
+    first_registration_date: document.getElementById('resultFirstRegistration'),
     asigurator: document.getElementById('resultAsigurator'),
     raw_text: document.getElementById('resultRaw'),
   };
 
-  let base64Image = '';
+  let selectedFile = null;
   let lastScanData = null;
 
   function getCookie(name) {
@@ -183,11 +204,16 @@
   }
 
   function fillFields(data = {}) {
-    fields.tip_document.value = data.tip_document || '';
+    const forcedDocType = docType.value || '';
+    fields.tip_document.value = forcedDocType || data.tip_document || '';
     fields.expiry_date.value = data.expiry_date || '';
     fields.plate_number.value = data.plate_number || '';
     fields.vin.value = data.vin || '';
     fields.make.value = data.make || '';
+    fields.model.value = data.model || '';
+    fields.fuel.value = data.fuel || '';
+    fields.manufacture_year.value = data.manufacture_year || '';
+    fields.first_registration_date.value = data.first_registration_date || '';
     fields.asigurator.value = data.asigurator || '';
     fields.raw_text.value = data.raw_text || '';
     setConfidence(data.confidence || 'none');
@@ -199,43 +225,52 @@
     lastScanData = null;
 
     const file = event.target.files?.[0];
+    selectedFile = file || null;
     if (!file) {
-      base64Image = '';
       scanBtn.disabled = true;
       preview.classList.add('d-none');
+      preview.removeAttribute('src');
       previewPlaceholder.classList.remove('d-none');
+      previewPlaceholder.innerHTML = '<div class="text-center px-3"><i class="bi bi-image fs-1 d-block mb-2"></i>Preview-ul documentului va apărea aici</div>';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      base64Image = reader.result;
-      preview.src = reader.result;
-      preview.classList.remove('d-none');
-      previewPlaceholder.classList.add('d-none');
+    if ((file.type || '').startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        preview.src = reader.result;
+        preview.classList.remove('d-none');
+        previewPlaceholder.classList.add('d-none');
+        scanBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      preview.classList.add('d-none');
+      preview.removeAttribute('src');
+      previewPlaceholder.classList.remove('d-none');
+      previewPlaceholder.innerHTML = `<div class="text-center px-3"><i class="bi bi-file-earmark-text fs-1 d-block mb-2"></i>${file.name}</div>`;
       scanBtn.disabled = false;
-    };
-    reader.readAsDataURL(file);
+    }
   });
 
   scanBtn.addEventListener('click', async () => {
-    if (!base64Image) return;
+    if (!selectedFile) return;
 
     scanBtn.disabled = true;
     saveBtn.disabled = true;
     showMessage('Scanez documentul... te rog așteaptă puțin.', 'info');
 
     try {
+      const formData = new FormData();
+      formData.append('document', selectedFile);
+      formData.append('hint_type', docType.value || 'NECUNOSCUT');
+
       const response = await fetch('{% url "accounts:car_scan_api" car.pk %}', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'X-CSRFToken': getCookie('csrftoken'),
         },
-        body: JSON.stringify({
-          image: base64Image,
-          hint_type: docType.value || null,
-        })
+        body: formData
       });
 
       const payload = await response.json();
@@ -258,11 +293,17 @@
   saveBtn.addEventListener('click', async () => {
     const data = {
       tip_document: fields.tip_document.value,
+      target_document: docType.value || fields.tip_document.value,
       expiry_date: fields.expiry_date.value,
       plate_number: fields.plate_number.value,
       vin: fields.vin.value,
       make: fields.make.value,
+      model: fields.model.value,
+      fuel: fields.fuel.value,
+      manufacture_year: fields.manufacture_year.value,
+      first_registration_date: fields.first_registration_date.value,
       asigurator: fields.asigurator.value,
+      raw_text: fields.raw_text.value,
     };
 
     saveBtn.disabled = true;

@@ -27,7 +27,7 @@ class BookingForm(forms.ModelForm):
         model = Booking
         fields = [
             'client_name', 'client_phone', 'client_email',
-            'car_brand', 'car_model', 'car_year', 'car_fuel', 'car_plate',
+            'car_brand', 'car_model', 'car_year', 'car_fuel', 'car_plate', 'car_vin',
             'service_item', 'garage', 'problem_description',
             'booking_date', 'booking_time',
         ]
@@ -40,6 +40,7 @@ class BookingForm(forms.ModelForm):
             'car_year': forms.NumberInput(attrs={'class': 'form-control', 'min': 1950, 'placeholder': 'ex: 2018'}),
             'car_fuel': forms.Select(attrs={'class': 'form-select'}),
             'car_plate': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ex: B 123 ABC', 'style': 'text-transform:uppercase'}),
+            'car_vin': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ex: UU1KSD0F554433221', 'style': 'text-transform:uppercase'}),
             'service_item': forms.Select(attrs={'class': 'form-select'}),
             'garage': forms.Select(attrs={'class': 'form-select'}),
             'problem_description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Descrieți problema sau serviciul dorit...'}),
@@ -78,6 +79,7 @@ class BookingForm(forms.ModelForm):
             if saved_car.fuel:
                 cleaned['car_fuel'] = saved_car.fuel
             cleaned['car_plate'] = saved_car.plate_number
+            cleaned['car_vin'] = saved_car.vin
 
         if self.center and garage and garage.center_id != self.center.id:
             self.add_error('garage', 'Garajul selectat nu aparține acestui service.')
@@ -115,3 +117,16 @@ class BookingForm(forms.ModelForm):
         if not plate:
             raise forms.ValidationError('Introduceți numărul de înmatriculare.')
         return plate
+
+
+    def clean_car_vin(self):
+        vin = (self.cleaned_data.get('car_vin') or '').upper().strip()
+        vin = ''.join(ch for ch in vin if ch.isalnum())
+        if not vin:
+            raise forms.ValidationError('VIN-ul este obligatoriu.')
+        if len(vin) != 17:
+            raise forms.ValidationError('VIN-ul trebuie să aibă exact 17 caractere.')
+        if any(ch in {'I', 'O', 'Q'} for ch in vin):
+            raise forms.ValidationError('VIN-ul nu poate conține literele I, O sau Q.')
+        return vin
+

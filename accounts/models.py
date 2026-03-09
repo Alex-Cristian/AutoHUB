@@ -18,7 +18,7 @@ class Car(models.Model):
     year = models.PositiveIntegerField(null=True, blank=True, verbose_name='An fabricație')
     fuel = models.CharField(max_length=20, blank=True, verbose_name='Combustibil')
     plate_number = models.CharField(max_length=15, verbose_name='Nr. înmatriculare')
-    vin = models.CharField(max_length=17, blank=True, verbose_name='Serie șasiu (VIN)')
+    vin = models.CharField(max_length=17, verbose_name='Serie șasiu (VIN)')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
