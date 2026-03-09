@@ -5,12 +5,13 @@ from django.contrib.auth import login
 from django.db.models import Avg, Count, Min, Max, Q, Prefetch
 from django.utils import timezone
 
-from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite, ServiceGarage, ServiceImage
+from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite, ServiceGarage, ServiceImage, ServiceMechanic
 from .forms import (
     ServiceCenterRegisterForm,
     ServiceCenterPublicRegisterForm,
     ServiceGarageForm,
     ServiceGalleryImageForm,
+    ServiceMechanicForm,
     ServiceOwnerBookingForm,
 )
 from bookings.models import Booking, BookingNotification, BookingAttachment
@@ -283,12 +284,14 @@ def service_dashboard(request):
     if centers is None:
         return redirect('services:register_service')
 
-    bookings_qs = Booking.objects.filter(center__in=centers).select_related('center', 'service_item', 'user', 'garage').order_by('-created_at')
+    bookings_qs = Booking.objects.filter(center__in=centers).select_related('center', 'service_item', 'user', 'garage', 'mechanic').prefetch_related('attachments').order_by('-created_at')
     pending = bookings_qs.filter(status=Booking.STATUS_PENDING)
     active = bookings_qs.exclude(status=Booking.STATUS_CANCELLED)[:50]
     unread_count = BookingNotification.objects.filter(recipient=request.user, is_read=False).count()
     latest_notifications = BookingNotification.objects.filter(recipient=request.user)[:6]
     pending_verifications = ServiceCenter.objects.filter(verification_status='pending').count() if request.user.is_staff else 0
+    mechanic_form = ServiceMechanicForm(prefix='mechanic')
+    mechanics_by_center = [(center, center.mechanics.order_by('name')) for center in centers]
 
     return render(request, 'services/service_dashboard.html', {
         'centers': centers,
@@ -297,7 +300,126 @@ def service_dashboard(request):
         'unread_count': unread_count,
         'latest_notifications': latest_notifications,
         'pending_verifications': pending_verifications,
+        'mechanic_form': mechanic_form,
+        'mechanics_by_center': mechanics_by_center,
     })
+
+
+@login_required
+def mechanic_create(request, pk):
+    center = _owner_center_or_404(request, pk)
+    if center is None:
+        return redirect('core:home')
+
+    if request.method == 'POST':
+        form = ServiceMechanicForm(request.POST, prefix='mechanic')
+        if form.is_valid():
+            mechanic = form.save(commit=False)
+            mechanic.center = center
+            mechanic.save()
+            messages.success(request, f'Mecanicul {mechanic.name} a fost adăugat.')
+        else:
+            messages.error(request, 'Mecanicul nu a putut fi salvat. Verifică datele introduse.')
+    return redirect('services:dashboard')
+
+
+
+@login_required
+def mechanic_update(request, pk):
+    mechanic = get_object_or_404(ServiceMechanic, pk=pk)
+    if not (request.user.is_staff or mechanic.center.owner_id == request.user.id):
+        return redirect('core:home')
+
+    if request.method == 'POST':
+        form = ServiceMechanicForm(request.POST, instance=mechanic, prefix=f'mech_{mechanic.pk}')
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Datele mecanicului {mechanic.name} au fost actualizate.')
+        else:
+            messages.error(request, 'Datele mecanicului nu au putut fi salvate. Verifică formularul.')
+    return redirect('services:dashboard')
+
+
+@login_required
+def mechanic_delete(request, pk):
+    mechanic = get_object_or_404(ServiceMechanic, pk=pk)
+    if not (request.user.is_staff or mechanic.center.owner_id == request.user.id):
+        return redirect('core:home')
+
+    if request.method == 'POST':
+        name = mechanic.name
+        mechanic.delete()
+        messages.success(request, f'Mecanicul {name} a fost șters.')
+    return redirect('services:dashboard')
+
+
+@login_required
+def booking_detail(request, pk):
+    booking = get_object_or_404(
+        Booking.objects.select_related('center', 'service_item', 'user', 'garage', 'mechanic'),
+        pk=pk,
+    )
+    if not (request.user.is_staff or booking.center.owner_id == request.user.id):
+        return redirect('core:home')
+
+    mechanics = booking.center.mechanics.order_by('name')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'save_work_order_info':
+            booking.used_services = (request.POST.get('used_services') or '').strip()
+            booking.additional_description = (request.POST.get('additional_description') or '').strip()
+            booking.save(update_fields=['used_services', 'additional_description', 'updated_at'])
+            messages.success(request, 'Detaliile suplimentare pentru fișa de comandă au fost salvate.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'assign_mechanic':
+            mechanic_id = (request.POST.get('mechanic') or '').strip()
+            mechanic = None
+            if mechanic_id:
+                mechanic = get_object_or_404(ServiceMechanic, pk=mechanic_id, center=booking.center)
+            booking.mechanic = mechanic
+            booking.save(update_fields=['mechanic', 'updated_at'])
+            messages.success(request, 'Mecanicul a fost actualizat pentru această programare.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'add_attachments':
+            files = request.FILES.getlist('attachments')
+            if not files:
+                messages.warning(request, 'Selectează cel puțin o poză sau un video.')
+                return redirect('services:booking_detail', pk=booking.pk)
+
+            added = 0
+            for uploaded in files:
+                content_type = getattr(uploaded, 'content_type', '') or ''
+                if not (content_type.startswith('image/') or content_type.startswith('video/')):
+                    continue
+                media_kind = 'video' if content_type.startswith('video/') else 'image'
+                BookingAttachment.objects.create(booking=booking, file=uploaded, media_kind=media_kind)
+                added += 1
+
+            if added:
+                messages.success(request, f'Au fost adăugate {added} fișiere la programare.')
+            else:
+                messages.error(request, 'Fișierele selectate nu sunt imagini sau video valide.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+    return render(request, 'services/booking_detail.html', {
+        'booking': booking,
+        'mechanics': mechanics,
+    })
+
+
+@login_required
+def booking_print(request, pk):
+    booking = get_object_or_404(
+        Booking.objects.select_related('center', 'service_item', 'user', 'garage', 'mechanic'),
+        pk=pk,
+    )
+    if not (request.user.is_staff or booking.center.owner_id == request.user.id):
+        return redirect('core:home')
+
+    return render(request, 'services/booking_print.html', {'booking': booking})
 
 
 @login_required

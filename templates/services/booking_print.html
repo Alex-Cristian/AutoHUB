@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <title>Fișă comandă #{{ booking.pk }} — AutoEMG</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #111; margin: 0; background: #f4f4f4; }
+    .page { max-width: 960px; margin: 24px auto; background: #fff; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:24px; margin-bottom:24px; }
+    .brand { font-size: 30px; font-weight: 700; }
+    .muted { color:#666; font-size: 13px; }
+    h2 { margin:0 0 6px; font-size:22px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:20px; }
+    .box { border:1px solid #ddd; border-radius:12px; padding:16px; }
+    .box h3 { margin:0 0 12px; font-size:16px; }
+    .row { margin-bottom:8px; }
+    .label { font-size:12px; color:#666; text-transform:uppercase; letter-spacing:.04em; }
+    .value { font-size:15px; font-weight:600; }
+    .full { grid-column:1 / -1; }
+    .actions { max-width:960px; margin: 0 auto 16px; display:flex; gap:12px; justify-content:flex-end; }
+    .btn { background:#111; color:#fff; padding:10px 14px; border-radius:10px; text-decoration:none; display:inline-block; }
+    .signature-grid { display:grid; grid-template-columns:1fr 1fr; gap:48px; margin-top:56px; }
+    .signature-line { border-top:1px solid #111; padding-top:10px; text-align:center; min-height:60px; }
+    @media print {
+      body { background:#fff; }
+      .actions { display:none; }
+      .page { margin:0; box-shadow:none; max-width:none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="actions">
+    <a href="{% url 'services:booking_detail' booking.pk %}" class="btn">Înapoi la programare</a>
+    <a href="#" onclick="window.print(); return false;" class="btn">Print</a>
+  </div>
+  <div class="page">
+    <div class="topbar">
+      <div>
+        <div class="brand">{{ booking.center.name }}</div>
+        <div class="muted">Fișă de comandă / AutoEMG</div>
+      </div>
+      <div style="text-align:right;">
+        <h2>Programare #{{ booking.pk }}</h2>
+        <div class="muted">{{ booking.booking_date|date:"d.m.Y" }} • {{ booking.booking_time|time:"H:i" }}</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="box">
+        <h3>Date client</h3>
+        <div class="row"><div class="label">Nume</div><div class="value">{{ booking.client_name }}</div></div>
+        <div class="row"><div class="label">Telefon</div><div class="value">{{ booking.client_phone }}</div></div>
+        <div class="row"><div class="label">Email</div><div class="value">{{ booking.client_email }}</div></div>
+      </div>
+
+      <div class="box">
+        <h3>Date mașină</h3>
+        <div class="row"><div class="label">Mașină</div><div class="value">{{ booking.car_brand }} {{ booking.car_model }}</div></div>
+        <div class="row"><div class="label">An / combustibil</div><div class="value">{{ booking.car_year }} • {{ booking.get_car_fuel_display }}</div></div>
+        <div class="row"><div class="label">Nr. înmatriculare</div><div class="value">{{ booking.car_plate }}</div></div>
+        <div class="row"><div class="label">VIN</div><div class="value">{{ booking.car_vin }}</div></div>
+      </div>
+
+      <div class="box">
+        <h3>Date service</h3>
+        <div class="row"><div class="label">Denumire</div><div class="value">{{ booking.center.name }}</div></div>
+        <div class="row"><div class="label">Adresă</div><div class="value">{{ booking.center.address }}</div></div>
+        <div class="row"><div class="label">Telefon</div><div class="value">{{ booking.center.phone }}</div></div>
+        <div class="row"><div class="label">Email</div><div class="value">{{ booking.center.email|default:"—" }}</div></div>
+      </div>
+
+      <div class="box">
+        <h3>Date mecanic</h3>
+        <div class="row"><div class="label">Nume mecanic</div><div class="value">{% if booking.mechanic %}{{ booking.mechanic.name }}{% else %}____________________________{% endif %}</div></div>
+        <div class="row"><div class="label">Email</div><div class="value">{% if booking.mechanic and booking.mechanic.email %}{{ booking.mechanic.email }}{% else %}____________________________{% endif %}</div></div>
+        <div class="row"><div class="label">Telefon</div><div class="value">{% if booking.mechanic and booking.mechanic.phone %}{{ booking.mechanic.phone }}{% else %}____________________________{% endif %}</div></div>
+      </div>
+
+      <div class="box full">
+        <h3>Detalii programare</h3>
+        <div class="row"><div class="label">Garaj</div><div class="value">{% if booking.garage %}{{ booking.garage.name }}{% else %}—{% endif %}</div></div>
+        <div class="row"><div class="label">Serviciu selectat</div><div class="value">{% if booking.service_item %}{{ booking.service_item.name }}{% else %}—{% endif %}</div></div>
+        <div class="row"><div class="label">Descriere programare</div><div class="value">{{ booking.problem_description|linebreaksbr }}</div></div>
+      </div>
+
+      <div class="box full">
+        <h3>Servicii / piese folosite</h3>
+        <div class="value">{% if booking.used_services %}{{ booking.used_services|linebreaksbr }}{% else %}____________________________________________________________<br>____________________________________________________________<br>____________________________________________________________{% endif %}</div>
+      </div>
+
+      <div class="box full">
+        <h3>Descriere suplimentară</h3>
+        <div class="value">{% if booking.additional_description %}{{ booking.additional_description|linebreaksbr }}{% else %}____________________________________________________________<br>____________________________________________________________<br>____________________________________________________________{% endif %}</div>
+      </div>
+    </div>
+
+    <div class="signature-grid">
+      <div class="signature-line">Semnătură service</div>
+      <div class="signature-line">Semnătură client</div>
+    </div>
+  </div>
+</body>
+</html>

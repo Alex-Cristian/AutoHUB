@@ -54,8 +54,8 @@ def login_view(request):
             user = form.get_user()
             login(request, user)
             messages.success(request, f'Bun venit înapoi, {user.first_name or user.username}!')
-            next_url = request.GET.get('next', 'core:home')
-            return redirect(next_url)
+            next_url = request.GET.get('next')
+            return redirect(next_url or 'core:home')
     else:
         form = LoginForm(request)
     return render(request, 'accounts/login.html', {'form': form})

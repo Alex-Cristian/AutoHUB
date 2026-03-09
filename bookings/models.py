@@ -47,6 +47,11 @@ class Booking(models.Model):
         verbose_name='Serviciu ales'
     )
 
+    mechanic = models.ForeignKey(
+        'services.ServiceMechanic', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='bookings', verbose_name='Mecanic alocat'
+    )
+
     client_name = models.CharField(max_length=200, verbose_name='Nume complet')
     client_phone = models.CharField(max_length=20, verbose_name='Telefon')
     client_email = models.EmailField(verbose_name='Email')
@@ -75,6 +80,8 @@ class Booking(models.Model):
         default=STATUS_PENDING, verbose_name='Status'
     )
     notes = models.TextField(blank=True, verbose_name='Note interne (admin)')
+    used_services = models.TextField(blank=True, verbose_name='Servicii / piese folosite')
+    additional_description = models.TextField(blank=True, verbose_name='Descriere suplimentară pentru fișă')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
