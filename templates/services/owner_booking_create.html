@@ -224,6 +224,7 @@
       const url = `{% url 'bookings:garage_slots' center.slug %}?garage=${garageSelect.value}&date=${dateInput.value}&duration=${durationInput.value}`;
       const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
       const data = await response.json();
+      if (!response.ok) { throw new Error(data.error || 'Nu am putut încărca sloturile.'); }
       slotMeta.textContent = `${data.garage} · ${data.open_time}–${data.close_time} · blocare ${data.duration_minutes} min`;
       if (!data.slots || !data.slots.length) {
         slotHelp.textContent = 'Nu există ore libere pentru combinația selectată.';

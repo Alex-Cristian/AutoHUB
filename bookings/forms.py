@@ -1,6 +1,7 @@
 from django import forms
 from django.utils import timezone
 
+from .ai import normalize_duration_minutes
 from .models import Booking
 from services.models import ServiceItem, ServiceGarage
 from accounts.models import Car
@@ -19,7 +20,7 @@ class BookingForm(forms.ModelForm):
     )
     attachments = forms.FileField(
         required=False,
-        widget=MultiFileInput(attrs={'class': 'form-control', 'accept': 'image/*,video/*', 'multiple': True}),
+        widget=MultiFileInput(attrs={'class': 'form-control', 'accept': 'image/*,video/*', 'capture': 'environment', 'multiple': True}),
         help_text='Poți încărca poze și video cu problema mașinii.'
     )
 
@@ -43,7 +44,7 @@ class BookingForm(forms.ModelForm):
             'car_vin': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ex: UU1KSD0F554433221', 'style': 'text-transform:uppercase'}),
             'service_item': forms.Select(attrs={'class': 'form-select'}),
             'garage': forms.Select(attrs={'class': 'form-select'}),
-            'problem_description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Descrieți problema sau serviciul dorit...'}),
+            'problem_description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Descrieți problema sau serviciul dorit...', 'data-duration-source': 'problem-description'}),
             'booking_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'booking_time': forms.HiddenInput(),
         }
@@ -84,8 +85,10 @@ class BookingForm(forms.ModelForm):
         if self.center and garage and garage.center_id != self.center.id:
             self.add_error('garage', 'Garajul selectat nu aparține acestui service.')
 
+        requested_duration = normalize_duration_minutes(cleaned.get('duration_minutes') or 60)
+
         if garage and booking_date and booking_time and not garage.is_time_available(
-            booking_date, booking_time, duration_minutes=30, booking_status=Booking.STATUS_PENDING
+            booking_date, booking_time, duration_minutes=requested_duration, booking_status=Booking.STATUS_PENDING
         ):
             self.add_error('booking_time', 'Ora aleasă nu mai este disponibilă pentru garajul selectat.')
 

@@ -90,7 +90,7 @@
             <div class="row g-3">
               <div class="col-12"><label class="form-label">Serviciu (opțional)</label>{{ form.service_item }}</div>
               <div class="col-12"><label class="form-label">Descriere problemă / serviciu dorit <span class="text-red">*</span></label>{{ form.problem_description }}{% if form.problem_description.errors %}<div class="text-danger small mt-1">{{ form.problem_description.errors|join:" " }}</div>{% endif %}</div>
-              <div class="col-12"><label class="form-label">Poze / video problemă</label>{{ form.attachments }}<div class="small text-muted-custom mt-1">Încarcă poze sau clipuri scurte ca service-ul să înțeleagă problema mai repede.</div>{% if form.attachments.errors %}<div class="text-danger small mt-1">{{ form.attachments.errors|join:" " }}</div>{% endif %}</div>
+              <div class="col-12"><label class="form-label">Poze / video problemă</label>{{ form.attachments }}<div class="small text-muted-custom mt-1">Pe telefon, browserul va cere acces la cameră/poze. După ce alegi fișierele, poți scoate individual orice poză înainte de trimitere.</div><div id="attachmentPreview" class="row g-2 mt-2"></div>{% if form.attachments.errors %}<div class="text-danger small mt-1">{{ form.attachments.errors|join:" " }}</div>{% endif %}</div>
             </div>
           </div>
 
@@ -119,7 +119,7 @@
               <div class="d-flex justify-content-between flex-wrap gap-2 align-items-center mb-2">
                 <div>
                   <div class="fw-semibold">Calendar garaj</div>
-                  <div class="small text-muted-custom" id="slotHelp">Alege mai întâi garajul și data. Apoi selectează o oră liberă.</div>
+                  <div class="small text-muted-custom" id="slotHelp">Alege mai întâi descrierea, garajul și data. Sistemul estimează automat durata și îți arată doar orele de start care nu se suprapun.</div><div class="small text-warning mt-2" id="durationHelp">Estimarea duratei va apărea aici.</div>
                 </div>
                 <span class="badge text-bg-dark" id="slotMeta">{{ center.schedule }}</span>
               </div>
@@ -158,10 +158,20 @@
   const garageSelect = document.getElementById('id_garage');
   const dateInput = document.getElementById('id_booking_date');
   const timeInput = document.getElementById('id_booking_time');
+  const serviceItemInput = document.getElementById('id_service_item');
+  const problemInput = document.getElementById('id_problem_description');
+  const durationHelp = document.getElementById('durationHelp');
   const slotGrid = document.getElementById('slotGrid');
   const slotHelp = document.getElementById('slotHelp');
   const slotMeta = document.getElementById('slotMeta');
   const initialTime = timeInput ? timeInput.value : '';
+  const savedCarInput = document.getElementById('id_saved_car');
+  const brandInput = document.getElementById('id_car_brand');
+  const modelInput = document.getElementById('id_car_model');
+  const yearInput = document.getElementById('id_car_year');
+  const fuelInput = document.getElementById('id_car_fuel');
+  const plateInput = document.getElementById('id_car_plate');
+  const vinInput = document.getElementById('id_car_vin');
 
   function renderSlotButton(value, active) {
     const btn = document.createElement('button');
@@ -177,38 +187,139 @@
     return btn;
   }
 
+  let loadSeq = 0;
+
+  function debounce(fn, wait) {
+    let t = null;
+    return function(...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), wait);
+    };
+  }
+
   async function loadSlots() {
     slotGrid.innerHTML = '';
     timeInput.value = '';
     if (!garageSelect.value || !dateInput.value) {
-      slotHelp.textContent = 'Alege mai întâi garajul și data. Apoi selectează o oră liberă.';
+      slotHelp.textContent = 'Alege mai întâi descrierea, garajul și data. Apoi selectează o oră liberă.';
+      durationHelp.textContent = 'Estimarea duratei va apărea aici.';
       return;
     }
-    slotHelp.textContent = 'Se încarcă orele disponibile...';
+    const description = (problemInput && problemInput.value || '').trim();
+    const seq = ++loadSeq;
+    slotHelp.textContent = 'Se estimează durata și se încarcă orele disponibile...';
+    durationHelp.textContent = 'Calculăm durata aproximativă...';
     try {
-      const url = `{% url 'bookings:garage_slots' center.slug %}?garage=${garageSelect.value}&date=${dateInput.value}`;
+      const params = new URLSearchParams({
+        garage: garageSelect.value,
+        date: dateInput.value,
+        service_item: serviceItemInput && serviceItemInput.value ? serviceItemInput.value : '',
+        problem_description: description,
+        saved_car: savedCarInput && savedCarInput.value ? savedCarInput.value : '',
+        car_brand: brandInput && brandInput.value ? brandInput.value : '',
+        car_model: modelInput && modelInput.value ? modelInput.value : '',
+        car_year: yearInput && yearInput.value ? yearInput.value : '',
+        car_fuel: fuelInput && fuelInput.value ? fuelInput.value : '',
+        car_plate: plateInput && plateInput.value ? plateInput.value : '',
+        car_vin: vinInput && vinInput.value ? vinInput.value : '',
+      });
+      const url = `{% url 'bookings:garage_slots' center.slug %}?${params.toString()}`;
       const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
       const data = await response.json();
+      if (seq !== loadSeq) return;
+      if (!response.ok) {
+        throw new Error(data.error || 'Nu am putut încărca sloturile.');
+      }
       slotMeta.textContent = `${data.garage} · ${data.open_time}–${data.close_time} · slot ${data.slot_minutes} min`;
+      durationHelp.textContent = `Durata estimată: ${data.duration_minutes} min (${data.estimate_source === 'openai' ? 'OpenAI' : 'estimare implicită'}).`;
       if (!data.slots || !data.slots.length) {
         slotHelp.textContent = 'Nu există ore libere pentru combinația selectată.';
         return;
       }
-      slotHelp.textContent = 'Selectează o oră liberă pentru garajul ales.';
+      slotHelp.textContent = `Selectează o oră de start. Intervalul complet va bloca aproximativ ${data.duration_minutes} minute.`;
       data.slots.forEach(slot => slotGrid.appendChild(renderSlotButton(slot, slot === initialTime)));
       if (initialTime && data.slots.includes(initialTime)) {
         timeInput.value = initialTime;
       }
     } catch (err) {
       slotHelp.textContent = 'Nu am putut încărca sloturile acum.';
+      durationHelp.textContent = 'Estimarea duratei nu este disponibilă momentan.';
     }
   }
 
+  const debouncedLoadSlots = debounce(loadSlots, 500);
   if (garageSelect && dateInput && timeInput) {
     garageSelect.addEventListener('change', loadSlots);
     dateInput.addEventListener('change', loadSlots);
+    if (serviceItemInput) serviceItemInput.addEventListener('change', loadSlots);
+    if (savedCarInput) savedCarInput.addEventListener('change', loadSlots);
+    [brandInput, modelInput, yearInput, fuelInput, plateInput, vinInput].forEach(el => { if (el) el.addEventListener('change', loadSlots); });
+    if (problemInput) problemInput.addEventListener('input', debouncedLoadSlots);
     if (garageSelect.value && dateInput.value) loadSlots();
   }
+})();
+</script>
+
+<script>
+(function() {
+  const input = document.getElementById('id_attachments');
+  const preview = document.getElementById('attachmentPreview');
+  if (!input || !preview) return;
+  let dt = new DataTransfer();
+
+  function syncFiles() {
+    input.files = dt.files;
+  }
+
+  function render() {
+    preview.innerHTML = '';
+    Array.from(dt.files).forEach((file, index) => {
+      const col = document.createElement('div');
+      col.className = 'col-md-4';
+      const box = document.createElement('div');
+      box.className = 'p-2 rounded-3 h-100';
+      box.style.background = 'var(--ah-dark3)';
+      box.style.border = '1px solid var(--ah-border)';
+      const title = document.createElement('div');
+      title.className = 'small fw-semibold mb-2';
+      title.textContent = file.name;
+      const meta = document.createElement('div');
+      meta.className = 'small text-muted-custom mb-2';
+      meta.textContent = `${Math.round(file.size / 1024)} KB`;
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn btn-sm btn-outline-danger';
+      removeBtn.textContent = 'Șterge';
+      removeBtn.addEventListener('click', () => {
+        const next = new DataTransfer();
+        Array.from(dt.files).forEach((f, i) => { if (i !== index) next.items.add(f); });
+        dt = next;
+        syncFiles();
+        render();
+      });
+      box.appendChild(title);
+      if (file.type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.className = 'img-fluid rounded-3 mb-2';
+        img.style.width = '100%';
+        img.style.height = '220px';
+        img.style.objectFit = 'contain';
+        img.style.background = '#000';
+        img.src = URL.createObjectURL(file);
+        box.appendChild(img);
+      }
+      box.appendChild(meta);
+      box.appendChild(removeBtn);
+      col.appendChild(box);
+      preview.appendChild(col);
+    });
+  }
+
+  input.addEventListener('change', () => {
+    Array.from(input.files).forEach(file => dt.items.add(file));
+    syncFiles();
+    render();
+  });
 })();
 </script>
 

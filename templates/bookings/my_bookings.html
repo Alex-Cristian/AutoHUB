@@ -47,6 +47,31 @@
           <i class="bi bi-chat-text me-1"></i>{{ b.problem_description|truncatewords:30 }}
         </div>
         {% endif %}
+
+        {% if b.attachments.all %}
+        <div class="row g-2 mt-3">
+          {% for attachment in b.attachments.all %}
+          <div class="col-md-4">
+            <div class="p-2 rounded-3 h-100" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              {% if attachment.is_image %}
+                <img src="{{ attachment.file.url }}" alt="Poză programare {{ b.pk }}" class="img-fluid rounded-3 mb-2" style="width:100%;height:220px;object-fit:contain;background:#000;">
+              {% else %}
+                <video controls class="w-100 rounded-3 mb-2" style="height:220px;object-fit:contain;background:#000;">
+                  <source src="{{ attachment.file.url }}">
+                </video>
+              {% endif %}
+              <div class="d-flex justify-content-between align-items-center gap-2">
+                <span class="small text-muted-custom">{{ attachment.uploaded_at|date:"d.m.Y H:i" }}</span>
+                <form method="post" action="{% url 'bookings:attachment_delete' attachment.pk %}">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Șterge</button>
+                </form>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
       </div>
     </div>
     {% endfor %}

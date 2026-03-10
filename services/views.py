@@ -356,7 +356,7 @@ def mechanic_delete(request, pk):
 @login_required
 def booking_detail(request, pk):
     booking = get_object_or_404(
-        Booking.objects.select_related('center', 'service_item', 'user', 'garage', 'mechanic'),
+        Booking.objects.select_related('center', 'service_item', 'user', 'garage', 'mechanic').prefetch_related('attachments'),
         pk=pk,
     )
     if not (request.user.is_staff or booking.center.owner_id == request.user.id):
@@ -381,6 +381,16 @@ def booking_detail(request, pk):
             booking.mechanic = mechanic
             booking.save(update_fields=['mechanic', 'updated_at'])
             messages.success(request, 'Mecanicul a fost actualizat pentru această programare.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'delete_attachment':
+            attachment_id = (request.POST.get('attachment_id') or '').strip()
+            attachment = get_object_or_404(BookingAttachment, pk=attachment_id, booking=booking)
+            file_storage = attachment.file
+            attachment.delete()
+            if file_storage:
+                file_storage.delete(save=False)
+            messages.info(request, 'Fișierul a fost șters din programare.')
             return redirect('services:booking_detail', pk=booking.pk)
 
         if action == 'add_attachments':
