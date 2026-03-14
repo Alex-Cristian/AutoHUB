@@ -378,10 +378,13 @@
           </div>
         </div>
 
-        <div id="panelActions" class="d-flex gap-2 mt-4 {% if not active_section %}d-none{% endif %}">
+        <div id="panelActions" class="d-flex gap-2 mt-4 flex-wrap {% if not active_section %}d-none{% endif %}">
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-save me-1"></i>Salvează
           </button>
+          <a id="scanDocBtn" href="{% url 'accounts:car_scan' car.pk %}" class="btn btn-primary">
+            <i class="bi bi-camera me-1"></i>Scanează document
+          </a>
           <a href="{% url 'accounts:profile' %}" class="btn btn-outline-secondary">Înapoi la profil</a>
         </div>
       </form>
@@ -399,6 +402,16 @@
     const activeInput = document.getElementById('activeSectionInput');
     const closeBtn = document.getElementById('closePanelBtn');
     const actions = document.getElementById('panelActions');
+    const scanDocBtn = document.getElementById('scanDocBtn');
+    const baseScanUrl = "{% url 'accounts:car_scan' car.pk %}";
+
+    const sectionToDocType = {
+      'itp':            'ITP',
+      'rca':            'RCA',
+      'rovinieta':      'ROVINIETA',
+      'casco':          'CASCO',
+      'siguranta_auto': 'TRUSA',
+    };
 
     function syncDisabledFields() {
       document.querySelectorAll('.expiry-field-group').forEach((group) => {
@@ -422,9 +435,14 @@
       if (description) description.textContent = text || '';
       if (activeInput) activeInput.value = section || '';
       if (closeBtn) closeBtn.classList.remove('d-none');
-      if (actions) {
-        actions.classList.toggle('d-none', !section);
+      if (actions) actions.classList.toggle('d-none', !section);
+
+      // Actualizeaza link-ul Scanează cu tipul documentului preselectat
+      if (scanDocBtn) {
+        const docType = sectionToDocType[section] || '';
+        scanDocBtn.href = docType ? `${baseScanUrl}?tip=${docType}` : baseScanUrl;
       }
+
       if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 

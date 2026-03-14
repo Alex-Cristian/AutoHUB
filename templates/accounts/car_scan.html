@@ -334,6 +334,14 @@
   });
 
   fillFields();
+
+  // Presetează tipul documentului din URL (?tip=ITP etc.)
+  const urlParams = new URLSearchParams(window.location.search);
+  const tipParam = urlParams.get('tip');
+  if (tipParam) {
+    const opt = Array.from(docType.options).find(o => o.value === tipParam.toUpperCase());
+    if (opt) docType.value = opt.value;
+  }
 })();
 </script>
 {% endblock %}

@@ -2,10 +2,10 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.contrib.auth import login
-from django.db.models import Avg, Count, Min, Max, Q, Prefetch
+from django.db.models import Avg, Count, Min, Max, Q, Prefetch, F, Subquery, OuterRef
 from django.utils import timezone
 
-from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite, ServiceGarage, ServiceImage, ServiceMechanic
+from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite, ServiceGarage, ServiceImage, ServiceMechanic, ReviewImage
 from .forms import (
     ServiceCenterRegisterForm,
     ServiceCenterPublicRegisterForm,
@@ -13,25 +13,22 @@ from .forms import (
     ServiceGalleryImageForm,
     ServiceMechanicForm,
     ServiceOwnerBookingForm,
+    ReviewForm,
 )
 from bookings.models import Booking, BookingNotification, BookingAttachment
 
 
 def category_list(request):
-    categories = ServiceCategory.objects.annotate(
-        center_count=Count('center_categories', filter=Q(center_categories__is_active=True), distinct=True)
-    ).order_by('order')
+    categories = ServiceCategory.objects.all().order_by('order')
+    for cat in categories:
+        cat.center_count_display = ServiceCenter.objects.filter(
+            Q(category=cat) | Q(categories=cat),
+            is_active=True
+        ).distinct().count()
     return render(request, 'services/categories.html', {'categories': categories})
 
 
 def service_list(request):
-    qs = ServiceCenter.objects.filter(is_active=True).annotate(
-        avg_rating=Avg('review__rating', filter=Q(review__is_approved=True)),
-        review_count=Count('review', filter=Q(review__is_approved=True)),
-        min_price=Min('serviceitem_set__price_from'),
-        max_price=Max('serviceitem_set__price_to'),
-    ).prefetch_related('categories')
-
     category_slug = request.GET.get('category', '').strip()
     city = request.GET.get('city', '').strip()
     min_rating = request.GET.get('min_rating', '').strip()
@@ -40,47 +37,88 @@ def service_list(request):
     sort_by = request.GET.get('sort', 'rating')
     search_q = request.GET.get('q', '').strip()
 
+    qs = ServiceCenter.objects.filter(is_active=True).prefetch_related(
+        'categories', 'serviceitem_set', 'review_set'
+    ).select_related('category')
+
     if search_q:
-        qs = qs.filter(Q(name__icontains=search_q) | Q(description__icontains=search_q) | Q(address__icontains=search_q))
+        search_q_lower = search_q.lower()
+        matched_category = ServiceCategory.objects.filter(
+            Q(name__iexact=search_q) |
+            Q(name__icontains=search_q) |
+            Q(slug__iexact=search_q_lower.replace(' ', '-'))
+        ).first()
+        if matched_category:
+            qs = qs.filter(
+                Q(categories=matched_category) | Q(category=matched_category)
+            ).distinct()
+        else:
+            qs = qs.filter(
+                Q(name__icontains=search_q) |
+                Q(description__icontains=search_q) |
+                Q(address__icontains=search_q) |
+                Q(categories__name__icontains=search_q) |
+                Q(category__name__icontains=search_q)
+            ).distinct()
 
     if category_slug:
-        qs = qs.filter(Q(categories__slug=category_slug) | Q(category__slug=category_slug)).distinct()
+        qs = qs.filter(
+            Q(categories__slug=category_slug) | Q(category__slug=category_slug)
+        ).distinct()
 
     if city:
         qs = qs.filter(city=city)
 
+    # Calcul in Python - imun la distinct()
+    centers = list(qs)
+
+    for c in centers:
+        approved = [r for r in c.review_set.all() if r.is_approved]
+        c.avg_rating = round(sum(r.rating for r in approved) / len(approved), 1) if approved else 0.0
+        c.review_count = len(approved)
+        prices = [float(s.price_from) for s in c.serviceitem_set.all() if s.price_from is not None]
+        c.min_price = min(prices) if prices else None
+
+    # Filtrare dupa rating
     if min_rating:
         try:
-            qs = qs.filter(avg_rating__gte=float(min_rating))
+            r_val = float(min_rating)
+            centers = [c for c in centers if c.avg_rating >= r_val]
         except ValueError:
             pass
 
+    # Filtrare dupa pret
     if price_min:
         try:
-            qs = qs.filter(min_price__gte=float(price_min))
+            p = float(price_min)
+            centers = [c for c in centers if c.min_price is not None and c.min_price >= p]
         except ValueError:
             pass
 
     if price_max:
         try:
-            qs = qs.filter(min_price__lte=float(price_max))
+            p = float(price_max)
+            centers = [c for c in centers if c.min_price is not None and c.min_price <= p]
         except ValueError:
             pass
 
-    sort_options = {
-        'rating': '-avg_rating',
-        'price_asc': 'min_price',
-        'price_desc': '-min_price',
-        'reviews': '-review_count',
-        'name': 'name',
-    }
-    qs = qs.order_by(sort_options.get(sort_by, '-avg_rating'))
+    # Sortare in Python - 100% corecta
+    if sort_by == 'price_asc':
+        centers.sort(key=lambda c: (c.min_price is None, c.min_price or 0))
+    elif sort_by == 'price_desc':
+        centers.sort(key=lambda c: (c.min_price is None, -(c.min_price or 0)))
+    elif sort_by == 'reviews':
+        centers.sort(key=lambda c: -c.review_count)
+    elif sort_by == 'name':
+        centers.sort(key=lambda c: c.name.lower())
+    else:  # rating
+        centers.sort(key=lambda c: (-c.avg_rating, -c.review_count))
 
     categories = ServiceCategory.objects.all()
     from .models import CITY_CHOICES
     context = {
-        'centers': qs,
-        'top5': qs[:5],
+        'centers': centers,
+        'top5': centers[:5],
         'categories': categories,
         'cities': CITY_CHOICES,
         'selected_category': category_slug,
@@ -90,7 +128,7 @@ def service_list(request):
         'selected_price_max': price_max,
         'selected_sort': sort_by,
         'search_q': search_q,
-        'total_count': qs.count(),
+        'total_count': len(centers),
     }
     return render(request, 'services/service_list.html', context)
 
@@ -113,6 +151,15 @@ def service_detail(request, slug):
         pct = int((cnt / review_count * 100)) if review_count else 0
         rating_breakdown[i] = {'count': cnt, 'pct': pct}
 
+    can_review = False
+    user_review = None
+    review_form = ReviewForm()
+    if request.user.is_authenticated:
+        can_review = Booking.objects.filter(
+            user=request.user, center=center, status=Booking.STATUS_DONE
+        ).exists()
+        user_review = Review.objects.filter(center=center, user=request.user).first()
+
     return render(request, 'services/service_detail.html', {
         'center': center,
         'services': services,
@@ -122,6 +169,9 @@ def service_detail(request, slug):
         'is_favorited': is_favorited,
         'rating_breakdown': rating_breakdown,
         'popular_services': services.filter(is_popular=True)[:3],
+        'can_review': can_review,
+        'user_review': user_review,
+        'review_form': review_form,
     })
 
 
@@ -639,4 +689,4 @@ def notification_mark_read(request, pk):
     notif = get_object_or_404(BookingNotification, pk=pk, recipient=request.user)
     notif.is_read = True
     notif.save(update_fields=['is_read'])
-    return redirect(request.META.get('HTTP_REFERER', 'services:notifications'))
+    return redirect(request.META.get('HTTP_REFERER', 'services:notifications')) 

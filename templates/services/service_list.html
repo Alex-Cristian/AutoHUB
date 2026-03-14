@@ -109,7 +109,11 @@
 <!-- ===== PANOU LATERAL FILTRE ===== -->
 <div id="filterDrawer">
   <div class="drawer-header">
-    <h6 class="fw-bold mb-0"><i class="bi bi-funnel me-2 text-red"></i>Filtre</h6>
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-funnel text-red"></i>
+      <h6 class="fw-bold mb-0">Filtre</h6>
+      <span id="badgeActive" class="badge bg-danger" style="display:none;font-size:0.65rem;">0</span>
+    </div>
     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="inchideFiltre()">
       <i class="bi bi-x-lg"></i>
     </button>
@@ -118,12 +122,15 @@
   <div class="drawer-body">
     <form method="get" id="filterForm">
       {% if search_q %}<input type="hidden" name="q" value="{{ search_q }}">{% endif %}
-      <input type="hidden" name="sort" value="{{ selected_sort|default:'rating' }}">
+
+      <!-- hidden inputs — populate la submit -->
       <input type="hidden" name="category" id="hiddenCategory" value="{{ selected_category }}">
       <input type="hidden" name="min_rating" id="hiddenRating" value="{{ selected_min_rating }}">
+      <input type="hidden" name="sort" id="hiddenSort" value="{{ selected_sort|default:'rating' }}">
 
-      <!-- APROAPE DE MINE -->
+      <!-- APROAPE DE MINE - sus -->
       <div class="filter-group-drawer">
+        <p class="filter-title-drawer">Distanță</p>
         <button type="button" id="btnSortDist" onclick="toggleSortDist()"
                 class="btn btn-sm w-100 btn-outline-secondary">
           <i class="bi bi-geo-alt me-1"></i>Aproape de mine
@@ -140,25 +147,34 @@
       <!-- SORTARE -->
       <div class="filter-group-drawer">
         <p class="filter-title-drawer">Sortare</p>
-        <select name="sort" class="form-select form-select-sm"
-                onchange="document.getElementById('filterForm').submit()">
-          <option value="rating" {% if selected_sort == "rating" or not selected_sort %}selected{% endif %}>⭐ Rating</option>
-          <option value="reviews" {% if selected_sort == "reviews" %}selected{% endif %}>💬 Nr. recenzii</option>
-          <option value="price_asc" {% if selected_sort == "price_asc" %}selected{% endif %}>💰 Preț crescător</option>
-          <option value="price_desc" {% if selected_sort == "price_desc" %}selected{% endif %}>💰 Preț descrescător</option>
-          <option value="name" {% if selected_sort == "name" %}selected{% endif %}>🔤 Nume</option>
-        </select>
+        <div class="d-flex flex-column gap-1" id="sortButtons">
+          <button type="button" onclick="pickSort('rating', this)" data-sort="rating"
+                  class="btn btn-sm text-start {% if selected_sort == 'rating' or not selected_sort %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  style="border-radius:8px;">⭐ Rating + Recenzii</button>
+          <button type="button" onclick="pickSort('reviews', this)" data-sort="reviews"
+                  class="btn btn-sm text-start {% if selected_sort == 'reviews' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  style="border-radius:8px;">💬 Nr. recenzii</button>
+          <button type="button" onclick="pickSort('price_asc', this)" data-sort="price_asc"
+                  class="btn btn-sm text-start {% if selected_sort == 'price_asc' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  style="border-radius:8px;">💰 Preț crescător</button>
+          <button type="button" onclick="pickSort('price_desc', this)" data-sort="price_desc"
+                  class="btn btn-sm text-start {% if selected_sort == 'price_desc' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  style="border-radius:8px;">💰 Preț descrescător</button>
+          <button type="button" onclick="pickSort('name', this)" data-sort="name"
+                  class="btn btn-sm text-start {% if selected_sort == 'name' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  style="border-radius:8px;">🔤 Nume</button>
+        </div>
       </div>
 
       <!-- CATEGORII -->
       <div class="filter-group-drawer">
         <p class="filter-title-drawer">Categorie</p>
-        <div class="d-flex flex-column gap-1">
-          <button type="button" onclick="selectCategorie('', this)"
+        <div class="d-flex flex-column gap-1" id="categoryButtons">
+          <button type="button" onclick="pickCategory('')"
                   class="btn btn-sm text-start {% if not selected_category %}btn-primary{% else %}btn-outline-secondary{% endif %}"
                   style="border-radius:8px;">🔍 Toate</button>
           {% for cat in categories %}
-          <button type="button" onclick="selectCategorie('{{ cat.slug }}', this)"
+          <button type="button" onclick="pickCategory('{{ cat.slug }}')"
                   data-slug="{{ cat.slug }}"
                   class="btn btn-sm text-start {% if selected_category == cat.slug %}btn-primary{% else %}btn-outline-secondary{% endif %}"
                   style="border-radius:8px;">{{ cat.icon }} {{ cat.name }}</button>
@@ -169,8 +185,7 @@
       <!-- ORAS -->
       <div class="filter-group-drawer">
         <p class="filter-title-drawer">Oraș</p>
-        <select name="city" class="form-select form-select-sm"
-                onchange="document.getElementById('filterForm').submit()">
+        <select name="city" class="form-select form-select-sm" id="citySelect" onchange="updateBadge()">
           <option value="" {% if not selected_city %}selected{% endif %}>Toate</option>
           {% for val, label in cities %}
             <option value="{{ val }}" {% if selected_city == val %}selected{% endif %}>{{ label }}</option>
@@ -181,14 +196,14 @@
       <!-- RATING MINIM -->
       <div class="filter-group-drawer">
         <p class="filter-title-drawer">Rating minim</p>
-        <div class="d-flex flex-column gap-1">
+        <div class="d-flex flex-column gap-1" id="ratingButtons">
           {% for r in "54321" %}
-          <button type="button" onclick="selectRating('{{ r }}', this)"
+          <button type="button" onclick="pickRating('{{ r }}')"
                   data-rating="{{ r }}"
                   class="btn btn-sm text-start {% if selected_min_rating|stringformat:'s' == r %}btn-primary{% else %}btn-outline-secondary{% endif %}"
                   style="border-radius:8px;">{{ r }}★ și peste</button>
           {% endfor %}
-          <button type="button" onclick="selectRating('', this)"
+          <button type="button" onclick="pickRating('')"
                   class="btn btn-sm text-start {% if not selected_min_rating %}btn-primary{% else %}btn-outline-secondary{% endif %}"
                   style="border-radius:8px;">Orice rating</button>
         </div>
@@ -199,12 +214,12 @@
         <p class="filter-title-drawer">Preț (RON)</p>
         <div class="row g-1 mb-2">
           <div class="col-6">
-            <input type="number" name="price_min" class="form-control form-control-sm"
-                   placeholder="Min" value="{{ selected_price_min }}" min="0">
+            <input type="number" name="price_min" id="priceMin" class="form-control form-control-sm"
+                   placeholder="Min" value="{{ selected_price_min }}" min="0" oninput="updateBadge()">
           </div>
           <div class="col-6">
-            <input type="number" name="price_max" class="form-control form-control-sm"
-                   placeholder="Max" value="{{ selected_price_max }}" min="0">
+            <input type="number" name="price_max" id="priceMax" class="form-control form-control-sm"
+                   placeholder="Max" value="{{ selected_price_max }}" min="0" oninput="updateBadge()">
           </div>
         </div>
       </div>
@@ -213,13 +228,12 @@
   </div>
 
   <div class="drawer-footer d-flex gap-2">
-    <button type="submit" form="filterForm" class="btn btn-primary btn-sm flex-grow-1">
+    <button type="button" onclick="aplicaFiltre()" class="btn btn-primary btn-sm flex-grow-1">
       <i class="bi bi-check2 me-1"></i>Aplică filtrele
     </button>
-    <a href="{% url 'services:list' %}" class="btn btn-outline-secondary btn-sm"
-       onclick="localStorage.removeItem('sort_dist_activ');localStorage.removeItem('dist_radius')">
+    <button type="button" onclick="resetFiltre()" class="btn btn-outline-secondary btn-sm">
       Resetează
-    </a>
+    </button>
   </div>
 </div>
 
@@ -238,10 +252,6 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
       <div>
         <h1 class="section-title mb-1">Service-uri auto</h1>
-        <p class="text-muted-custom small mb-0">
-          <strong class="text-white">{{ total_count }}</strong> rezultate găsite
-          {% if search_q %} pentru „<em>{{ search_q }}</em>"{% endif %}
-        </p>
       </div>
 
       <div class="d-flex gap-2 align-items-center">
@@ -267,8 +277,8 @@
         </button>
 
         <!-- Sortare rapida -->
-        <select name="sort" class="form-select form-select-sm" style="width:auto"
-                onchange="window.location='?sort='+this.value+'{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_city %}&city={{ selected_city }}{% endif %}'">
+        <select class="form-select form-select-sm" style="width:auto"
+                onchange="sortRapid(this.value)">
           <option value="rating" {% if selected_sort == "rating" or not selected_sort %}selected{% endif %}>⭐ Rating</option>
           <option value="reviews" {% if selected_sort == "reviews" %}selected{% endif %}>💬 Recenzii</option>
           <option value="price_asc" {% if selected_sort == "price_asc" %}selected{% endif %}>💰 Preț ↑</option>
@@ -307,6 +317,7 @@
                           <i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}
                           <span class="mx-2">·</span>
                           <i class="bi bi-tag me-1"></i>{{ center.category.name }}
+                          {% for cat in center.categories.all %}{% if cat != center.category %} · {{ cat.name }}{% endif %}{% endfor %}
                           <span id="dist_{{ center.slug }}"
                                 data-lat="{{ center.latitude|default:0|stringformat:'f' }}"
                                 data-lng="{{ center.longitude|default:0|stringformat:'f' }}"
@@ -453,21 +464,106 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape') inchideFiltre(); });
 
   // ===== BADGE FILTRE ACTIVE =====
-  function updateBadgeFiltre() {
-    let count = 0;
-    if ("{{ selected_category|default:'' }}".trim()) count++;
-    if ("{{ selected_city|default:'' }}".trim()) count++;
-    if ("{{ selected_min_rating|default:'' }}".trim()) count++;
-    if ("{{ selected_price_min|default:'' }}".trim()) count++;
-    if ("{{ selected_price_max|default:'' }}".trim()) count++;
-    const badge = document.getElementById('badgeFiltre');
-    if (count > 0) {
-      badge.textContent = count;
-      badge.classList.add('visible');
+  // ===== STARE FILTRE (fara submit automat) =====
+  let pendingCategory = "{{ selected_category }}";
+  let pendingRating = "{{ selected_min_rating }}";
+  let pendingSort = "{{ selected_sort|default:'rating' }}";
+
+  function pickCategory(slug) {
+    // toggle: daca dai click pe aceeasi categorie, o deselectezi
+    pendingCategory = (pendingCategory === slug) ? '' : slug;
+    document.querySelectorAll('#categoryButtons button').forEach(btn => {
+      const s = btn.dataset.slug || '';
+      btn.classList.toggle('btn-primary', s === pendingCategory && (pendingCategory !== '' || s === ''));
+      btn.classList.toggle('btn-outline-secondary', !(s === pendingCategory && (pendingCategory !== '' || s === '')));
+    });
+    // highlight butonul "Toate" cand nimic selectat
+    const btnToate = document.querySelector('#categoryButtons button:first-child');
+    if (btnToate) {
+      btnToate.classList.toggle('btn-primary', pendingCategory === '');
+      btnToate.classList.toggle('btn-outline-secondary', pendingCategory !== '');
+    }
+    updateBadge();
+  }
+
+  function pickRating(val) {
+    pendingRating = (pendingRating === val) ? '' : val;
+    document.querySelectorAll('#ratingButtons button').forEach(btn => {
+      const r = btn.dataset.rating || '';
+      btn.classList.toggle('btn-primary', r === pendingRating);
+      btn.classList.toggle('btn-outline-secondary', r !== pendingRating);
+    });
+    // butonul "Orice rating" (ultimul)
+    const btnOrice = document.querySelector('#ratingButtons button:last-child');
+    if (btnOrice) {
+      btnOrice.classList.toggle('btn-primary', pendingRating === '');
+      btnOrice.classList.toggle('btn-outline-secondary', pendingRating !== '');
+    }
+    updateBadge();
+  }
+
+  function pickSort(val, btn) {
+    // Toggle: daca dai click pe cel deja selectat, revii la rating (default)
+    if (pendingSort === val && val !== 'rating') {
+      pendingSort = 'rating';
     } else {
-      badge.classList.remove('visible');
+      pendingSort = val;
+    }
+    document.querySelectorAll('#sortButtons button').forEach(b => {
+      const isActive = b.dataset.sort === pendingSort;
+      b.classList.toggle('btn-primary', isActive);
+      b.classList.toggle('btn-outline-secondary', !isActive);
+    });
+  }
+
+  function updateBadge() {
+    let count = 0;
+    if (pendingCategory) count++;
+    if (pendingRating) count++;
+    const city = document.getElementById('citySelect')?.value;
+    if (city) count++;
+    const pMin = document.getElementById('priceMin')?.value;
+    const pMax = document.getElementById('priceMax')?.value;
+    if (pMin) count++;
+    if (pMax) count++;
+
+    // badge in header drawer
+    const b = document.getElementById('badgeActive');
+    if (b) { b.textContent = count; b.style.display = count > 0 ? 'inline' : 'none'; }
+
+    // badge buton filtre
+    const badge = document.getElementById('badgeFiltre');
+    if (badge) {
+      if (count > 0) { badge.textContent = count; badge.classList.add('visible'); }
+      else badge.classList.remove('visible');
     }
   }
+
+  function aplicaFiltre() {
+    localStorage.removeItem('sort_dist_activ');
+    document.getElementById('hiddenCategory').value = pendingCategory;
+    document.getElementById('hiddenRating').value = pendingRating;
+    document.getElementById('hiddenSort').value = pendingSort;
+    document.getElementById('filterForm').submit();
+  }
+
+  function resetFiltre() {
+    localStorage.removeItem('sort_dist_activ');
+    localStorage.removeItem('dist_radius');
+    window.location = "{% url 'services:list' %}";
+  }
+
+  function sortRapid(val) {
+    pendingSort = val;
+    document.getElementById('hiddenSort').value = val;
+    document.getElementById('filterForm').submit();
+  }
+
+  // DEPRECATED - pastrate pentru compatibilitate
+  function selectCategorie(slug) { pickCategory(slug); }
+  function selectRating(val) { pickRating(val); }
+
+  function updateBadgeFiltre() { updateBadge(); }
 
   // ===== LOCALSTORAGE =====
   function salveazaLocatia(lat, lng) { localStorage.setItem("user_loc", JSON.stringify({ lat, lng })); }
@@ -570,15 +666,11 @@
     }
   }
 
-  function selectCategorie(slug) {
-    const cur = document.getElementById('hiddenCategory').value;
-    document.getElementById('hiddenCategory').value = (slug !== '' && cur === slug) ? '' : slug;
-    document.getElementById('filterForm').submit();
-  }
-
-  function selectRating(val) {
-    const cur = document.getElementById('hiddenRating').value;
-    document.getElementById('hiddenRating').value = (val !== '' && cur === val) ? '' : val;
+  // sortare rapida din header - submiteza imediat
+  function sortRapid(val) {
+    document.getElementById('hiddenCategory').value = pendingCategory;
+    document.getElementById('hiddenRating').value = pendingRating;
+    document.getElementById('hiddenSort').value = val;
     document.getElementById('filterForm').submit();
   }
 
@@ -728,7 +820,7 @@
 
   // ===== LA INCARCARE =====
   window.addEventListener('DOMContentLoaded', () => {
-    updateBadgeFiltre();
+    updateBadge();
 
     const loc = getLocatieSalvata();
     if (loc) {
@@ -747,7 +839,15 @@
     }
 
     if (localStorage.getItem("sort_dist_activ") === "true" && loc) {
-      aplicaSortareDupaDistanta(loc.lat, loc.lng);
+      // Aplica sortarea dupa distanta DOAR daca nu exista un sort activ din server
+      const urlParams = new URLSearchParams(window.location.search);
+      const serverSort = urlParams.get('sort') || 'rating';
+      if (serverSort === 'rating') {
+        aplicaSortareDupaDistanta(loc.lat, loc.lng);
+      } else {
+        // Exista un sort din server - anuleaza sort_dist_activ
+        localStorage.removeItem('sort_dist_activ');
+      }
     }
 
     razaActiva = parseInt(localStorage.getItem("dist_radius") || "0");

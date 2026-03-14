@@ -52,7 +52,11 @@ class ServiceCategory(models.Model):
         return reverse('services:list') + f'?category={self.slug}'
 
     def center_count(self):
-        return self.center_categories.filter(is_active=True).distinct().count()
+        from django.db.models import Q
+        return ServiceCenter.objects.filter(
+            Q(category=self) | Q(categories=self),
+            is_active=True
+        ).distinct().count()
 
 
 class ServiceCenter(models.Model):
