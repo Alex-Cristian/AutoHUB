@@ -90,7 +90,56 @@
   <!-- Tabel lucrări active -->
   <div id="section-active">
     {% if active_bookings %}
+
+    <!-- Filtre mecanic -->
+    <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+      <div style="position:relative;">
+        <button type="button" id="mp-date-btn"
+                class="btn btn-sm btn-outline-light d-flex align-items-center gap-2"
+                onclick="toggleMpCal()">
+          <i class="bi bi-calendar2"></i>
+          <span id="mp-date-label">Azi</span>
+          <i class="bi bi-chevron-down" style="font-size:.7rem;"></i>
+        </button>
+        <div id="mp-cal-popup" style="display:none;position:absolute;z-index:999;top:calc(100% + 4px);left:0;
+             background:var(--ah-dark2);border:1px solid var(--ah-border);border-radius:18px;
+             padding:1rem;box-shadow:0 16px 40px rgba(0,0,0,0.4);width:270px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <button type="button" class="btn btn-sm btn-outline-light px-2 py-1" onclick="mpCalPrev()">←</button>
+            <span id="mp-cal-month" style="font-weight:700;font-size:.9rem;"></span>
+            <button type="button" class="btn btn-sm btn-outline-light px-2 py-1" onclick="mpCalNext()">→</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px;">
+            <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Lu</div>
+            <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Ma</div>
+            <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Mi</div>
+            <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Jo</div>
+            <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Vi</div>
+            <div style="text-align:center;font-size:.68rem;color:#e63946;">Sâ</div>
+            <div style="text-align:center;font-size:.68rem;color:#e63946;">Du</div>
+          </div>
+          <div id="mp-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
+          <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2" onclick="mpShowAll()">
+            <i class="bi bi-list-ul me-1"></i>Toate zilele
+          </button>
+        </div>
+      </div>
+
+      <select id="mp-sort" class="form-select form-select-sm" style="width:auto;min-width:160px;"
+              onchange="mpApplyFilters()">
+        <option value="time-asc" selected>Oră ↑ crescător</option>
+        <option value="time-desc">Oră ↓ descrescător</option>
+        <option value="date-asc">Dată ↑ crescător</option>
+        <option value="date-desc">Dată ↓ descrescător</option>
+      </select>
+
+      <span class="small text-muted-custom ms-1" id="mp-count"></span>
+    </div>
+
     <div class="mp-wrap">
+      <div id="mp-no-results" style="display:none;" class="mp-empty">
+        <div class="small">Nicio programare pentru filtrele selectate.</div>
+      </div>
       <table class="mp-table">
         <thead>
           <tr>
@@ -102,9 +151,12 @@
             <th style="text-align:right;">Acțiuni</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="mp-tbody">
           {% for booking in active_bookings %}
-          <tr onclick="openBookingModal('modal-booking-{{ booking.pk }}')">
+          <tr class="mp-row"
+              data-date="{{ booking.booking_date|date:'Y-m-d' }}"
+              data-time="{{ booking.booking_time|time:'H:i' }}"
+              onclick="openBookingModal('modal-booking-{{ booking.pk }}')">
             <td><span style="color:var(--ah-muted);font-weight:600;">#{{ booking.pk }}</span></td>
             <td>
               <div class="fw-semibold text-white">{{ booking.car_brand }} {{ booking.car_model }}</div>
@@ -576,5 +628,115 @@ function showTab(tab, el) {
 function openBookingModal(id) {
   new bootstrap.Modal(document.getElementById(id)).show();
 }
+
+// ── Filtre mecanic profil ──
+const today = new Date();
+const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+let mpFilterDate = todayStr;
+let mpCalCur = new Date(today.getFullYear(), today.getMonth(), 1);
+
+function toggleMpCal() {
+  const popup = document.getElementById('mp-cal-popup');
+  const isOpen = popup.style.display !== 'none';
+  popup.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderMpCal();
+}
+
+function mpCalPrev() { mpCalCur = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth()-1, 1); renderMpCal(); }
+function mpCalNext() { mpCalCur = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth()+1, 1); renderMpCal(); }
+
+function renderMpCal() {
+  const label = mpCalCur.toLocaleDateString('ro-RO', {month:'long', year:'numeric'});
+  document.getElementById('mp-cal-month').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+  const grid = document.getElementById('mp-cal-grid');
+  grid.innerHTML = '';
+  const datesWithRows = new Set(Array.from(document.querySelectorAll('.mp-row')).map(r => r.dataset.date));
+  let startDow = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth(), 1).getDay();
+  startDow = startDow === 0 ? 6 : startDow - 1;
+  for (let i = 0; i < startDow; i++) grid.appendChild(document.createElement('div'));
+  const daysInMonth = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth()+1, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${mpCalCur.getFullYear()}-${String(mpCalCur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isSel = mpFilterDate === dateStr;
+    const isToday = dateStr === todayStr;
+    const hasRows = datesWithRows.has(dateStr);
+    const cell = document.createElement('div');
+    cell.style.cssText = 'text-align:center;padding:4px 2px;border-radius:8px;font-size:12px;position:relative;cursor:pointer;';
+    if (isSel) { cell.style.background = 'var(--ah-red)'; cell.style.color = '#fff'; cell.style.fontWeight = '700'; }
+    else if (isToday) { cell.style.border = '1px solid var(--ah-red)'; cell.style.color = 'var(--ah-red)'; cell.style.fontWeight = '700'; }
+    else if (hasRows) { cell.style.color = '#e8e8e8'; cell.style.fontWeight = '600'; }
+    else { cell.style.color = 'var(--ah-muted)'; }
+    const num = document.createElement('div');
+    num.textContent = d;
+    cell.appendChild(num);
+    if (hasRows) {
+      const dot = document.createElement('div');
+      dot.style.cssText = `width:4px;height:4px;border-radius:50%;margin:1px auto 0;background:${isSel?'#fff':'var(--ah-red)'};`;
+      cell.appendChild(dot);
+    }
+    cell.onmouseover = () => { if (!isSel) cell.style.background = 'rgba(255,255,255,0.08)'; };
+    cell.onmouseout = () => { if (!isSel) cell.style.background = ''; };
+    cell.onclick = () => {
+      mpFilterDate = dateStr;
+      const dl = new Date(dateStr+'T00:00:00').toLocaleDateString('ro-RO', {day:'numeric', month:'long'});
+      document.getElementById('mp-date-label').textContent = dl;
+      document.getElementById('mp-cal-popup').style.display = 'none';
+      mpApplyFilters();
+    };
+    grid.appendChild(cell);
+  }
+}
+
+function mpShowAll() {
+  mpFilterDate = null;
+  document.getElementById('mp-date-label').textContent = 'Toate zilele';
+  document.getElementById('mp-cal-popup').style.display = 'none';
+  mpApplyFilters();
+}
+
+function mpApplyFilters() {
+  const rows = Array.from(document.querySelectorAll('.mp-row'));
+  const sortVal = document.getElementById('mp-sort')?.value || 'time-asc';
+  const tbody = document.getElementById('mp-tbody');
+  const noResults = document.getElementById('mp-no-results');
+
+  // Sortare
+  rows.sort((a, b) => {
+    if (sortVal === 'time-asc')  return (a.dataset.time||'').localeCompare(b.dataset.time||'');
+    if (sortVal === 'time-desc') return (b.dataset.time||'').localeCompare(a.dataset.time||'');
+    const da = (a.dataset.date||'') + (a.dataset.time||'');
+    const db = (b.dataset.date||'') + (b.dataset.time||'');
+    if (sortVal === 'date-asc')  return da.localeCompare(db);
+    if (sortVal === 'date-desc') return db.localeCompare(da);
+    return 0;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+
+  // Filtrare dată
+  let visible = 0;
+  rows.forEach(row => {
+    const show = !mpFilterDate || row.dataset.date === mpFilterDate;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  const countEl = document.getElementById('mp-count');
+  if (countEl) countEl.textContent = `${visible} programări`;
+  if (noResults) noResults.style.display = visible === 0 ? 'block' : 'none';
+}
+
+// Închide calendar la click afară
+document.addEventListener('click', function(e) {
+  const popup = document.getElementById('mp-cal-popup');
+  const btn = document.getElementById('mp-date-btn');
+  if (popup && !popup.contains(e.target) && btn && !btn.contains(e.target)) {
+    popup.style.display = 'none';
+  }
+});
+
+// Inițializare: dată azi + oră crescătoare
+document.addEventListener('DOMContentLoaded', function() {
+  mpApplyFilters();
+});
 </script>
 {% endblock %}

@@ -305,13 +305,21 @@
   </section>
 
   <section class="mb-4" id="asteptare">
-    <div class="dashboard-section-head">
-      <div>
-        <h2 class="dashboard-section-title"><i class="bi bi-hourglass-split text-orange me-2"></i>Programări în așteptare</h2>
-        <div class="dashboard-section-note">Acceptă rapid cererile noi și blochează durata în garaj.</div>
+    <div class="dashboard-panel" style="cursor:pointer;" onclick="toggleSection('asteptare-body', 'chevron-asteptare', 'btn-asteptare')">
+      <div class="dashboard-panel-header" style="margin-bottom:0;">
+        <div>
+          <h2 class="dashboard-panel-title"><i class="bi bi-hourglass-split text-orange me-2"></i>Programări în așteptare</h2>
+          <div class="dashboard-panel-subtitle">Acceptă rapid cererile noi și blochează durata în garaj.</div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+          <span class="dashboard-panel-subtitle">{{ pending_bookings|length }} de confirmat</span>
+          <button type="button" class="btn btn-sm btn-outline-light" id="btn-asteptare" onclick="event.stopPropagation(); toggleSection('asteptare-body', 'chevron-asteptare', 'btn-asteptare')">
+            <i class="bi bi-chevron-down" id="chevron-asteptare"></i>
+          </button>
+        </div>
       </div>
-      <span class="dashboard-section-note">{{ pending_bookings|length }} de confirmat</span>
     </div>
+    <div id="asteptare-body" style="display:none;">
 
     {% if pending_bookings %}
       <div class="dashboard-list-grid">
@@ -356,17 +364,23 @@
         <a class="btn btn-outline-warning" href="{% url 'services:verification_list' %}"><i class="bi bi-shield-check me-1"></i>Verificare servicii</a>
       </div>
     {% endif %}
+    </div>
   </section>
 
   {# ─── MECANICI: doar 2 panouri în grid (adaugă + existenți) ─── #}
   <section class="mb-4 d-flex flex-column gap-4" id="mecanici">
     <div class="dashboard-panel">
-      <div class="dashboard-panel-header">
+      <div class="dashboard-panel-header" style="cursor:pointer;" onclick="toggleAdaugaMecanic()">
         <div>
           <h2 class="dashboard-panel-title"><i class="bi bi-person-workspace text-red me-2"></i>Adaugă mecanic</h2>
           <div class="dashboard-panel-subtitle">Formular simplu, cu câmpuri mari și ușor de completat și de pe telefon.</div>
         </div>
+        <button type="button" class="btn btn-sm btn-outline-light" id="btn-adauga-mecanic"
+                onclick="event.stopPropagation(); toggleAdaugaMecanic()">
+          <i class="bi bi-chevron-down" id="chevron-adauga-mecanic"></i>
+        </button>
       </div>
+      <div id="adauga-mecanic-body" style="display:none;">
       {% if centers|length == 1 %}
         <form method="post" action="{% url 'services:mechanic_create' centers.0.pk %}" class="dashboard-inline-form" enctype="multipart/form-data">
           {% csrf_token %}
@@ -432,6 +446,7 @@
           {% endfor %}
         </div>
       {% endif %}
+      </div>
     </div>
 
     <div class="dashboard-panel">
@@ -440,8 +455,8 @@
           <h2 class="dashboard-panel-title"><i class="bi bi-people text-orange me-2"></i>Mecanici existenți</h2>
           <div class="dashboard-panel-subtitle">Îi vezi pe toți într-un singur loc și poți edita rapid datele sau îi poți elimina.</div>
         </div>
-        <button type="button" class="btn btn-sm btn-outline-light" id="mecanici-toggle-btn" style="white-space:nowrap; flex-shrink:0;" onclick="event.stopPropagation(); toggleMecanici();">
-          <i class="bi bi-chevron-down me-1" id="mecanici-chevron"></i>Arată mecanici
+        <button type="button" class="btn btn-sm btn-outline-light" id="mecanici-toggle-btn" onclick="event.stopPropagation(); toggleMecanici();">
+          <i class="bi bi-chevron-down" id="mecanici-chevron"></i>
         </button>
       </div>
       <div class="dashboard-list-grid" id="mecanici-list" style="display:none;">
@@ -512,13 +527,21 @@
   </section>
 
   <section id="programari">
-    <div class="dashboard-section-head">
-      <div>
-        <h2 class="dashboard-section-title"><i class="bi bi-list-check text-red me-2"></i>Ultimele programări</h2>
-        <div class="dashboard-section-note">Carduri mai aerisite, acțiuni clare și preview rapid pentru poze.</div>
+    <div class="dashboard-panel" style="cursor:pointer;" onclick="toggleSection('programari-body', 'chevron-programari', 'btn-programari')">
+      <div class="dashboard-panel-header" style="margin-bottom:0;">
+        <div>
+          <h2 class="dashboard-panel-title"><i class="bi bi-list-check text-red me-2"></i>Ultimele programări</h2>
+          <div class="dashboard-panel-subtitle">Carduri mai aerisite, acțiuni clare și preview rapid pentru poze.</div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+          <span class="dashboard-panel-subtitle">max 50</span>
+          <button type="button" class="btn btn-sm btn-outline-light" id="btn-programari" onclick="event.stopPropagation(); toggleSection('programari-body', 'chevron-programari', 'btn-programari')">
+            <i class="bi bi-chevron-down" id="chevron-programari"></i>
+          </button>
+        </div>
       </div>
-      <span class="dashboard-section-note">max 50</span>
     </div>
+    <div id="programari-body" style="display:none;">
 
     {% if bookings %}
       <div class="d-flex gap-2 flex-wrap mb-3" id="booking-filters">
@@ -589,9 +612,21 @@
     {% else %}
       <div class="dashboard-empty">Nu există programări încă.</div>
     {% endif %}
+    </div>
   </section>
 </div>
 
+<script>
+function toggleSection(bodyId, chevronId, btnId) {
+  const body = document.getElementById(bodyId);
+  const chevron = document.getElementById(chevronId);
+  const btn = document.getElementById(btnId);
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? '' : 'none';
+  if (chevron) chevron.className = isHidden ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+  if (btn) btn.innerHTML = `<i class="bi bi-chevron-${isHidden ? 'up' : 'down'}"></i>`;
+}
+</script>
 <script>
 // ── Filtre programări ──
 document.addEventListener('DOMContentLoaded', function () {
@@ -638,14 +673,21 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // ── Toggle mecanici ──
+function toggleAdaugaMecanic() {
+  const body = document.getElementById('adauga-mecanic-body');
+  const chevron = document.getElementById('chevron-adauga-mecanic');
+  const btn = document.getElementById('btn-adauga-mecanic');
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? '' : 'none';
+  chevron.className = isHidden ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+}
+
 function toggleMecanici() {
   const list = document.getElementById('mecanici-list');
-  const btn = document.getElementById('mecanici-toggle-btn');
+  const chevron = document.getElementById('mecanici-chevron');
   const isHidden = list.style.display === 'none';
   list.style.display = isHidden ? 'grid' : 'none';
-  btn.innerHTML = isHidden
-    ? '<i class="bi bi-chevron-up me-1"></i>Ascunde mecanici'
-    : '<i class="bi bi-chevron-down me-1"></i>Arată mecanici';
+  if (chevron) chevron.className = isHidden ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
 }
 </script>
 {% endblock %}

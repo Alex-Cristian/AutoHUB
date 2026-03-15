@@ -8,7 +8,11 @@
       <p class="text-muted-custom mb-0">{{ booking.center.name }} • {{ booking.booking_date|date:"d.m.Y" }} • {{ booking.booking_time|time:"H:i" }}</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
+      {% if request.GET.back == 'programari' %}
+      <a href="{% url 'services:bookings_list' %}" class="btn btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Programări</a>
+      {% else %}
       <a href="{% url 'services:dashboard' %}" class="btn btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+      {% endif %}
       <a href="#work-order" class="btn btn-nav-cta"><i class="bi bi-file-earmark-text me-1"></i>Completează fișa</a>
     </div>
   </div>
@@ -116,6 +120,35 @@
           <div class="small text-muted-custom">{% if booking.mechanic.email %}{{ booking.mechanic.email }}<br>{% endif %}{% if booking.mechanic.phone %}{{ booking.mechanic.phone }}{% endif %}</div>
         {% endif %}
       </div>
+
+      {% if booking.status == 'pending' %}
+      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:rgba(230,57,70,0.35) !important;">
+        <h5 class="mb-3"><i class="bi bi-hourglass-split me-2 text-red"></i>Acțiuni programare</h5>
+        <p class="text-muted-custom small mb-3">Această programare este în așteptare. Acceptă și blochează un interval în garaj, sau respinge.</p>
+        <form method="post" action="{% url 'services:booking_accept' booking.pk %}" class="mb-2">
+          {% csrf_token %}
+          <select name="duration_minutes" class="form-select mb-2" required>
+            <option value="">— Selectează durata —</option>
+            <option value="30">30 min</option>
+            <option value="60">1 oră</option>
+            <option value="90">1:30</option>
+            <option value="120">2 ore</option>
+            <option value="150">2:30</option>
+            <option value="180">3 ore</option>
+            <option value="210">3:30</option>
+            <option value="240">4 ore</option>
+          </select>
+          <button class="btn btn-success w-100" type="submit"><i class="bi bi-check2 me-1"></i>Acceptă programarea</button>
+        </form>
+        <form method="post" action="{% url 'services:booking_reject' booking.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-outline-danger w-100" type="submit"
+                  onclick="return confirm('Sigur vrei să respingi această programare?')">
+            <i class="bi bi-x-lg me-1"></i>Respinge programarea
+          </button>
+        </form>
+      </div>
+      {% endif %}
 
       <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
         <h5 class="mb-3"><i class="bi bi-file-earmark-text me-2 text-orange"></i>Fișă de comandă</h5>

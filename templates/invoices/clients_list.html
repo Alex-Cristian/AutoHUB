@@ -3,11 +3,7 @@
 
 {% block extra_css %}
 <style>
-  .cl-shell {
-    background:
-      radial-gradient(circle at top right, rgba(230,57,70,0.10), transparent 25%),
-      radial-gradient(circle at bottom left, rgba(244,162,97,0.06), transparent 20%);
-  }
+  .cl-shell { background: none; }
 
   /* ── Hero ── */
   .cl-hero {
@@ -140,6 +136,67 @@
     </div>
   </div>
 
+  {# ── Filtre avansate ── #}
+  <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+
+    {# Calendar dată #}
+    <div style="position:relative;">
+      <button type="button" id="cl-date-btn"
+              class="btn btn-sm btn-outline-light d-flex align-items-center gap-2"
+              onclick="toggleClCal()">
+        <i class="bi bi-calendar2"></i>
+        <span id="cl-date-label">Luna curentă</span>
+        <i class="bi bi-chevron-down" style="font-size:.7rem;"></i>
+      </button>
+      <div id="cl-cal-popup" style="display:none;position:absolute;z-index:999;top:calc(100% + 4px);left:0;
+           background:var(--ah-dark2);border:1px solid var(--ah-border);border-radius:18px;
+           padding:1rem;box-shadow:0 16px 40px rgba(0,0,0,0.4);width:270px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <button type="button" class="btn btn-sm btn-outline-light px-2 py-1" onclick="clCalPrev()">←</button>
+          <span id="cl-cal-month" style="font-weight:700;font-size:.9rem;"></span>
+          <button type="button" class="btn btn-sm btn-outline-light px-2 py-1" onclick="clCalNext()">→</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px;">
+          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Lu</div>
+          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Ma</div>
+          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Mi</div>
+          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Jo</div>
+          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Vi</div>
+          <div style="text-align:center;font-size:.68rem;color:#e63946;">Sâ</div>
+          <div style="text-align:center;font-size:.68rem;color:#e63946;">Du</div>
+        </div>
+        <div id="cl-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1" onclick="clSetMonth()">
+            <i class="bi bi-calendar3 me-1"></i>Luna curentă
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1" onclick="clClearDate()">
+            <i class="bi bi-x me-1"></i>Toate
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <select id="cl-sort" class="form-select form-select-sm" style="width:auto;min-width:180px;" onchange="clApply()">
+      <option value="default">Ordine implicită</option>
+      <option value="count-desc">Programări ↓ descrescător</option>
+      <option value="count-asc">Programări ↑ crescător</option>
+      <option value="date-desc">Ultima programare ↓ recent</option>
+      <option value="date-asc">Ultima programare ↑ vechi</option>
+      <option value="name-asc">Nume A→Z</option>
+      <option value="name-desc">Nume Z→A</option>
+    </select>
+    <select id="cl-center-filter" class="form-select form-select-sm" style="width:auto;min-width:180px;" onchange="clApply()">
+      <option value="">Toate service-urile</option>
+      {% for c in clients %}
+        <option value="{{ c.center.name|lower }}">{{ c.center.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="button" id="cl-reset" class="btn btn-sm btn-outline-danger" style="display:none;" onclick="clReset()">
+      <i class="bi bi-x-circle me-1"></i>Reset
+    </button>
+  </div>
+
   {# ── Tabel ── #}
   {% if clients %}
   <div class="cl-table-wrap">
@@ -158,6 +215,9 @@
         <tr
           class="cl-row"
           data-search="{{ c.name|lower }} {{ c.phone }} {{ c.email|lower }}"
+          data-count="{{ c.count }}"
+          data-date="{{ c.last_booking.booking_date|date:'Y-m-d' }}"
+          data-center="{{ c.center.name|lower }}"
         >
           <td>
             <div class="cell-name">{{ c.name }}</div>
@@ -206,35 +266,187 @@
 </div>
 
 <script>
+// ── Calendar clienți ──
+const clToday = new Date();
+let clCalCur = new Date(clToday.getFullYear(), clToday.getMonth(), 1);
+let clFilterMode = 'month'; // 'month' | 'day' | 'all'
+let clFilterMonth = clToday.getMonth();
+let clFilterYear  = clToday.getFullYear();
+let clFilterDay   = null;
+
+function toggleClCal() {
+  const popup = document.getElementById('cl-cal-popup');
+  const isOpen = popup.style.display !== 'none';
+  popup.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderClCal();
+}
+function clCalPrev() { clCalCur = new Date(clCalCur.getFullYear(), clCalCur.getMonth()-1, 1); renderClCal(); }
+function clCalNext() { clCalCur = new Date(clCalCur.getFullYear(), clCalCur.getMonth()+1, 1); renderClCal(); }
+
+function renderClCal() {
+  const label = clCalCur.toLocaleDateString('ro-RO', {month:'long', year:'numeric'});
+  document.getElementById('cl-cal-month').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+  const grid = document.getElementById('cl-cal-grid');
+  grid.innerHTML = '';
+  const datesWithClients = new Set(Array.from(document.querySelectorAll('.cl-row')).map(r => r.dataset.date).filter(Boolean));
+  let startDow = new Date(clCalCur.getFullYear(), clCalCur.getMonth(), 1).getDay();
+  startDow = startDow === 0 ? 6 : startDow - 1;
+  for (let i = 0; i < startDow; i++) grid.appendChild(document.createElement('div'));
+  const daysInMonth = new Date(clCalCur.getFullYear(), clCalCur.getMonth()+1, 0).getDate();
+  const isCurrentMonthView = clCalCur.getFullYear() === clFilterYear && clCalCur.getMonth() === clFilterMonth;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${clCalCur.getFullYear()}-${String(clCalCur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isSelDay = clFilterMode === 'day' && clFilterDay === dateStr;
+    const isSelMonth = clFilterMode === 'month' && isCurrentMonthView;
+    const hasC = datesWithClients.has(dateStr);
+    const cell = document.createElement('div');
+    cell.style.cssText = 'text-align:center;padding:4px 2px;border-radius:8px;font-size:12px;position:relative;cursor:pointer;';
+    if (isSelDay) { cell.style.background='var(--ah-red)'; cell.style.color='#fff'; cell.style.fontWeight='700'; }
+    else if (isSelMonth) { cell.style.background='rgba(230,57,70,0.15)'; cell.style.color='#e8e8e8'; }
+    else if (hasC) { cell.style.color='#e8e8e8'; cell.style.fontWeight='600'; }
+    else { cell.style.color='var(--ah-muted)'; }
+    const num = document.createElement('div');
+    num.textContent = d;
+    cell.appendChild(num);
+    if (hasC) {
+      const dot = document.createElement('div');
+      dot.style.cssText = `width:4px;height:4px;border-radius:50%;margin:1px auto 0;background:${isSelDay?'#fff':'var(--ah-red)'};`;
+      cell.appendChild(dot);
+    }
+    cell.onmouseover = () => { if (!isSelDay) cell.style.background='rgba(255,255,255,0.08)'; };
+    cell.onmouseout  = () => { if (!isSelDay) cell.style.background = isSelMonth ? 'rgba(230,57,70,0.15)' : ''; };
+    cell.onclick = () => {
+      clFilterMode = 'day';
+      clFilterDay  = dateStr;
+      const dl = new Date(dateStr+'T00:00:00').toLocaleDateString('ro-RO', {day:'numeric', month:'long', year:'numeric'});
+      document.getElementById('cl-date-label').textContent = dl;
+      document.getElementById('cl-cal-popup').style.display = 'none';
+      clApply();
+    };
+    grid.appendChild(cell);
+  }
+}
+
+function clSetMonth() {
+  clFilterMode  = 'month';
+  clFilterMonth = clCalCur.getMonth();
+  clFilterYear  = clCalCur.getFullYear();
+  clFilterDay   = null;
+  const label = clCalCur.toLocaleDateString('ro-RO', {month:'long', year:'numeric'});
+  document.getElementById('cl-date-label').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+  document.getElementById('cl-cal-popup').style.display = 'none';
+  clApply();
+}
+
+function clClearDate() {
+  clFilterMode = 'all';
+  clFilterDay  = null;
+  document.getElementById('cl-date-label').textContent = 'Toate datele';
+  document.getElementById('cl-cal-popup').style.display = 'none';
+  clApply();
+}
+
+document.addEventListener('click', function(e) {
+  const popup = document.getElementById('cl-cal-popup');
+  const btn   = document.getElementById('cl-date-btn');
+  if (popup && !popup.contains(e.target) && btn && !btn.contains(e.target)) {
+    popup.style.display = 'none';
+  }
+});
+
 (function () {
-  const rows     = Array.from(document.querySelectorAll('.cl-row'));
-  const searchEl = document.getElementById('cl-search');
+  const rows      = Array.from(document.querySelectorAll('.cl-row'));
+  const searchEl  = document.getElementById('cl-search');
   const noResults = document.getElementById('cl-no-results');
   const visCount  = document.getElementById('visible-count');
   const statVis   = document.getElementById('stat-visible');
   const clearBtn  = document.getElementById('clear-search');
+  const tbody     = document.getElementById('cl-tbody');
 
-  searchEl.addEventListener('input', function () {
-    const q = this.value.trim().toLowerCase();
+  // Dedup center options
+  const centerSel = document.getElementById('cl-center-filter');
+  if (centerSel) {
+    const seen = new Set();
+    Array.from(centerSel.options).forEach(opt => {
+      if (opt.value && seen.has(opt.value)) opt.remove();
+      else seen.add(opt.value);
+    });
+  }
+
+  function clApply() {
+    const q         = (searchEl?.value || '').trim().toLowerCase();
+    const sortVal   = document.getElementById('cl-sort')?.value || 'default';
+    const centerVal = document.getElementById('cl-center-filter')?.value || '';
+
+    // Sortare
+    const sorted = rows.slice().sort((a, b) => {
+      if (sortVal === 'count-desc') return parseInt(b.dataset.count) - parseInt(a.dataset.count);
+      if (sortVal === 'count-asc')  return parseInt(a.dataset.count) - parseInt(b.dataset.count);
+      if (sortVal === 'date-desc')  return (b.dataset.date||'').localeCompare(a.dataset.date||'');
+      if (sortVal === 'date-asc')   return (a.dataset.date||'').localeCompare(b.dataset.date||'');
+      if (sortVal === 'name-asc')   return (a.dataset.search||'').localeCompare(b.dataset.search||'');
+      if (sortVal === 'name-desc')  return (b.dataset.search||'').localeCompare(a.dataset.search||'');
+      return 0;
+    });
+    sorted.forEach(r => tbody.appendChild(r));
+
+    // Filtrare cu dată
     let visible = 0;
-
-    rows.forEach(row => {
-      const match = !q || row.dataset.search.includes(q);
-      row.classList.toggle('row-hidden', !match);
-      if (match) visible++;
+    sorted.forEach(row => {
+      const searchMatch = !q || row.dataset.search.includes(q);
+      const centerMatch = !centerVal || row.dataset.center === centerVal;
+      let dateMatch = true;
+      if (clFilterMode === 'day') {
+        dateMatch = row.dataset.date === clFilterDay;
+      } else if (clFilterMode === 'month') {
+        const rowDate = row.dataset.date || '';
+        const prefix = `${clFilterYear}-${String(clFilterMonth+1).padStart(2,'0')}`;
+        dateMatch = rowDate.startsWith(prefix);
+      }
+      const show = searchMatch && centerMatch && dateMatch;
+      row.classList.toggle('row-hidden', !show);
+      if (show) visible++;
     });
 
     visCount.textContent = visible;
-    statVis.textContent  = visible;
+    if (statVis) statVis.textContent = visible;
     noResults.style.display = visible === 0 ? 'block' : 'none';
-    clearBtn.style.display  = q ? 'inline-flex' : 'none';
-  });
+
+    // Reset btn
+    const resetBtn = document.getElementById('cl-reset');
+    const hasDateFilter = clFilterMode !== 'all';
+    if (resetBtn) resetBtn.style.display = (q || centerVal || sortVal !== 'default' || hasDateFilter) ? 'inline-flex' : 'none';
+    if (clearBtn) clearBtn.style.display = q ? 'inline-flex' : 'none';
+  }
+
+  window.clApply = clApply;
+
+  window.clReset = function() {
+    if (searchEl) searchEl.value = '';
+    document.getElementById('cl-sort').value = 'default';
+    document.getElementById('cl-center-filter').value = '';
+    clFilterMode = 'all';
+    clFilterDay  = null;
+    document.getElementById('cl-date-label').textContent = 'Toate datele';
+    document.getElementById('cl-reset').style.display = 'none';
+    clApply();
+  };
 
   window.clearSearch = function () {
-    searchEl.value = '';
-    searchEl.dispatchEvent(new Event('input'));
+    if (searchEl) searchEl.value = '';
+    clApply();
     searchEl.focus();
   };
+
+  if (searchEl) searchEl.addEventListener('input', clApply);
+
+  // Setează label luna curentă
+  const initLabel = clToday.toLocaleDateString('ro-RO', {month:'long', year:'numeric'});
+  const dateLabel = document.getElementById('cl-date-label');
+  if (dateLabel) dateLabel.textContent = initLabel.charAt(0).toUpperCase() + initLabel.slice(1);
+  document.getElementById('cl-reset').style.display = 'inline-flex';
+
+  clApply();
 })();
 </script>
 {% endblock %}
