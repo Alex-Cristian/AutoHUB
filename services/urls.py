@@ -9,6 +9,9 @@ urlpatterns = [
     path('inregistrare-service/', views.service_register, name='register_service'),
     path('inregistrare-firma/', views.service_register_public, name='register_public'),
     path('dashboard/', views.service_dashboard, name='dashboard'),
+    path('dashboard/programari/', views.bookings_list, name='bookings_list'),  # ← mutat aici
+    path('dashboard/mechanici/', views.mechanics_list, name='mechanics_list'),
+    path('dashboard/mechanici/<int:pk>/profil/', views.mechanic_profile, name='mechanic_profile'),
     path('dashboard/service/<int:pk>/mechanici/adauga/', views.mechanic_create, name='mechanic_create'),
     path('dashboard/mechanici/<int:pk>/editeaza/', views.mechanic_update, name='mechanic_update'),
     path('dashboard/mechanici/<int:pk>/sterge/', views.mechanic_delete, name='mechanic_delete'),
@@ -27,6 +30,6 @@ urlpatterns = [
     path('verificare/<int:pk>/aproba/', views.verification_approve, name='verification_approve'),
     path('verificare/<int:pk>/respinge/', views.verification_reject, name='verification_reject'),
     path('<slug:slug>/recenzie/', views.review_create, name='review_create'),
-    path('<slug:slug>/', views.service_detail, name='detail'),
     path('<slug:slug>/favorit/', views.toggle_favorite, name='toggle_favorite'),
+    path('<slug:slug>/', views.service_detail, name='detail'),
 ]

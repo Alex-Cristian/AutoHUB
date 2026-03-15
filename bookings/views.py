@@ -111,6 +111,23 @@ def booking_create(request, slug):
                 media_kind = 'video' if content_type.startswith('video/') else 'image'
                 BookingAttachment.objects.create(booking=booking, file=uploaded, media_kind=media_kind)
 
+            if request.user.is_authenticated and request.POST.get('save_car') == '1':
+                saved_car_id = request.POST.get('saved_car', '').strip()
+                if not saved_car_id:
+                    fuel_val = booking.car_fuel if booking.car_fuel else ''
+                    Car.objects.get_or_create(
+                        owner=request.user,
+                        plate_number=booking.car_plate,
+                        defaults={
+                            'make': booking.car_brand,
+                            'model': booking.car_model,
+                            'year': booking.car_year,
+                            'fuel': fuel_val,
+                            'vin': booking.car_vin,
+                        }
+                    )
+                    messages.info(request, f'🚗 Mașina {booking.car_brand} {booking.car_model} a fost salvată în contul tău.')
+
             garage_label = f' în {booking.garage.name}' if booking.garage_id else ''
             messages.success(
                 request,
@@ -141,10 +158,27 @@ def booking_success(request, pk):
 
 @login_required
 def my_bookings(request):
+    from services.models import MechanicWorkLog
+
     bookings = Booking.objects.filter(user=request.user).select_related(
-        'center', 'center__category', 'service_item', 'garage'
-    ).prefetch_related('attachments').order_by('-created_at')
-    return render(request, 'bookings/my_bookings.html', {'bookings': bookings})
+        'center', 'center__category', 'service_item', 'garage', 'mechanic'
+    ).prefetch_related(
+        'attachments',
+    ).order_by('-created_at')
+
+    # Atașează work_log-ul mecanicului direct pe fiecare booking
+    booking_list = list(bookings)
+    for b in booking_list:
+        b.mechanic_work_log = None
+        if b.mechanic_id:
+            try:
+                b.mechanic_work_log = MechanicWorkLog.objects.filter(
+                    booking=b
+                ).prefetch_related('photos').first()
+            except Exception:
+                pass
+
+    return render(request, 'bookings/my_bookings.html', {'bookings': booking_list})
 
 
 @login_required

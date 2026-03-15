@@ -680,7 +680,7 @@
       name: "{{ c.name|escapejs }}",
       city: "{{ c.get_city_display|escapejs }}",
       category: "{{ c.category.name|escapejs }}",
-      icon: "{{ c.category.icon|escapejs }}",
+      icon: "{% if 'detailing' in c.category.slug %}✨{% elif 'mecanica' in c.category.slug %}🔧{% elif 'electrica' in c.category.slug %}⚡{% elif 'tractari' in c.category.slug %}🚛{% elif 'vulcanizari' in c.category.slug %}🔴{% elif 'tinichigerie' in c.category.slug %}🔨{% else %}🚗{% endif %}",
       rating: {% if c.avg_rating %}{{ c.avg_rating|floatformat:1|cut:"," }}{% else %}0{% endif %},
       lat: {{ c.latitude|stringformat:'f' }},
       lng: {{ c.longitude|stringformat:'f' }},
@@ -743,11 +743,31 @@
       initMap(lat, lng, 12);
       if (userMarker) map.removeLayer(userMarker);
       userMarker = L.marker([lat, lng], {
+        draggable: true,
         icon: L.divIcon({
-          html: `<div style="background:#4cc9f0;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 12px rgba(76,201,240,0.6);border:3px solid white;">📍</div>`,
+          html: `<div title="Trage pentru a corecta locația" style="background:#4cc9f0;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 12px rgba(76,201,240,0.6);border:3px solid white;cursor:grab;">📍</div>`,
           className:'', iconSize:[36,36], iconAnchor:[18,36]
         })
-      }).addTo(map).bindPopup('<strong>Locația ta</strong>').openPopup();
+      }).addTo(map).bindPopup('<strong>Locația ta</strong><br><small class="text-muted">Trage marker-ul pentru a corecta</small>').openPopup();
+      userMarker.on('dragstart', () => {
+        userMarker.closePopup();
+      });
+      userMarker.on('drag', e => {
+        const pos = e.latlng;
+        afiseazaDistanteCarduri(pos.lat, pos.lng);
+        if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(pos.lat, pos.lng);
+        if (razaActiva > 0) filtreazaDupaRaza(pos.lat, pos.lng, razaActiva);
+      });
+      userMarker.on('dragend', e => {
+        const pos = e.target.getLatLng();
+        salveazaLocatia(pos.lat, pos.lng);
+        const status = document.getElementById('locatieStatus');
+        status.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (corectat manual)`;
+        userMarker.bindPopup('<strong>Locația ta</strong><br><small style="color:#4cc9f0;">✓ Poziție corectată</small>').openPopup();
+        afiseazaDistanteCarduri(pos.lat, pos.lng);
+        if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(pos.lat, pos.lng);
+        if (razaActiva > 0) filtreazaDupaRaza(pos.lat, pos.lng, razaActiva);
+      });
       L.circle([lat, lng], { radius:25000, color:'#e63946', fillColor:'#e63946', fillOpacity:0.05, weight:1, dashArray:'5,5' }).addTo(map);
       if (sortDupa) aplicaSortareDupaDistanta(lat, lng);
       try {
@@ -829,11 +849,27 @@
       document.getElementById('btnResetMap').style.display = 'inline-block';
       initMap(loc.lat, loc.lng, 12);
       userMarker = L.marker([loc.lat, loc.lng], {
+        draggable: true,
         icon: L.divIcon({
-          html: `<div style="background:#4cc9f0;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 12px rgba(76,201,240,0.6);border:3px solid white;">📍</div>`,
+          html: `<div title="Trage pentru a corecta locația" style="background:#4cc9f0;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 12px rgba(76,201,240,0.6);border:3px solid white;cursor:grab;">📍</div>`,
           className:'', iconSize:[36,36], iconAnchor:[18,36]
         })
-      }).addTo(map).bindPopup('<strong>Locația ta</strong>');
+      }).addTo(map).bindPopup('<strong>Locația ta</strong><br><small class="text-muted">Trage marker-ul pentru a corecta</small>');
+      userMarker.on('drag', e => {
+        const pos = e.latlng;
+        afiseazaDistanteCarduri(pos.lat, pos.lng);
+        if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(pos.lat, pos.lng);
+        if (razaActiva > 0) filtreazaDupaRaza(pos.lat, pos.lng, razaActiva);
+      });
+      userMarker.on('dragend', e => {
+        const pos = e.target.getLatLng();
+        salveazaLocatia(pos.lat, pos.lng);
+        document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (corectat manual)`;
+        userMarker.bindPopup('<strong>Locația ta</strong><br><small style="color:#4cc9f0;">✓ Poziție corectată</small>').openPopup();
+        afiseazaDistanteCarduri(pos.lat, pos.lng);
+        if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(pos.lat, pos.lng);
+        if (razaActiva > 0) filtreazaDupaRaza(pos.lat, pos.lng, razaActiva);
+      });
       addServiceMarkers(SERVICES);
       afiseazaDistanteCarduri(loc.lat, loc.lng);
     }

@@ -228,6 +228,7 @@
       <a class="dashboard-chip" href="#asteptare"><i class="bi bi-hourglass"></i>În așteptare</a>
       <a class="dashboard-chip" href="#programari"><i class="bi bi-card-checklist"></i>Programări</a>
       <a class="dashboard-chip" href="#mecanici"><i class="bi bi-people"></i>Mecanici</a>
+      <a class="dashboard-chip" href="{% url 'services:mechanics_list' %}"><i class="bi bi-person-badge"></i>Interfață Mecanici</a>
       <a class="dashboard-chip" href="#centre"><i class="bi bi-building"></i>Service-uri</a>
       <a class="dashboard-chip" href="#notificari"><i class="bi bi-bell"></i>Notificări</a>
     </div>
@@ -357,7 +358,8 @@
     {% endif %}
   </section>
 
-  <section class="dashboard-grid-main mb-4" id="mecanici">
+  {# ─── MECANICI: doar 2 panouri în grid (adaugă + existenți) ─── #}
+  <section class="mb-4 d-flex flex-column gap-4" id="mecanici">
     <div class="dashboard-panel">
       <div class="dashboard-panel-header">
         <div>
@@ -366,23 +368,64 @@
         </div>
       </div>
       {% if centers|length == 1 %}
-        <form method="post" action="{% url 'services:mechanic_create' centers.0.pk %}" class="dashboard-inline-form">
+        <form method="post" action="{% url 'services:mechanic_create' centers.0.pk %}" class="dashboard-inline-form" enctype="multipart/form-data">
           {% csrf_token %}
           <div><label class="form-label">Nume</label>{{ mechanic_form.name }}</div>
           <div><label class="form-label">Email</label>{{ mechanic_form.email }}</div>
           <div><label class="form-label">Nr. telefon</label>{{ mechanic_form.phone }}</div>
+          <div><label class="form-label">Specializare</label>{{ mechanic_form.specialization }}</div>
+          <div>
+            <label class="form-label">Garaj alocat</label>
+            <select name="garage" class="form-select">
+              <option value="">— Fără garaj fix —</option>
+              {% for garage in centers.0.garages.all %}
+              <option value="{{ garage.pk }}">{{ garage.name }} ({{ garage.category.name }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Categorii servicii</label>
+            <div class="d-flex flex-wrap gap-2 mt-1">
+              {% for cat in centers.0.categories.all %}
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="service_categories" value="{{ cat.pk }}" id="dash_cat_{{ cat.pk }}">
+                <label class="form-check-label small" for="dash_cat_{{ cat.pk }}">{{ cat.name }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
           <div class="full"><button class="btn btn-nav-cta" type="submit"><i class="bi bi-plus-circle me-1"></i>Adaugă mecanic</button></div>
         </form>
       {% else %}
         <div class="dashboard-list-grid">
           {% for c in centers %}
-            <form method="post" action="{% url 'services:mechanic_create' c.pk %}" class="dashboard-mechanic-card">
+            <form method="post" action="{% url 'services:mechanic_create' c.pk %}" class="dashboard-mechanic-card" enctype="multipart/form-data">
               {% csrf_token %}
               <div class="fw-semibold text-white mb-3">{{ c.name }}</div>
               <div class="row g-3">
                 <div class="col-12"><label class="form-label">Nume</label>{{ mechanic_form.name }}</div>
                 <div class="col-md-6"><label class="form-label">Email</label>{{ mechanic_form.email }}</div>
                 <div class="col-md-6"><label class="form-label">Nr. telefon</label>{{ mechanic_form.phone }}</div>
+                <div class="col-12">
+                  <label class="form-label">Garaj alocat</label>
+                  <select name="garage" class="form-select">
+                    <option value="">— Fără garaj fix —</option>
+                    {% for garage in c.garages.all %}
+                    <option value="{{ garage.pk }}">{{ garage.name }} ({{ garage.category.name }})</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Categorii servicii</label>
+                  <div class="d-flex flex-wrap gap-2 mt-1">
+                    {% for cat in c.categories.all %}
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="service_categories" value="{{ cat.pk }}" id="dash_cat_{{ c.pk }}_{{ cat.pk }}">
+                      <label class="form-check-label small" for="dash_cat_{{ c.pk }}_{{ cat.pk }}">{{ cat.name }}</label>
+                    </div>
+                    {% endfor %}
+                  </div>
+                </div>
                 <div class="col-12"><button class="btn btn-outline-light w-100" type="submit">Adaugă mecanic</button></div>
               </div>
             </form>
@@ -392,13 +435,16 @@
     </div>
 
     <div class="dashboard-panel">
-      <div class="dashboard-panel-header">
+      <div class="dashboard-panel-header" style="cursor:pointer;" onclick="toggleMecanici()">
         <div>
           <h2 class="dashboard-panel-title"><i class="bi bi-people text-orange me-2"></i>Mecanici existenți</h2>
           <div class="dashboard-panel-subtitle">Îi vezi pe toți într-un singur loc și poți edita rapid datele sau îi poți elimina.</div>
         </div>
+        <button type="button" class="btn btn-sm btn-outline-light" id="mecanici-toggle-btn" style="white-space:nowrap; flex-shrink:0;" onclick="event.stopPropagation(); toggleMecanici();">
+          <i class="bi bi-chevron-down me-1" id="mecanici-chevron"></i>Arată mecanici
+        </button>
       </div>
-      <div class="dashboard-list-grid">
+      <div class="dashboard-list-grid" id="mecanici-list" style="display:none;">
         {% for center, mechanics in mechanics_by_center %}
           <div class="mechanic-management-card dashboard-mechanic-card">
             <div class="fw-semibold text-white mb-3">{{ center.name }}</div>
@@ -427,15 +473,19 @@
         {% endfor %}
       </div>
     </div>
+  </section>
+  {# ─── FIN secțiune mecanici ─── #}
 
-    <div class="dashboard-panel" id="centre">
+  {# ─── SERVICE-URI: secțiune separată, full width ─── #}
+  <section class="mb-4" id="centre">
+    <div class="dashboard-panel">
       <div class="dashboard-panel-header">
         <div>
           <h2 class="dashboard-panel-title"><i class="bi bi-building text-red me-2"></i>Service-urile tale</h2>
           <div class="dashboard-panel-subtitle">Acces rapid la profil, programare nouă și pagină publică.</div>
         </div>
       </div>
-      <div class="dashboard-list-grid">
+      <div class="dashboard-centers-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
         {% for c in centers %}
           <div class="dashboard-center-card">
             <div class="dashboard-center-card-header">
@@ -471,9 +521,30 @@
     </div>
 
     {% if bookings %}
-      <div class="dashboard-bookings-grid">
+      <div class="d-flex gap-2 flex-wrap mb-3" id="booking-filters">
+        <button class="btn btn-sm btn-nav-cta booking-filter-btn active" data-filter="all">
+          <i class="bi bi-list-ul me-1"></i>Toate
+          <span class="badge ms-1" style="background:rgba(255,255,255,0.2);" id="count-all">{{ bookings|length }}</span>
+        </button>
+        <button class="btn btn-sm btn-outline-light booking-filter-btn" data-filter="pending">
+          <i class="bi bi-hourglass-split me-1"></i>În așteptare
+          <span class="badge ms-1" style="background:rgba(255,255,255,0.15);" id="count-pending">0</span>
+        </button>
+        <button class="btn btn-sm btn-outline-light booking-filter-btn" data-filter="confirmed">
+          <i class="bi bi-check-circle me-1"></i>Confirmate
+          <span class="badge ms-1" style="background:rgba(255,255,255,0.15);" id="count-confirmed">0</span>
+        </button>
+        <button class="btn btn-sm btn-outline-light booking-filter-btn" data-filter="completed">
+          <i class="bi bi-check2-all me-1"></i>Finalizate
+          <span class="badge ms-1" style="background:rgba(255,255,255,0.15);" id="count-completed">0</span>
+        </button>
+      </div>
+
+      <div id="no-bookings-filter" class="dashboard-empty" style="display:none;">Nicio programare pentru acest filtru.</div>
+
+      <div class="dashboard-bookings-grid" id="bookings-grid">
         {% for b in bookings %}
-          <div class="dashboard-booking-card">
+          <div class="dashboard-booking-card" data-status="{{ b.status }}">
             <a href="{% url 'services:booking_detail' b.pk %}" class="stretched-link" aria-label="Deschide programarea {{ b.pk }}"></a>
             <div class="dashboard-booking-top position-relative" style="z-index:2;">
               <div>
@@ -520,4 +591,61 @@
     {% endif %}
   </section>
 </div>
+
+<script>
+// ── Filtre programări ──
+document.addEventListener('DOMContentLoaded', function () {
+  const cards = document.querySelectorAll('#bookings-grid .dashboard-booking-card');
+  const buttons = document.querySelectorAll('.booking-filter-btn');
+  const noResults = document.getElementById('no-bookings-filter');
+
+  // Calculează contoare
+  const counts = { all: cards.length, pending: 0, confirmed: 0, completed: 0 };
+  cards.forEach(c => {
+    const s = c.dataset.status;
+    if (s === 'pending') counts.pending++;
+    else if (s === 'confirmed') counts.confirmed++;
+    else if (s === 'completed') counts.completed++;
+  });
+  document.getElementById('count-all').textContent = counts.all;
+  document.getElementById('count-pending').textContent = counts.pending;
+  document.getElementById('count-confirmed').textContent = counts.confirmed;
+  document.getElementById('count-completed').textContent = counts.completed;
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', function () {
+      const filter = this.dataset.filter;
+
+      // Actualizează stilul butoanelor
+      buttons.forEach(b => {
+        b.classList.remove('btn-nav-cta', 'active');
+        b.classList.add('btn-outline-light');
+      });
+      this.classList.remove('btn-outline-light');
+      this.classList.add('btn-nav-cta', 'active');
+
+      // Filtrează cardurile
+      let visible = 0;
+      cards.forEach(card => {
+        const show = filter === 'all' || card.dataset.status === filter;
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+
+      noResults.style.display = visible === 0 ? 'block' : 'none';
+    });
+  });
+});
+
+// ── Toggle mecanici ──
+function toggleMecanici() {
+  const list = document.getElementById('mecanici-list');
+  const btn = document.getElementById('mecanici-toggle-btn');
+  const isHidden = list.style.display === 'none';
+  list.style.display = isHidden ? 'grid' : 'none';
+  btn.innerHTML = isHidden
+    ? '<i class="bi bi-chevron-up me-1"></i>Ascunde mecanici'
+    : '<i class="bi bi-chevron-down me-1"></i>Arată mecanici';
+}
+</script>
 {% endblock %}

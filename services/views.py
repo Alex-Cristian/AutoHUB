@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.contrib.auth import login
-from django.db.models import Avg, Count, Min, Max, Q, Prefetch, F, Subquery, OuterRef
+from django.db.models import Avg, Count, Min, Max, Q, Prefetch
 from django.utils import timezone
 
 from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite, ServiceGarage, ServiceImage, ServiceMechanic, ReviewImage
@@ -29,6 +29,20 @@ def category_list(request):
 
 
 def service_list(request):
+    from django.db.models import Subquery, OuterRef, FloatField, IntegerField
+    from django.db.models.functions import Coalesce
+
+    min_price_sq = Subquery(
+        ServiceItem.objects.filter(center=OuterRef('pk'))
+        .order_by('price_from').values('price_from')[:1]
+    )
+
+    qs = ServiceCenter.objects.filter(is_active=True).annotate(
+        avg_rating=Avg('review__rating', filter=Q(review__is_approved=True)),
+        review_count=Count('review', filter=Q(review__is_approved=True), distinct=True),
+        min_price=min_price_sq,
+    ).prefetch_related('categories')
+
     category_slug = request.GET.get('category', '').strip()
     city = request.GET.get('city', '').strip()
     min_rating = request.GET.get('min_rating', '').strip()
@@ -36,10 +50,6 @@ def service_list(request):
     price_max = request.GET.get('price_max', '').strip()
     sort_by = request.GET.get('sort', 'rating')
     search_q = request.GET.get('q', '').strip()
-
-    qs = ServiceCenter.objects.filter(is_active=True).prefetch_related(
-        'categories', 'serviceitem_set', 'review_set'
-    ).select_related('category')
 
     if search_q:
         search_q_lower = search_q.lower()
@@ -58,7 +68,9 @@ def service_list(request):
                 Q(description__icontains=search_q) |
                 Q(address__icontains=search_q) |
                 Q(categories__name__icontains=search_q) |
-                Q(category__name__icontains=search_q)
+                Q(categories__slug__icontains=search_q) |
+                Q(category__name__icontains=search_q) |
+                Q(category__slug__icontains=search_q)
             ).distinct()
 
     if category_slug:
@@ -69,56 +81,39 @@ def service_list(request):
     if city:
         qs = qs.filter(city=city)
 
-    # Calcul in Python - imun la distinct()
-    centers = list(qs)
-
-    for c in centers:
-        approved = [r for r in c.review_set.all() if r.is_approved]
-        c.avg_rating = round(sum(r.rating for r in approved) / len(approved), 1) if approved else 0.0
-        c.review_count = len(approved)
-        prices = [float(s.price_from) for s in c.serviceitem_set.all() if s.price_from is not None]
-        c.min_price = min(prices) if prices else None
-
-    # Filtrare dupa rating
     if min_rating:
         try:
-            r_val = float(min_rating)
-            centers = [c for c in centers if c.avg_rating >= r_val]
+            qs = qs.filter(avg_rating__gte=float(min_rating))
         except ValueError:
             pass
 
-    # Filtrare dupa pret
     if price_min:
         try:
-            p = float(price_min)
-            centers = [c for c in centers if c.min_price is not None and c.min_price >= p]
+            qs = qs.filter(min_price__gte=float(price_min))
         except ValueError:
             pass
 
     if price_max:
         try:
-            p = float(price_max)
-            centers = [c for c in centers if c.min_price is not None and c.min_price <= p]
+            qs = qs.filter(min_price__lte=float(price_max))
         except ValueError:
             pass
 
-    # Sortare in Python - 100% corecta
-    if sort_by == 'price_asc':
-        centers.sort(key=lambda c: (c.min_price is None, c.min_price or 0))
-    elif sort_by == 'price_desc':
-        centers.sort(key=lambda c: (c.min_price is None, -(c.min_price or 0)))
-    elif sort_by == 'reviews':
-        centers.sort(key=lambda c: -c.review_count)
-    elif sort_by == 'name':
-        centers.sort(key=lambda c: c.name.lower())
-    else:  # rating
-        centers.sort(key=lambda c: (-c.avg_rating, -c.review_count))
+    from django.db.models import F
+    sort_options = {
+        'rating': F('avg_rating').desc(nulls_last=True),
+        'price_asc': F('min_price').asc(nulls_last=True),
+        'price_desc': F('min_price').desc(nulls_last=True),
+        'reviews': F('review_count').desc(nulls_last=True),
+        'name': F('name').asc(),
+    }
+    qs = qs.order_by(sort_options.get(sort_by, F('avg_rating').desc(nulls_last=True)))
 
     categories = ServiceCategory.objects.all()
     from .models import CITY_CHOICES
     context = {
-        'centers': centers,
-        'top5': centers[:5],
+        'centers': qs,
+        'top5': qs[:5],
         'categories': categories,
         'cities': CITY_CHOICES,
         'selected_category': category_slug,
@@ -128,7 +123,7 @@ def service_list(request):
         'selected_price_max': price_max,
         'selected_sort': sort_by,
         'search_q': search_q,
-        'total_count': len(centers),
+        'total_count': qs.count(),
     }
     return render(request, 'services/service_list.html', context)
 
@@ -155,6 +150,7 @@ def service_detail(request, slug):
     user_review = None
     review_form = ReviewForm()
     if request.user.is_authenticated:
+        from bookings.models import Booking
         can_review = Booking.objects.filter(
             user=request.user, center=center, status=Booking.STATUS_DONE
         ).exists()
@@ -231,7 +227,6 @@ def service_register_public(request):
                 messages.success(request, '✅ Contul și service-ul au fost create. Bine ai venit în dashboard!')
             return redirect('services:dashboard')
         else:
-            # ===== DEBUG TEMPORAR =====
             print("=" * 60)
             print("FORM PUBLIC ERRORS:", form.errors)
             print("POST DATA:", request.POST)
@@ -255,7 +250,6 @@ def service_register(request):
                 messages.success(request, '✅ Service-ul a fost înregistrat. Acum poți gestiona programările din dashboard.')
             return redirect('services:dashboard')
         else:
-            # ===== DEBUG TEMPORAR =====
             print("=" * 60)
             print("FORM REGISTER ERRORS:", form.errors)
             print("POST DATA:", request.POST)
@@ -333,6 +327,7 @@ def service_dashboard(request):
     centers = _require_service_owner(request)
     if centers is None:
         return redirect('services:register_service')
+    centers = centers.prefetch_related('garages', 'garages__category', 'categories')
 
     bookings_qs = Booking.objects.filter(center__in=centers).select_related('center', 'service_item', 'user', 'garage', 'mechanic').prefetch_related('attachments').order_by('-created_at')
     pending = bookings_qs.filter(status=Booking.STATUS_PENDING)
@@ -340,7 +335,7 @@ def service_dashboard(request):
     unread_count = BookingNotification.objects.filter(recipient=request.user, is_read=False).count()
     latest_notifications = BookingNotification.objects.filter(recipient=request.user)[:6]
     pending_verifications = ServiceCenter.objects.filter(verification_status='pending').count() if request.user.is_staff else 0
-    mechanic_form = ServiceMechanicForm(prefix='mechanic')
+    mechanic_form = ServiceMechanicForm()
     mechanics_by_center = [(center, center.mechanics.order_by('name')) for center in centers]
 
     return render(request, 'services/service_dashboard.html', {
@@ -356,22 +351,58 @@ def service_dashboard(request):
 
 
 @login_required
+def bookings_list(request):
+    """Pagina dedicată cu toate programările — search live + filtre pe status."""
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+    centers = centers.prefetch_related('garages', 'categories')
+
+    bookings = Booking.objects.filter(
+        center__in=centers
+    ).select_related(
+        'center', 'garage', 'mechanic'
+    ).order_by('-booking_date', '-booking_time')
+
+    return render(request, 'services/bookings_list.html', {
+        'bookings': bookings,
+        'centers': centers,
+    })
+
+
+@login_required
 def mechanic_create(request, pk):
     center = _owner_center_or_404(request, pk)
     if center is None:
         return redirect('core:home')
 
     if request.method == 'POST':
-        form = ServiceMechanicForm(request.POST, prefix='mechanic')
-        if form.is_valid():
-            mechanic = form.save(commit=False)
-            mechanic.center = center
+        name = request.POST.get('name', '').strip()
+        if name:
+            from .models import ServiceGarage, ServiceCategory
+            mechanic = ServiceMechanic(center=center, name=name)
+            mechanic.specialization = request.POST.get('specialization', '').strip()
+            mechanic.phone = request.POST.get('phone', '').strip()
+            mechanic.email = request.POST.get('email', '').strip()
+            garage_id = request.POST.get('garage', '').strip()
+            if garage_id:
+                try:
+                    mechanic.garage = ServiceGarage.objects.get(pk=garage_id, center=center)
+                except ServiceGarage.DoesNotExist:
+                    pass
+            if request.FILES.get('photo'):
+                mechanic.photo = request.FILES['photo']
             mechanic.save()
+            cat_ids = request.POST.getlist('service_categories')
+            if cat_ids:
+                mechanic.service_categories.set(ServiceCategory.objects.filter(pk__in=cat_ids))
             messages.success(request, f'Mecanicul {mechanic.name} a fost adăugat.')
         else:
-            messages.error(request, 'Mecanicul nu a putut fi salvat. Verifică datele introduse.')
+            messages.error(request, 'Numele mecanicului este obligatoriu.')
+    referer = request.META.get('HTTP_REFERER', '')
+    if 'mechanici' in referer:
+        return redirect('services:mechanics_list')
     return redirect('services:dashboard')
-
 
 
 @login_required
@@ -381,13 +412,45 @@ def mechanic_update(request, pk):
         return redirect('core:home')
 
     if request.method == 'POST':
-        form = ServiceMechanicForm(request.POST, instance=mechanic, prefix=f'mech_{mechanic.pk}')
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Datele mecanicului {mechanic.name} au fost actualizate.')
+        # Salvare directă din câmpurile trimise de modal
+        name = request.POST.get('name', '').strip()
+        if name:
+            mechanic.name = name
+        mechanic.specialization = request.POST.get('specialization', '').strip()
+        mechanic.phone = request.POST.get('phone', '').strip()
+        mechanic.email = request.POST.get('email', '').strip()
+
+        # Garaj
+        garage_id = request.POST.get('garage', '').strip()
+        if garage_id:
+            try:
+                from .models import ServiceGarage
+                mechanic.garage = ServiceGarage.objects.get(pk=garage_id, center=mechanic.center)
+            except ServiceGarage.DoesNotExist:
+                mechanic.garage = None
         else:
-            messages.error(request, 'Datele mecanicului nu au putut fi salvate. Verifică formularul.')
-    return redirect('services:dashboard')
+            mechanic.garage = None
+
+        # Status disponibilitate (concediu etc.)
+        availability_status = request.POST.get('availability_status', 'available')
+        if hasattr(mechanic, 'availability_status'):
+            mechanic.availability_status = availability_status
+
+        # Fotografie
+        if request.FILES.get('photo'):
+            mechanic.photo = request.FILES['photo']
+
+        mechanic.save()
+
+        # Categorii servicii
+        cat_ids = request.POST.getlist('service_categories')
+        from .models import ServiceCategory
+        mechanic.service_categories.set(ServiceCategory.objects.filter(pk__in=cat_ids))
+
+        messages.success(request, f'Datele mecanicului {mechanic.name} au fost actualizate.')
+
+    # Întoarce la profilul mecanicului, nu la dashboard
+    return redirect('services:mechanic_profile', pk=pk)
 
 
 @login_required
@@ -430,7 +493,15 @@ def booking_detail(request, pk):
                 mechanic = get_object_or_404(ServiceMechanic, pk=mechanic_id, center=booking.center)
             booking.mechanic = mechanic
             booking.save(update_fields=['mechanic', 'updated_at'])
-            messages.success(request, 'Mecanicul a fost actualizat pentru această programare.')
+            if mechanic and booking.user:
+                BookingNotification.objects.create(
+                    recipient=booking.user,
+                    booking=booking,
+                    kind=BookingNotification.KIND_STATUS_UPDATE,
+                    title=f"Programarea #{booking.pk} a fost alocată unui mecanic",
+                    message=f"{booking.center.name}: mecanicul {mechanic.name} va prelua mașina ta pe {booking.booking_date} la {booking.booking_time.strftime('%H:%M')}.",
+                )
+            messages.success(request, f'Mecanicul {"a fost alocat" if mechanic else "a fost eliminat"} pentru această programare.')
             return redirect('services:booking_detail', pk=booking.pk)
 
         if action == 'delete_attachment':
@@ -689,4 +760,123 @@ def notification_mark_read(request, pk):
     notif = get_object_or_404(BookingNotification, pk=pk, recipient=request.user)
     notif.is_read = True
     notif.save(update_fields=['is_read'])
-    return redirect(request.META.get('HTTP_REFERER', 'services:notifications')) 
+    return redirect(request.META.get('HTTP_REFERER', 'services:notifications'))
+
+
+# ===== MECHANIC INTERFACE =====
+
+@login_required
+def mechanics_list(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+    centers = centers.prefetch_related('garages', 'garages__category', 'categories')
+    mechanics = ServiceMechanic.objects.filter(center__in=centers).select_related('center', 'garage').prefetch_related('service_categories').order_by('center', 'name')
+    return render(request, 'services/mechanics_list.html', {
+        'centers': centers,
+        'mechanics': mechanics,
+    })
+
+
+@login_required
+def mechanic_profile(request, pk):
+    from .models import MechanicWorkLog, MechanicPhoto
+    from bookings.models import Booking, BookingNotification
+
+    mechanic = get_object_or_404(ServiceMechanic, pk=pk)
+    if not (request.user.is_staff or mechanic.center.owner_id == request.user.id):
+        return redirect('core:home')
+
+    active_bookings = Booking.objects.filter(
+        mechanic=mechanic, status__in=['confirmed', 'in_progress']
+    ).select_related('center', 'service_item', 'garage').order_by('booking_date', 'booking_time')
+
+    done_bookings = Booking.objects.filter(
+        mechanic=mechanic, status='done'
+    ).select_related('center', 'service_item').order_by('-booking_date')[:20]
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'save_work_log':
+            booking_id = request.POST.get('booking_id')
+            booking = get_object_or_404(Booking, pk=booking_id, mechanic=mechanic)
+            work_log, _ = MechanicWorkLog.objects.get_or_create(
+                booking=booking, mechanic=mechanic
+            )
+            work_log.repair_description = request.POST.get('repair_description', '').strip()
+            work_log.parts_used = request.POST.get('parts_used', '').strip()
+            work_log.save()
+            messages.success(request, 'Fișa de lucru a fost salvată.')
+            return redirect('services:mechanic_profile', pk=pk)
+
+        if action == 'upload_photos':
+            booking_id = request.POST.get('booking_id')
+            photo_type = request.POST.get('photo_type', 'before')
+            booking = get_object_or_404(Booking, pk=booking_id, mechanic=mechanic)
+            work_log, _ = MechanicWorkLog.objects.get_or_create(
+                booking=booking, mechanic=mechanic
+            )
+            photos = request.FILES.getlist('photos')
+            for photo in photos:
+                MechanicPhoto.objects.create(
+                    work_log=work_log,
+                    photo=photo,
+                    photo_type=photo_type,
+                    caption=request.POST.get('caption', '').strip()
+                )
+            messages.success(request, f'{len(photos)} poze adăugate.')
+            return redirect('services:mechanic_profile', pk=pk)
+
+        if action == 'delete_photo':
+            photo_id = request.POST.get('photo_id')
+            photo = get_object_or_404(MechanicPhoto, pk=photo_id, work_log__mechanic=mechanic)
+            photo.photo.delete(save=False)
+            photo.delete()
+            messages.info(request, 'Poza a fost ștearsă.')
+            return redirect('services:mechanic_profile', pk=pk)
+
+        if action == 'update_status':
+            booking_id = request.POST.get('booking_id')
+            new_status = request.POST.get('new_status')
+            booking = get_object_or_404(Booking, pk=booking_id, mechanic=mechanic)
+            allowed = ['in_progress', 'done']
+            if new_status in allowed:
+                booking.status = new_status
+                booking.save(update_fields=['status', 'updated_at'])
+                if new_status == 'in_progress':
+                    wl, _ = MechanicWorkLog.objects.get_or_create(booking=booking, mechanic=mechanic)
+                    if not wl.started_at:
+                        from django.utils import timezone
+                        wl.started_at = timezone.now()
+                        wl.save(update_fields=['started_at'])
+                if new_status == 'done':
+                    wl, _ = MechanicWorkLog.objects.get_or_create(booking=booking, mechanic=mechanic)
+                    from django.utils import timezone
+                    wl.finished_at = timezone.now()
+                    wl.save(update_fields=['finished_at'])
+                if booking.user:
+                    status_labels = {'in_progress': 'în lucru', 'done': 'finalizată'}
+                    BookingNotification.objects.create(
+                        recipient=booking.user,
+                        booking=booking,
+                        kind=BookingNotification.KIND_STATUS_UPDATE,
+                        title=f"Programarea #{booking.pk} este acum {status_labels.get(new_status, new_status)}",
+                        message=f"{booking.center.name}: mecanicul {mechanic.name} a actualizat statusul programării tale.",
+                    )
+                messages.success(request, 'Statusul a fost actualizat.')
+            return redirect('services:mechanic_profile', pk=pk)
+
+    active_list = list(active_bookings)
+    done_list = list(done_bookings)
+    for b in active_list + done_list:
+        try:
+            b.work_log_obj = b.work_log
+        except Exception:
+            b.work_log_obj = None
+
+    return render(request, 'services/mechanic_profile.html', {
+        'mechanic': mechanic,
+        'active_bookings': active_list,
+        'done_bookings': done_list,
+    })

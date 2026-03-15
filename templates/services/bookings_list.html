@@ -1,0 +1,447 @@
+{% extends 'base.html' %}
+{% block title %}Programări — AutoEMG{% endblock %}
+
+{% block extra_css %}
+<style>
+  .blist-shell {
+    background:
+      radial-gradient(circle at top right, rgba(230,57,70,0.12), transparent 25%),
+      radial-gradient(circle at bottom left, rgba(244,162,97,0.07), transparent 20%);
+  }
+
+  /* ── Header hero ── */
+  .blist-hero {
+    background: linear-gradient(135deg, rgba(230,57,70,0.14), rgba(18,18,18,0.98) 50%, rgba(244,162,97,0.08));
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 24px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .blist-kicker {
+    display: inline-flex; align-items: center; gap:.5rem;
+    padding:.38rem .75rem; border-radius:999px;
+    background: rgba(255,255,255,0.06); color:#ccc; font-size:.82rem;
+    margin-bottom:.85rem;
+  }
+
+  /* ── Search bar ── */
+  .blist-search-wrap {
+    position: relative;
+  }
+  .blist-search-wrap i {
+    position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
+    color: var(--ah-muted); font-size: 1rem; pointer-events: none;
+  }
+  .blist-search-input {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 14px;
+    color: #fff;
+    padding: .75rem 1rem .75rem 2.75rem;
+    font-size: .95rem;
+    transition: border-color .2s, background .2s;
+  }
+  .blist-search-input::placeholder { color: var(--ah-muted); }
+  .blist-search-input:focus {
+    outline: none;
+    border-color: rgba(230,57,70,0.55);
+    background: rgba(255,255,255,0.07);
+  }
+
+  /* ── Filtre status ── */
+  .blist-filters { display: flex; gap: .6rem; flex-wrap: wrap; }
+  .blist-filter-btn {
+    display: inline-flex; align-items: center; gap: .45rem;
+    padding: .5rem .9rem; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    color: #bbb; font-size: .84rem; font-weight: 600;
+    cursor: pointer; transition: all .18s;
+    white-space: nowrap;
+  }
+  .blist-filter-btn:hover { border-color: rgba(230,57,70,0.4); color: #fff; background: rgba(230,57,70,0.1); }
+  .blist-filter-btn.active { background: rgba(230,57,70,0.18); border-color: rgba(230,57,70,0.6); color: #fff; }
+  .blist-filter-btn.active.all    { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.25); }
+  .blist-filter-btn.active.confirmed { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.5); color: #4ade80; }
+  .blist-filter-btn.active.completed { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.5); color: #a5b4fc; }
+  .blist-filter-btn.active.pending   { background: rgba(234,179,8,0.15);  border-color: rgba(234,179,8,0.5);  color: #fde047; }
+  .blist-filter-btn.active.rejected  { background: rgba(239,68,68,0.15);  border-color: rgba(239,68,68,0.5);  color: #fca5a5; }
+  .blist-count-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 20px; border-radius: 999px;
+    background: rgba(255,255,255,0.12); color: #fff;
+    font-size: .72rem; font-weight: 700; padding: 0 .4rem;
+  }
+
+  /* ── Stats rapide ── */
+  .blist-stat-row {
+    display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .75rem;
+    margin-bottom: 1.25rem;
+  }
+  .blist-stat {
+    background: rgba(22,22,22,0.9);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 18px; padding: 1rem;
+    display: flex; flex-direction: column; gap: .3rem;
+  }
+  .blist-stat-val { font-size: 1.8rem; font-weight: 800; font-family: 'Barlow Condensed', sans-serif; line-height: 1; }
+  .blist-stat-label { font-size: .8rem; color: var(--ah-muted); }
+
+  /* ── Tabel ── */
+  .blist-table-wrap {
+    background: rgba(22,22,22,0.92);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.22);
+  }
+  .blist-table {
+    width: 100%; border-collapse: collapse;
+  }
+  .blist-table thead tr {
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .blist-table th {
+    padding: .85rem 1rem;
+    font-size: .78rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--ah-muted);
+    white-space: nowrap;
+  }
+  .blist-table th.sortable { cursor: pointer; user-select: none; }
+  .blist-table th.sortable:hover { color: #fff; }
+  .blist-table td {
+    padding: .85rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    vertical-align: middle;
+    font-size: .9rem;
+  }
+  .blist-table tbody tr {
+    transition: background .15s;
+    cursor: pointer;
+  }
+  .blist-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+  .blist-table tbody tr:last-child td { border-bottom: none; }
+  .blist-table tbody tr.row-hidden { display: none; }
+
+  /* celule speciale */
+  .cell-id { color: var(--ah-muted); font-size: .82rem; font-weight: 600; }
+  .cell-client { font-weight: 700; color: #fff; }
+  .cell-client-sub { font-size: .78rem; color: var(--ah-muted); margin-top: .1rem; }
+  .cell-car { font-weight: 600; color: #e2e2e2; }
+  .cell-car-plate {
+    display: inline-block; margin-top: .2rem;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px; padding: .1rem .45rem;
+    font-size: .75rem; font-weight: 700; letter-spacing: .05em; color: #ddd;
+  }
+  .cell-date { font-weight: 600; color: #e2e2e2; white-space: nowrap; }
+  .cell-time { font-size: .8rem; color: var(--ah-muted); }
+  .cell-mechanic { font-size: .88rem; color: #ccc; }
+  .cell-mechanic.unassigned { color: var(--ah-muted); font-style: italic; }
+
+  /* status pills */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .32rem .7rem; border-radius: 999px;
+    font-size: .76rem; font-weight: 700; white-space: nowrap;
+  }
+  .status-pill.pending   { background: rgba(234,179,8,0.15);  color: #fde047; border: 1px solid rgba(234,179,8,0.3); }
+  .status-pill.confirmed { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+  .status-pill.completed { background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
+  .status-pill.rejected  { background: rgba(239,68,68,0.15);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+  .status-pill.in_progress { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); }
+
+  /* acțiuni */
+  .cell-actions { display: flex; gap: .4rem; justify-content: flex-end; }
+
+  /* no results */
+  .blist-empty {
+    padding: 3rem 1rem; text-align: center; color: var(--ah-muted);
+  }
+  .blist-empty-icon { font-size: 2.5rem; opacity: .3; margin-bottom: .75rem; }
+
+  /* highlight match */
+  mark.search-hl {
+    background: rgba(230,57,70,0.35); color: #fff;
+    border-radius: 3px; padding: 0 .15rem;
+  }
+
+  @media (max-width: 991.98px) {
+    .blist-stat-row { grid-template-columns: repeat(2, 1fr); }
+    .col-mechanic, .col-actions-th { display: none; }
+    td.col-mechanic, td.col-actions { display: none; }
+  }
+  @media (max-width: 575.98px) {
+    .blist-stat-row { grid-template-columns: repeat(2, 1fr); }
+    .col-date { display: none; } td.col-date { display: none; }
+    .blist-table th, .blist-table td { padding: .7rem .6rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5 blist-shell">
+
+  {# ── Hero ── #}
+  <div class="blist-hero">
+    <span class="blist-kicker"><i class="bi bi-calendar2-week"></i> Programări AutoEMG</span>
+    <div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3">
+      <div>
+        <h1 class="mb-1">Toate programările</h1>
+        <p class="text-muted-custom mb-0">Caută rapid după client, mașină sau număr de înmatriculare. Filtrează după status.</p>
+      </div>
+      {% if centers %}
+      <a href="{% url 'services:owner_booking_create' centers.0.pk %}" class="btn btn-nav-cta flex-shrink-0">
+        <i class="bi bi-plus-circle me-1"></i>Programare nouă
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Stats ── #}
+  <div class="blist-stat-row">
+    <div class="blist-stat">
+      <div class="blist-stat-val" id="stat-total">{{ bookings|length }}</div>
+      <div class="blist-stat-label">Total programări</div>
+    </div>
+    <div class="blist-stat">
+      <div class="blist-stat-val" id="stat-pending" style="color:#fde047;">–</div>
+      <div class="blist-stat-label">În așteptare</div>
+    </div>
+    <div class="blist-stat">
+      <div class="blist-stat-val" id="stat-confirmed" style="color:#4ade80;">–</div>
+      <div class="blist-stat-label">Confirmate</div>
+    </div>
+    <div class="blist-stat">
+      <div class="blist-stat-val" id="stat-completed" style="color:#a5b4fc;">–</div>
+      <div class="blist-stat-label">Finalizate</div>
+    </div>
+  </div>
+
+  {# ── Toolbar: search + filtre ── #}
+  <div class="d-flex flex-column flex-md-row gap-3 mb-3 align-items-md-center">
+    <div class="blist-search-wrap flex-grow-1">
+      <i class="bi bi-search"></i>
+      <input
+        type="text"
+        id="blist-search"
+        class="blist-search-input"
+        placeholder="Caută după client, mașină, număr înmatriculare, telefon..."
+        autocomplete="off"
+      >
+    </div>
+    <div class="blist-filters flex-shrink-0">
+      <button class="blist-filter-btn active all" data-filter="all">
+        <i class="bi bi-list-ul"></i>Toate
+        <span class="blist-count-badge" id="fc-all">{{ bookings|length }}</span>
+      </button>
+      <button class="blist-filter-btn pending" data-filter="pending">
+        <i class="bi bi-hourglass-split"></i>Așteptare
+        <span class="blist-count-badge" id="fc-pending">0</span>
+      </button>
+      <button class="blist-filter-btn confirmed" data-filter="confirmed">
+        <i class="bi bi-check-circle"></i>Confirmate
+        <span class="blist-count-badge" id="fc-confirmed">0</span>
+      </button>
+      <button class="blist-filter-btn completed" data-filter="completed">
+        <i class="bi bi-check2-all"></i>Finalizate
+        <span class="blist-count-badge" id="fc-completed">0</span>
+      </button>
+      <button class="blist-filter-btn rejected" data-filter="rejected">
+        <i class="bi bi-x-circle"></i>Respinse
+        <span class="blist-count-badge" id="fc-rejected">0</span>
+      </button>
+    </div>
+  </div>
+
+  {# ── Rezultate vizibile ── #}
+  <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+    <span class="small text-muted-custom">
+      <span id="visible-count">{{ bookings|length }}</span> programări afișate
+    </span>
+    <span class="small text-muted-custom" id="search-hint" style="display:none;">
+      <i class="bi bi-search me-1"></i>Rezultate pentru: <strong id="search-term-display"></strong>
+      <button class="btn btn-link btn-sm text-muted-custom p-0 ms-2" onclick="clearSearch()">✕ Șterge</button>
+    </span>
+  </div>
+
+  {# ── Tabel ── #}
+  {% if bookings %}
+  <div class="blist-table-wrap">
+    <table class="blist-table" id="blist-table">
+      <thead>
+        <tr>
+          <th class="sortable" data-col="id">#ID</th>
+          <th>Client</th>
+          <th>Mașină</th>
+          <th class="sortable col-date" data-col="date">Data și ora</th>
+          <th>Status</th>
+          <th class="col-mechanic">Mecanic</th>
+          <th class="col-actions-th" style="text-align:right;">Acțiuni</th>
+        </tr>
+      </thead>
+      <tbody id="blist-tbody">
+        {% for b in bookings %}
+        <tr
+          class="blist-row"
+          data-status="{{ b.status }}"
+          data-search="{{ b.pk }} {{ b.client_name|lower }} {{ b.client_phone }} {{ b.client_email|lower }} {{ b.car_brand|lower }} {{ b.car_model|lower }} {{ b.car_plate|lower }}"
+          data-id="{{ b.pk }}"
+          data-date="{{ b.booking_date|date:'Y-m-d' }} {{ b.booking_time|time:'H:i' }}"
+          onclick="window.location='{% url 'services:booking_detail' b.pk %}'"
+        >
+          <td><span class="cell-id">#{{ b.pk }}</span></td>
+          <td>
+            <div class="cell-client">{{ b.client_name }}</div>
+            <div class="cell-client-sub">{{ b.client_phone }}</div>
+          </td>
+          <td>
+            <div class="cell-car">{{ b.car_brand }} {{ b.car_model }}</div>
+            <span class="cell-car-plate">{{ b.car_plate }}</span>
+          </td>
+          <td class="col-date">
+            <div class="cell-date">{{ b.booking_date|date:"d.m.Y" }}</div>
+            <div class="cell-time">{{ b.booking_time|time:"H:i" }}</div>
+          </td>
+          <td>
+            <span class="status-pill {{ b.status }}">
+              {{ b.get_status_icon }} {{ b.get_status_display }}
+            </span>
+          </td>
+          <td class="col-mechanic">
+            {% if b.mechanic %}
+              <span class="cell-mechanic">{{ b.mechanic.name }}</span>
+            {% else %}
+              <span class="cell-mechanic unassigned">Nealocat</span>
+            {% endif %}
+          </td>
+          <td class="col-actions" onclick="event.stopPropagation()">
+            <div class="cell-actions">
+              <a href="{% url 'services:booking_detail' b.pk %}" class="btn btn-sm btn-outline-light" title="Detalii">
+                <i class="bi bi-eye"></i>
+              </a>
+              <a href="{% url 'services:booking_print' b.pk %}" class="btn btn-sm btn-outline-secondary" title="Fișă comandă">
+                <i class="bi bi-printer"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="blist-empty" id="blist-no-results" style="display:none;">
+      <div class="blist-empty-icon"><i class="bi bi-search"></i></div>
+      <div class="fw-semibold text-white mb-1">Nicio programare găsită</div>
+      <div class="small">Încearcă un alt termen de căutare sau schimbă filtrul de status.</div>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="blist-table-wrap">
+    <div class="blist-empty">
+      <div class="blist-empty-icon"><i class="bi bi-calendar-x"></i></div>
+      <div class="fw-semibold text-white mb-1">Nu există programări încă</div>
+      <div class="small">Programările noi vor apărea automat aici.</div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+(function () {
+  const rows      = Array.from(document.querySelectorAll('.blist-row'));
+  const searchEl  = document.getElementById('blist-search');
+  const noResults = document.getElementById('blist-no-results');
+  const visCount  = document.getElementById('visible-count');
+  const searchHint = document.getElementById('search-hint');
+  const searchTermDisplay = document.getElementById('search-term-display');
+
+  // ── Calculează contoare per status ──
+  const counts = { all: rows.length, pending:0, confirmed:0, completed:0, rejected:0, in_progress:0 };
+  rows.forEach(r => {
+    const s = r.dataset.status;
+    if (counts[s] !== undefined) counts[s]++;
+  });
+  ['pending','confirmed','completed','rejected'].forEach(k => {
+    const el = document.getElementById('fc-' + k);
+    if (el) el.textContent = counts[k];
+  });
+  // stats hero
+  ['pending','confirmed','completed'].forEach(k => {
+    const el = document.getElementById('stat-' + k);
+    if (el) el.textContent = counts[k];
+  });
+
+  let activeFilter = 'all';
+  let activeSearch = '';
+
+  // ── Filtre ──
+  document.querySelectorAll('.blist-filter-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.blist-filter-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      activeFilter = this.dataset.filter;
+      applyFilters();
+    });
+  });
+
+  // ── Search live ──
+  searchEl.addEventListener('input', function () {
+    activeSearch = this.value.trim().toLowerCase();
+    applyFilters();
+
+    if (activeSearch) {
+      searchHint.style.display = 'inline-flex';
+      searchTermDisplay.textContent = this.value.trim();
+    } else {
+      searchHint.style.display = 'none';
+    }
+  });
+
+  // ── Aplică filtre + search ──
+  function applyFilters() {
+    let visible = 0;
+    rows.forEach(row => {
+      const statusMatch = activeFilter === 'all' || row.dataset.status === activeFilter;
+      const searchMatch = !activeSearch || row.dataset.search.includes(activeSearch);
+      const show = statusMatch && searchMatch;
+      row.classList.toggle('row-hidden', !show);
+      if (show) visible++;
+    });
+    visCount.textContent = visible;
+    noResults.style.display = visible === 0 ? 'block' : 'none';
+  }
+
+  // ── Clear search ──
+  window.clearSearch = function () {
+    searchEl.value = '';
+    activeSearch = '';
+    searchHint.style.display = 'none';
+    applyFilters();
+  };
+
+  // ── Sortare după coloană ──
+  document.querySelectorAll('th.sortable').forEach(th => {
+    let asc = true;
+    th.addEventListener('click', function () {
+      const col = this.dataset.col;
+      const tbody = document.getElementById('blist-tbody');
+      const sorted = rows.slice().sort((a, b) => {
+        let va = a.dataset[col] || '';
+        let vb = b.dataset[col] || '';
+        return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
+      asc = !asc;
+      sorted.forEach(r => tbody.appendChild(r));
+      // indicator vizual
+      document.querySelectorAll('th.sortable').forEach(t => t.innerHTML = t.innerHTML.replace(/ [↑↓]/, ''));
+      this.innerHTML += asc ? ' ↓' : ' ↑';
+    });
+  });
+})();
+</script>
+{% endblock %}

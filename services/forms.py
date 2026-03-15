@@ -314,12 +314,33 @@ class ServiceGarageForm(forms.ModelForm):
 class ServiceMechanicForm(forms.ModelForm):
     class Meta:
         model = ServiceMechanic
-        fields = ['name', 'email', 'phone']
+        fields = ['name', 'email', 'phone', 'specialization', 'photo', 'garage', 'service_categories']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Andrei Popescu'}),
             'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Ex: andrei@service.ro'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 0722 123 456'}),
+            'specialization': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Mecanica motor, Electrica auto'}),
+            'photo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'garage': forms.Select(attrs={'class': 'form-select'}),
+            'service_categories': forms.CheckboxSelectMultiple(),
         }
+
+    def __init__(self, *args, **kwargs):
+        center = kwargs.pop('center', None)
+        super().__init__(*args, **kwargs)
+        if center:
+            self.fields['garage'].queryset = center.garages.all()
+            cats = center.categories.all()
+            if not cats.exists() and center.category_id:
+                from .models import ServiceCategory
+                cats = ServiceCategory.objects.filter(pk=center.category_id)
+            self.fields['service_categories'].queryset = cats
+        else:
+            from .models import ServiceGarage, ServiceCategory
+            self.fields['garage'].queryset = ServiceGarage.objects.none()
+            self.fields['service_categories'].queryset = ServiceCategory.objects.none()
+        self.fields['garage'].empty_label = '— Fără garaj fix —'
+        self.fields['garage'].required = False
 
 class ServiceGalleryImageForm(forms.ModelForm):
     class Meta:

@@ -242,6 +242,17 @@ class ServiceMechanic(models.Model):
     name = models.CharField(max_length=160, verbose_name='Nume mecanic')
     email = models.EmailField(blank=True, verbose_name='Email')
     phone = models.CharField(max_length=20, blank=True, verbose_name='Telefon')
+    specialization = models.CharField(max_length=200, blank=True, verbose_name='Specializare')
+    photo = models.ImageField(upload_to='mechanic_photos/', blank=True, null=True, verbose_name='Fotografie')
+    garage = models.ForeignKey(
+        'ServiceGarage', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='mechanics', verbose_name='Garaj alocat'
+    )
+    service_categories = models.ManyToManyField(
+        'ServiceCategory', blank=True,
+        related_name='mechanics', verbose_name='Categorii servicii'
+    )
+    is_active = models.BooleanField(default=True, verbose_name='Activ')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -251,6 +262,68 @@ class ServiceMechanic(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.center.name}"
+
+    def active_bookings_count(self):
+        return self.bookings.filter(status__in=['confirmed', 'in_progress']).count()
+
+    def completed_bookings_count(self):
+        return self.bookings.filter(status='done').count()
+
+
+class MechanicWorkLog(models.Model):
+    booking = models.OneToOneField(
+        'bookings.Booking', on_delete=models.CASCADE,
+        related_name='work_log', verbose_name='Programare'
+    )
+    mechanic = models.ForeignKey(
+        ServiceMechanic, on_delete=models.CASCADE,
+        related_name='work_logs', verbose_name='Mecanic'
+    )
+    repair_description = models.TextField(blank=True, verbose_name='Descriere reparatie')
+    parts_used = models.TextField(blank=True, verbose_name='Piese folosite')
+    started_at = models.DateTimeField(null=True, blank=True, verbose_name='Inceput lucru')
+    finished_at = models.DateTimeField(null=True, blank=True, verbose_name='Terminat lucru')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Fisa lucru mecanic'
+        verbose_name_plural = 'Fise lucru mecanici'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Fisa #{self.pk} - {self.mechanic.name} / {self.booking}"
+
+
+class MechanicPhoto(models.Model):
+    PHOTO_TYPE_BEFORE = 'before'
+    PHOTO_TYPE_AFTER = 'after'
+    PHOTO_TYPE_DURING = 'during'
+ 
+    PHOTO_TYPE_CHOICES = [
+        (PHOTO_TYPE_BEFORE, 'Inainte de reparatie'),
+        (PHOTO_TYPE_AFTER, 'Dupa reparatie'),
+        (PHOTO_TYPE_DURING, 'In timpul reparatiei'),
+    ]
+    work_log = models.ForeignKey(
+        MechanicWorkLog, on_delete=models.CASCADE,
+        related_name='photos', verbose_name='Fisa lucru'
+    )
+    photo = models.ImageField(upload_to='mechanic_work_photos/', verbose_name='Fotografie')
+    photo_type = models.CharField(
+        max_length=10, choices=PHOTO_TYPE_CHOICES,
+        default=PHOTO_TYPE_BEFORE, verbose_name='Tip fotografie'
+    )
+    caption = models.CharField(max_length=200, blank=True, verbose_name='Descriere')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Fotografie lucru'
+        verbose_name_plural = 'Fotografii lucru'
+        ordering = ['photo_type', 'uploaded_at']
+
+    def __str__(self):
+        return f"{self.get_photo_type_display()} - {self.work_log}"
 
 class ServiceImage(models.Model):
     center = models.ForeignKey(ServiceCenter, on_delete=models.CASCADE, related_name='gallery_images', verbose_name='Service')

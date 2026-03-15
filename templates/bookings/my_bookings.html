@@ -1,6 +1,31 @@
 {% extends 'base.html' %}
 {% block title %}Programările mele — AutoEMG{% endblock %}
 
+{% block extra_css %}
+<style>
+  .work-photo-grid { display:flex; flex-wrap:wrap; gap:.5rem; }
+  .work-photo-thumb {
+    width:100px; height:100px; object-fit:cover; border-radius:12px;
+    border:1px solid rgba(255,255,255,0.1); cursor:pointer;
+    transition:transform .15s, border-color .15s;
+  }
+  .work-photo-thumb:hover { transform:scale(1.04); border-color:var(--ah-red); }
+  .work-section-label {
+    display:inline-flex; align-items:center; gap:.4rem;
+    font-size:.72rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.07em; padding:.28rem .65rem; border-radius:999px;
+  }
+  .work-section-label.before { background:rgba(234,179,8,0.12); color:#fde047; border:1px solid rgba(234,179,8,0.3); }
+  .work-section-label.after  { background:rgba(34,197,94,0.12);  color:#4ade80; border:1px solid rgba(34,197,94,0.3); }
+  .transparency-banner {
+    background: linear-gradient(135deg, rgba(230,57,70,0.10), rgba(22,22,22,0.95) 60%);
+    border: 1px solid rgba(230,57,70,0.25);
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4">
   <h2 class="section-title mb-1">
@@ -13,6 +38,8 @@
     {% for b in bookings %}
     <div class="col-12">
       <div class="rounded-xl p-4" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+
+        <!-- Header programare -->
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
           <div>
             <div class="d-flex align-items-center gap-2 mb-1">
@@ -42,36 +69,141 @@
             </a>
           </div>
         </div>
+
         {% if b.problem_description %}
         <div class="mt-3 p-2 rounded-3 small text-muted-custom" style="background:var(--ah-dark3);">
           <i class="bi bi-chat-text me-1"></i>{{ b.problem_description|truncatewords:30 }}
         </div>
         {% endif %}
 
-        {% if b.attachments.all %}
-        <div class="row g-2 mt-3">
-          {% for attachment in b.attachments.all %}
-          <div class="col-md-4">
-            <div class="p-2 rounded-3 h-100" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
-              {% if attachment.is_image %}
-                <img src="{{ attachment.file.url }}" alt="Poză programare {{ b.pk }}" class="img-fluid rounded-3 mb-2" style="width:100%;height:220px;object-fit:contain;background:#000;">
-              {% else %}
-                <video controls class="w-100 rounded-3 mb-2" style="height:220px;object-fit:contain;background:#000;">
-                  <source src="{{ attachment.file.url }}">
-                </video>
-              {% endif %}
-              <div class="d-flex justify-content-between align-items-center gap-2">
-                <span class="small text-muted-custom">{{ attachment.uploaded_at|date:"d.m.Y H:i" }}</span>
-                <form method="post" action="{% url 'bookings:attachment_delete' attachment.pk %}">
-                  {% csrf_token %}
-                  <button class="btn btn-sm btn-outline-danger" type="submit">Șterge</button>
-                </form>
-              </div>
+        <!-- ══════════════════════════════════════════
+             POZE LUCRARE — adăugate de mecanic
+        ══════════════════════════════════════════ -->
+        {% if b.mechanic %}
+        {% with wl=b.mechanic_work_log %}
+        {% if wl %}
+        {% with before_photos=wl.photos.all %}
+        {% if before_photos %}
+        <div class="transparency-banner mt-4">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-camera-fill text-red"></i>
+            <div>
+              <div class="fw-bold text-white" style="font-size:.95rem;">Poze lucrare — {{ b.mechanic.name }}</div>
+              <div class="small text-muted-custom">Mecanicul a adăugat fotografii cu starea mașinii tale</div>
             </div>
           </div>
+
+          <!-- Poze intrare (before) -->
+          {% with has_before=False %}
+          {% for photo in before_photos %}{% if photo.photo_type == 'before' %}{% with has_before=True %}{% endwith %}{% endif %}{% endfor %}
+          {% endwith %}
+
+          {% for photo in before_photos %}
+          {% if photo.photo_type == 'before' and forloop.first %}
+          <div class="mb-3">
+            <span class="work-section-label before mb-2 d-inline-flex">
+              <i class="bi bi-arrow-down-circle"></i> La intrare
+            </span>
+            <div class="work-photo-grid mt-2">
+          {% endif %}
+          {% if photo.photo_type == 'before' %}
+              <img src="{{ photo.photo.url }}"
+                   class="work-photo-thumb"
+                   onclick="openPhotoModal('{{ photo.photo.url }}', 'La intrare — {{ b.car_brand }} {{ b.car_model }}')"
+                   alt="Poză intrare mașină">
+          {% endif %}
+          {% if photo.photo_type == 'before' and forloop.last %}
+            </div>
+          </div>
+          {% endif %}
           {% endfor %}
+
+          <!-- Poze ieșire (after) -->
+          {% for photo in before_photos %}
+          {% if photo.photo_type == 'after' and forloop.first %}
+          <div class="mb-2">
+            <span class="work-section-label after mb-2 d-inline-flex">
+              <i class="bi bi-arrow-up-circle"></i> La ieșire
+            </span>
+            <div class="work-photo-grid mt-2">
+          {% endif %}
+          {% if photo.photo_type == 'after' %}
+              <img src="{{ photo.photo.url }}"
+                   class="work-photo-thumb"
+                   onclick="openPhotoModal('{{ photo.photo.url }}', 'La ieșire — {{ b.car_brand }} {{ b.car_model }}')"
+                   alt="Poză ieșire mașină">
+          {% endif %}
+          {% if photo.photo_type == 'after' and forloop.last %}
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+
+          <!-- Poze în timpul lucrării -->
+          {% for photo in before_photos %}{% if photo.photo_type == 'during' %}{% with found_during=True %}{% endwith %}{% endif %}{% endfor %}
+          {% for photo in before_photos %}
+          {% if photo.photo_type == 'during' and forloop.first %}
+          <div class="mb-2">
+            <span class="work-section-label mb-2 d-inline-flex" style="background:rgba(249,115,22,0.12);color:#fb923c;border:1px solid rgba(249,115,22,0.3);">
+              <i class="bi bi-camera-video"></i> În timpul lucrării
+            </span>
+            <div class="work-photo-grid mt-2">
+          {% endif %}
+          {% if photo.photo_type == 'during' %}
+              <img src="{{ photo.photo.url }}"
+                   class="work-photo-thumb"
+                   onclick="openPhotoModal('{{ photo.photo.url }}', 'În lucru — {{ b.car_brand }} {{ b.car_model }}')"
+                   alt="Poză lucrare">
+          {% endif %}
+          {% if photo.photo_type == 'during' and forloop.last %}
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+
+          {% if wl.repair_description %}
+          <div class="mt-3 pt-3" style="border-top:1px solid rgba(255,255,255,0.07);">
+            <div class="small text-muted-custom mb-1"><i class="bi bi-file-text me-1"></i>Ce s-a lucrat:</div>
+            <div class="small text-white">{{ wl.repair_description }}</div>
+          </div>
+          {% endif %}
         </div>
         {% endif %}
+        {% endwith %}
+        {% endif %}
+        {% endwith %}
+        {% endif %}
+        <!-- ══ END POZE LUCRARE ══ -->
+
+        <!-- Pozele clientului -->
+        {% if b.attachments.all %}
+        <div class="mt-3">
+          <div class="small text-muted-custom mb-2"><i class="bi bi-paperclip me-1"></i>Fișierele tale atașate</div>
+          <div class="row g-2">
+            {% for attachment in b.attachments.all %}
+            <div class="col-md-4">
+              <div class="p-2 rounded-3 h-100" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+                {% if attachment.is_image %}
+                  <img src="{{ attachment.file.url }}" alt="Poză programare {{ b.pk }}" class="img-fluid rounded-3 mb-2" style="width:100%;height:220px;object-fit:contain;background:#000;">
+                {% else %}
+                  <video controls class="w-100 rounded-3 mb-2" style="height:220px;object-fit:contain;background:#000;">
+                    <source src="{{ attachment.file.url }}">
+                  </video>
+                {% endif %}
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                  <span class="small text-muted-custom">{{ attachment.uploaded_at|date:"d.m.Y H:i" }}</span>
+                  <form method="post" action="{% url 'bookings:attachment_delete' attachment.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Șterge</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
       </div>
     </div>
     {% endfor %}
@@ -87,4 +219,27 @@
   </div>
   {% endif %}
 </div>
+
+<!-- Modal lightbox pentru poze -->
+<div class="modal fade" id="photoModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content" style="background:#000;border:1px solid var(--ah-border);">
+      <div class="modal-header" style="border-color:rgba(255,255,255,0.1);">
+        <span class="small text-muted-custom" id="photoModalLabel"></span>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-2 text-center">
+        <img id="photoModalImg" src="" style="max-width:100%;max-height:75vh;object-fit:contain;border-radius:8px;">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openPhotoModal(url, label) {
+  document.getElementById('photoModalImg').src = url;
+  document.getElementById('photoModalLabel').textContent = label;
+  new bootstrap.Modal(document.getElementById('photoModal')).show();
+}
+</script>
 {% endblock %}
