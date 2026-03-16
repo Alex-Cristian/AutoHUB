@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.models import Car
-from services.models import ServiceCenter, ServiceGarage, ServiceItem
+from services.models import ServiceCenter, ServiceGarage, ServiceItem, ServiceCategory
 from .ai import estimate_booking_duration, normalize_duration_minutes
 from .forms import BookingForm
 from .models import Booking, BookingAttachment
@@ -93,7 +93,10 @@ def _get_duration_estimate_from_request(center, request):
 
 
 def booking_create(request, slug):
-    center = get_object_or_404(ServiceCenter.objects.prefetch_related('garages'), slug=slug, is_active=True)
+    center = get_object_or_404(
+        ServiceCenter.objects.prefetch_related('garages', 'garages__category', 'categories'),
+        slug=slug, is_active=True
+    )
 
     if request.method == 'POST':
         form = BookingForm(center=center, user=request.user, data=request.POST, files=request.FILES)
@@ -141,10 +144,16 @@ def booking_create(request, slug):
     if request.user.is_authenticated:
         cars = Car.objects.filter(owner=request.user).order_by('make', 'model', 'plate_number')
 
+    center_cat_ids = set(center.categories.values_list('id', flat=True))
+    if center.category_id:
+        center_cat_ids.add(center.category_id)
+    categories = ServiceCategory.objects.filter(id__in=center_cat_ids).order_by('order', 'name')
+
     context = {
         'center': center,
         'form': form,
         'cars': cars,
+        'categories': categories,
     }
     return render(request, 'bookings/booking_create.html', context)
 
@@ -166,7 +175,6 @@ def my_bookings(request):
         'attachments',
     ).order_by('-created_at')
 
-    # Atașează work_log-ul mecanicului direct pe fiecare booking
     booking_list = list(bookings)
     for b in booking_list:
         b.mechanic_work_log = None
@@ -239,4 +247,53 @@ def garage_slots(request, slug):
         'estimate_reason': estimate.get('reason', ''),
         'service_name': estimate.get('service_name', ''),
         'slots': slots,
+    })
+
+
+@require_GET
+def garaje_disponibile(request, slug):
+    center = get_object_or_404(
+        ServiceCenter.objects.prefetch_related('garages__category', 'categories'),
+        slug=slug, is_active=True
+    )
+
+    category_slug = request.GET.get('category', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    if not date_str:
+        return JsonResponse({'garages': [], 'error': 'Data este obligatorie.'}, status=400)
+
+    try:
+        booking_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({'garages': [], 'error': 'Format dată invalid.'}, status=400)
+
+    estimate = _get_duration_estimate_from_request(center, request)
+    duration_minutes = normalize_duration_minutes(estimate.get('minutes'))
+
+    garages_qs = center.garages.select_related('category')
+    if category_slug:
+        garages_qs = garages_qs.filter(category__slug=category_slug)
+
+    result = []
+    for garage in garages_qs:
+        slots = garage.available_slots_for_date(booking_date, duration_minutes=duration_minutes)
+        result.append({
+            'id': garage.pk,
+            'name': garage.name,
+            'category': garage.category.name,
+            'category_slug': garage.category.slug,
+            'open_time': garage.open_time.strftime('%H:%M'),
+            'close_time': garage.close_time.strftime('%H:%M'),
+            'slots': slots,
+            'slots_count': len(slots),
+        })
+
+    return JsonResponse({
+        'center': center.name,
+        'date': date_str,
+        'duration_minutes': duration_minutes,
+        'estimate_source': estimate.get('source', 'fallback'),
+        'estimate_reason': estimate.get('reason', ''),
+        'garages': result,
     })

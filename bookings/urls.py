@@ -10,4 +10,5 @@ urlpatterns = [
     path('confirmare/<int:pk>/', views.booking_success, name='success'),
     path('programarile-mele/', views.my_bookings, name='my_bookings'),
     path('atasamente/<int:pk>/sterge/', views.attachment_delete, name='attachment_delete'),
+    path('programare/<slug:slug>/garaje/', views.garaje_disponibile, name='garaje_disponibile'),
 ]
