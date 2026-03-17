@@ -139,28 +139,34 @@
       </form>
       {% else %}
       {# ── Navbar service owner ── #}
-      <ul class="navbar-nav me-auto ms-lg-2">
+      <ul class="navbar-nav me-auto ms-lg-2 service-owner-nav">
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
-             href="{% url 'services:dashboard' %}">
+          <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'services:dashboard' %}">
             <i class="bi bi-speedometer2 me-1"></i>Dashboard
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'bookings_list' %}active{% endif %}"
-             href="{% url 'services:bookings_list' %}">
+          <a class="nav-link {% if request.resolver_match.url_name == 'bookings_list' %}active{% endif %}" href="{% url 'services:bookings_list' %}">
             <i class="bi bi-calendar2-week me-1"></i>Programări
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'mechanics_list' %}active{% endif %}"
-             href="{% url 'services:mechanics_list' %}">
+          <a class="nav-link {% if request.resolver_match.url_name == 'car_history' %}active{% endif %}" href="{% url 'services:car_history' %}">
+            <i class="bi bi-clock-history me-1"></i>Istoric mașini
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'parts_inventory' %}active{% endif %}" href="{% url 'services:parts_inventory' %}">
+            <i class="bi bi-box-seam me-1"></i>Piese
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'mechanics_list' %}active{% endif %}" href="{% url 'services:mechanics_list' %}">
             <i class="bi bi-people me-1"></i>Mecanici
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
-             href="{% url 'services:notifications' %}">
+          <a class="nav-link {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" href="{% url 'services:notifications' %}">
             <i class="bi bi-bell me-1"></i>Notificări
             {% if service_unread_notifications %}<span class="badge bg-danger ms-1">{{ service_unread_notifications }}</span>{% endif %}
           </a>

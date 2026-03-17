@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import login, logout
+from django.db import models
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils.dateparse import parse_date
@@ -155,6 +156,23 @@ def car_delete(request, pk):
         return redirect(next_url or 'accounts:cars')
     return render(request, 'accounts/car_confirm_delete.html', {'car': car})
 
+
+
+@login_required
+def car_service_history(request, pk):
+    from bookings.models import Booking
+
+    car = get_object_or_404(Car, pk=pk, owner=request.user)
+    history = Booking.objects.filter(
+        status=Booking.STATUS_DONE,
+    ).filter(
+        models.Q(car_vin__iexact=car.vin) | models.Q(car_plate__iexact=car.plate_number)
+    ).select_related('center', 'mechanic').order_by('-booking_date', '-booking_time', '-created_at')
+
+    return render(request, 'accounts/car_history.html', {
+        'car': car,
+        'history': history,
+    })
 
 def _pick_worst_status(*items):
     priority = {

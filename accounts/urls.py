@@ -16,6 +16,7 @@ urlpatterns = [
     path('masini/<int:pk>/editeaza/', views.car_update, name='car_update'),
     path('masini/<int:pk>/sterge/', views.car_delete, name='car_delete'),
     path('masini/<int:pk>/calendar-expirari/', views.car_expiry_calendar, name='car_calendar'),
+    path('masini/<int:pk>/istoric/', views.car_service_history, name='car_history'),
     path('masini/<int:pk>/scan/', views.car_scan_document, name='car_scan'),
     path('masini/<int:pk>/scan/api/', views.car_scan_api, name='car_scan_api'),
     path('masini/<int:pk>/scan/salveaza/', views.car_scan_save, name='car_scan_save'),

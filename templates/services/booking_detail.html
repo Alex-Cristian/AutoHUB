@@ -121,12 +121,75 @@
         {% endif %}
       </div>
 
+      
+      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
+        <h5 class="mb-3"><i class="bi bi-flag me-2 text-orange"></i>Actualizează statusul</h5>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_status">
+          <div class="row g-2">
+            <div class="col-8">
+              <select name="status" class="form-select">
+                {% for value, label in status_choices %}
+                  <option value="{{ value }}" {% if booking.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-4 d-grid">
+              <button class="btn btn-outline-warning" type="submit">Salvează</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
+        <h5 class="mb-3"><i class="bi bi-clock-history me-2 text-red"></i>Ultimele intervenții făcute la tine în service</h5>
+        {% if history_entries %}
+          <div class="d-grid gap-3">
+            {% for item in history_entries|slice:":3" %}
+              <div class="border rounded-xl p-3" style="border-color:var(--ah-border)">
+                <div class="d-flex justify-content-between gap-3 flex-wrap">
+                  <div>
+                    <div class="fw-semibold">{{ item.center.name }}</div>
+                    <div class="small text-muted-custom">{{ item.booking_date|date:"d.m.Y" }} • {{ item.booking_time|time:"H:i" }}</div>
+                  </div>
+                  <span class="badge bg-success">Finalizată</span>
+                </div>
+                <div class="small mt-2">{{ item.used_services|default:item.problem_description|linebreaksbr }}</div>
+              </div>
+            {% endfor %}
+          </div>
+          {% if history_entries|length > 3 %}
+            <button class="btn btn-sm btn-outline-light mt-3" type="button" data-bs-toggle="collapse" data-bs-target="#moreHistory">Afișează mai multe</button>
+            <div class="collapse mt-3" id="moreHistory">
+              <div class="d-grid gap-3">
+                {% for item in history_entries|slice:"3:" %}
+                  <div class="border rounded-xl p-3" style="border-color:var(--ah-border)">
+                    <div class="d-flex justify-content-between gap-3 flex-wrap">
+                      <div>
+                        <div class="fw-semibold">{{ item.center.name }}</div>
+                        <div class="small text-muted-custom">{{ item.booking_date|date:"d.m.Y" }} • {{ item.booking_time|time:"H:i" }}</div>
+                      </div>
+                      <span class="badge bg-success">Finalizată</span>
+                    </div>
+                    <div class="small mt-2">{{ item.used_services|default:item.problem_description|linebreaksbr }}</div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="text-muted-custom">Nu există alte lucrări finalizate pentru această mașină în service-ul tău.</div>
+        {% endif %}
+      </div>
+
       {% if booking.status == 'pending' %}
       <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:rgba(230,57,70,0.35) !important;">
         <h5 class="mb-3"><i class="bi bi-hourglass-split me-2 text-red"></i>Acțiuni programare</h5>
-        <p class="text-muted-custom small mb-3">Această programare este în așteptare. Acceptă și blochează un interval în garaj, sau respinge.</p>
+        <p class="text-muted-custom small mb-3">Înainte să confirmi, trimite clientului un preț aproximativ și durata estimată. Programarea devine confirmată doar după ce clientul acceptă oferta.</p>
         <form method="post" action="{% url 'services:booking_accept' booking.pk %}" class="mb-2">
           {% csrf_token %}
+          <input name="estimated_price" type="number" min="0" step="0.01" class="form-control mb-2" placeholder="Preț aproximativ (RON)" required>
           <select name="duration_minutes" class="form-select mb-2" required>
             <option value="">— Selectează durata —</option>
             <option value="30">30 min</option>
@@ -138,7 +201,7 @@
             <option value="210">3:30</option>
             <option value="240">4 ore</option>
           </select>
-          <button class="btn btn-success w-100" type="submit"><i class="bi bi-check2 me-1"></i>Acceptă programarea</button>
+          <button class="btn btn-success w-100" type="submit"><i class="bi bi-send-check me-1"></i>Trimite oferta către client</button>
         </form>
         <form method="post" action="{% url 'services:booking_reject' booking.pk %}">
           {% csrf_token %}
@@ -147,6 +210,19 @@
             <i class="bi bi-x-lg me-1"></i>Respinge programarea
           </button>
         </form>
+      </div>
+      {% endif %}
+
+
+      {% if booking.status == 'quoted' %}
+      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:rgba(244,162,97,0.35) !important;">
+        <h5 class="mb-3"><i class="bi bi-chat-left-text me-2 text-orange"></i>Ofertă trimisă clientului</h5>
+        <div class="small text-muted-custom">Clientul trebuie să accepte oferta ca programarea să devină confirmată.</div>
+        <div class="mt-3 d-grid gap-2 small">
+          <div><strong>Preț aproximativ:</strong> {{ booking.estimated_price }} RON</div>
+          <div><strong>Durată:</strong> {{ booking.get_duration_display }}</div>
+          <div><strong>Data / ora:</strong> {{ booking.booking_date|date:"d.m.Y" }} la {{ booking.booking_time|time:"H:i" }}</div>
+        </div>
       </div>
       {% endif %}
 

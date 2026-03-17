@@ -9,6 +9,7 @@ from services.models import ServiceCenter, ServiceItem, ServiceGarage
 
 class Booking(models.Model):
     STATUS_PENDING = 'pending'
+    STATUS_QUOTED = 'quoted'
     STATUS_CONFIRMED = 'confirmed'
     STATUS_IN_PROGRESS = 'in_progress'
     STATUS_DONE = 'done'
@@ -16,6 +17,7 @@ class Booking(models.Model):
 
     STATUS_CHOICES = [
         (STATUS_PENDING, 'În așteptare'),
+        (STATUS_QUOTED, 'În așteptarea clientului'),
         (STATUS_CONFIRMED, 'Confirmată'),
         (STATUS_IN_PROGRESS, 'În lucru'),
         (STATUS_DONE, 'Finalizată'),
@@ -73,6 +75,9 @@ class Booking(models.Model):
     booking_time = models.TimeField(verbose_name='Ora programării')
     duration_minutes = models.PositiveIntegerField(
         null=True, blank=True, verbose_name='Durată blocare garaj (minute)'
+    )
+    estimated_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Preț aproximativ (RON)'
     )
 
     status = models.CharField(
@@ -160,6 +165,7 @@ class Booking(models.Model):
     def get_status_badge(self):
         classes = {
             'pending': 'warning text-dark',
+            'quoted': 'secondary',
             'confirmed': 'info text-dark',
             'in_progress': 'primary',
             'done': 'success',
@@ -170,6 +176,7 @@ class Booking(models.Model):
     def get_status_icon(self):
         icons = {
             'pending': '⏳',
+            'quoted': '💬',
             'confirmed': '✅',
             'in_progress': '🔧',
             'done': '🏁',
