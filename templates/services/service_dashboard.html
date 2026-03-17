@@ -165,20 +165,11 @@
     <div class="d-flex flex-column flex-xl-row align-items-xl-end justify-content-between gap-4">
       <div>
         <h1 class="mb-2">Tot ce ai nevoie, într-un singur loc</h1>
-        <p class="dashboard-subtitle mb-0">Am reorganizat dashboard-ul ca să fie mai clar, mai elegant și mult mai ușor de folosit și de pe telefon: vezi rapid programările, notificările, mecanicii și acțiunile importante.</p>
+        <p class="dashboard-subtitle mb-0">Am reorganizat dashboard-ul ca să fie mai clar, mai elegant și mult mai ușor de folosit și de pe telefon: vezi rapid notificările, cererile noi și zonele importante din service.</p>
       </div>
-      <div class="dashboard-hero-actions">
-        <a class="btn btn-nav-cta" href="#programari"><i class="bi bi-calendar2-week me-1"></i>Vezi programările</a>
-        <a class="btn btn-outline-light" href="#mecanici"><i class="bi bi-person-plus me-1"></i>Adaugă mecanic</a>
       </div>
-    </div>
 
-    <div class="dashboard-mobile-shortcuts">
-      <a class="dashboard-shortcut-btn" href="#programari"><i class="bi bi-calendar2-week"></i><span>Programări</span></a>
-      <a class="dashboard-shortcut-btn" href="#mecanici"><i class="bi bi-person-plus"></i><span>Mecanici</span></a>
-      <a class="dashboard-shortcut-btn" href="{% url 'services:notifications' %}"><i class="bi bi-bell"></i><span>Notificări</span></a>
-      <a class="dashboard-shortcut-btn" href="{% url 'invoices:clients' %}"><i class="bi bi-receipt"></i><span>Facturi</span></a>
-    </div>
+    
 
     <div class="dashboard-stat-grid mt-4">
       <div class="dashboard-stat-card">
@@ -226,9 +217,8 @@
     <div class="dashboard-chip-nav">
       <a class="dashboard-chip" href="#actiunirapide"><i class="bi bi-lightning-charge"></i>Acțiuni rapide</a>
       <a class="dashboard-chip" href="#asteptare"><i class="bi bi-hourglass"></i>În așteptare</a>
-      <a class="dashboard-chip" href="#programari"><i class="bi bi-card-checklist"></i>Programări</a>
-      <a class="dashboard-chip" href="#mecanici"><i class="bi bi-people"></i>Mecanici</a>
-      <a class="dashboard-chip" href="{% url 'services:mechanics_list' %}"><i class="bi bi-person-badge"></i>Interfață Mecanici</a>
+      <a class="dashboard-chip" href="{% url 'services:parts_inventory' %}"><i class="bi bi-box-seam"></i>Piese</a>
+      <a class="dashboard-chip" href="{% url 'services:car_history' %}"><i class="bi bi-clock-history"></i>Istoric mașini</a>
       <a class="dashboard-chip" href="#centre"><i class="bi bi-building"></i>Service-uri</a>
       <a class="dashboard-chip" href="#notificari"><i class="bi bi-bell"></i>Notificări</a>
     </div>
@@ -258,20 +248,6 @@
           </div>
         </a>
         {% if centers %}
-        <a class="dashboard-action-card" href="{% url 'services:owner_booking_create' centers.0.pk %}">
-          <div class="dashboard-action-icon"><i class="bi bi-calendar-plus"></i></div>
-          <div>
-            <div class="fw-semibold text-white mb-1">Programare nouă</div>
-            <div class="small text-muted-custom">Creează imediat o programare direct din service.</div>
-          </div>
-        </a>
-        <a class="dashboard-action-card" href="#mecanici">
-          <div class="dashboard-action-icon"><i class="bi bi-person-plus"></i></div>
-          <div>
-            <div class="fw-semibold text-white mb-1">Adaugă mecanic</div>
-            <div class="small text-muted-custom">Completezi rapid datele și îl ai disponibil la fișe.</div>
-          </div>
-        </a>
         {% endif %}
       </div>
     </div>
@@ -344,10 +320,11 @@
               <a class="btn btn-sm btn-outline-light" href="{% url 'services:booking_detail' b.pk %}">Detalii programare</a>
               <div class="d-flex gap-2 flex-wrap ms-auto">
                 <form method="post" action="{% url 'services:booking_accept' b.pk %}" class="d-flex gap-2 flex-wrap justify-content-end">{% csrf_token %}
+                  <input name="estimated_price" type="number" min="0" step="0.01" class="form-control form-control-sm" style="min-width:130px;" placeholder="Preț aprox. (RON)" required>
                   <select name="duration_minutes" class="form-select form-select-sm" style="min-width:140px;" required>
-                    <option value="">Durată blocare</option><option value="30">30 min</option><option value="60">1 oră</option><option value="90">1:30</option><option value="120">2 ore</option><option value="150">2:30</option><option value="180">3 ore</option><option value="210">3:30</option><option value="240">4 ore</option>
+                    <option value="">Durată</option><option value="30">30 min</option><option value="60">1 oră</option><option value="90">1:30</option><option value="120">2 ore</option><option value="150">2:30</option><option value="180">3 ore</option><option value="210">3:30</option><option value="240">4 ore</option>
                   </select>
-                  <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check2 me-1"></i>Acceptă</button>
+                  <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-send-check me-1"></i>Trimite oferta</button>
                 </form>
                 <form method="post" action="{% url 'services:booking_reject' b.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-lg me-1"></i>Respinge</button></form>
               </div>
@@ -367,128 +344,6 @@
     </div>
   </section>
 
-  {# ─── MECANICI: doar 2 panouri în grid (adaugă + existenți) ─── #}
-  <section class="mb-4 d-flex flex-column gap-4" id="mecanici">
-    <div class="dashboard-panel">
-      <div class="dashboard-panel-header" style="cursor:pointer;" onclick="toggleAdaugaMecanic()">
-        <div>
-          <h2 class="dashboard-panel-title"><i class="bi bi-person-workspace text-red me-2"></i>Adaugă mecanic</h2>
-          <div class="dashboard-panel-subtitle">Formular simplu, cu câmpuri mari și ușor de completat și de pe telefon.</div>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-light" id="btn-adauga-mecanic"
-                onclick="event.stopPropagation(); toggleAdaugaMecanic()">
-          <i class="bi bi-chevron-down" id="chevron-adauga-mecanic"></i>
-        </button>
-      </div>
-      <div id="adauga-mecanic-body" style="display:none;">
-      {% if centers|length == 1 %}
-        <form method="post" action="{% url 'services:mechanic_create' centers.0.pk %}" class="dashboard-inline-form" enctype="multipart/form-data">
-          {% csrf_token %}
-          <div><label class="form-label">Nume</label>{{ mechanic_form.name }}</div>
-          <div><label class="form-label">Email</label>{{ mechanic_form.email }}</div>
-          <div><label class="form-label">Nr. telefon</label>{{ mechanic_form.phone }}</div>
-          <div><label class="form-label">Specializare</label>{{ mechanic_form.specialization }}</div>
-          <div>
-            <label class="form-label">Garaj alocat</label>
-            <select name="garage" class="form-select">
-              <option value="">— Fără garaj fix —</option>
-              {% for garage in centers.0.garages.all %}
-              <option value="{{ garage.pk }}">{{ garage.name }} ({{ garage.category.name }})</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div>
-            <label class="form-label">Categorii servicii</label>
-            <div class="d-flex flex-wrap gap-2 mt-1">
-              {% for cat in centers.0.categories.all %}
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="service_categories" value="{{ cat.pk }}" id="dash_cat_{{ cat.pk }}">
-                <label class="form-check-label small" for="dash_cat_{{ cat.pk }}">{{ cat.name }}</label>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-          <div class="full"><button class="btn btn-nav-cta" type="submit"><i class="bi bi-plus-circle me-1"></i>Adaugă mecanic</button></div>
-        </form>
-      {% else %}
-        <div class="dashboard-list-grid">
-          {% for c in centers %}
-            <form method="post" action="{% url 'services:mechanic_create' c.pk %}" class="dashboard-mechanic-card" enctype="multipart/form-data">
-              {% csrf_token %}
-              <div class="fw-semibold text-white mb-3">{{ c.name }}</div>
-              <div class="row g-3">
-                <div class="col-12"><label class="form-label">Nume</label>{{ mechanic_form.name }}</div>
-                <div class="col-md-6"><label class="form-label">Email</label>{{ mechanic_form.email }}</div>
-                <div class="col-md-6"><label class="form-label">Nr. telefon</label>{{ mechanic_form.phone }}</div>
-                <div class="col-12">
-                  <label class="form-label">Garaj alocat</label>
-                  <select name="garage" class="form-select">
-                    <option value="">— Fără garaj fix —</option>
-                    {% for garage in c.garages.all %}
-                    <option value="{{ garage.pk }}">{{ garage.name }} ({{ garage.category.name }})</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Categorii servicii</label>
-                  <div class="d-flex flex-wrap gap-2 mt-1">
-                    {% for cat in c.categories.all %}
-                    <div class="form-check">
-                      <input class="form-check-input" type="checkbox" name="service_categories" value="{{ cat.pk }}" id="dash_cat_{{ c.pk }}_{{ cat.pk }}">
-                      <label class="form-check-label small" for="dash_cat_{{ c.pk }}_{{ cat.pk }}">{{ cat.name }}</label>
-                    </div>
-                    {% endfor %}
-                  </div>
-                </div>
-                <div class="col-12"><button class="btn btn-outline-light w-100" type="submit">Adaugă mecanic</button></div>
-              </div>
-            </form>
-          {% endfor %}
-        </div>
-      {% endif %}
-      </div>
-    </div>
-
-    <div class="dashboard-panel">
-      <div class="dashboard-panel-header" style="cursor:pointer;" onclick="toggleMecanici()">
-        <div>
-          <h2 class="dashboard-panel-title"><i class="bi bi-people text-orange me-2"></i>Mecanici existenți</h2>
-          <div class="dashboard-panel-subtitle">Îi vezi pe toți într-un singur loc și poți edita rapid datele sau îi poți elimina.</div>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-light" id="mecanici-toggle-btn" onclick="event.stopPropagation(); toggleMecanici();">
-          <i class="bi bi-chevron-down" id="mecanici-chevron"></i>
-        </button>
-      </div>
-      <div class="dashboard-list-grid" id="mecanici-list" style="display:none;">
-        {% for center, mechanics in mechanics_by_center %}
-          <div class="mechanic-management-card dashboard-mechanic-card">
-            <div class="fw-semibold text-white mb-3">{{ center.name }}</div>
-            {% if mechanics %}
-              {% for m in mechanics %}
-                <div class="border rounded-4 p-3 mb-3" style="border-color:var(--ah-border) !important;">
-                  <form method="post" action="{% url 'services:mechanic_update' m.pk %}">
-                    {% csrf_token %}
-                    <div class="row g-2">
-                      <div class="col-12"><label class="form-label small">Nume</label><input type="text" name="mech_{{ m.pk }}-name" value="{{ m.name }}" class="form-control"></div>
-                      <div class="col-md-6"><label class="form-label small">Email</label><input type="email" name="mech_{{ m.pk }}-email" value="{{ m.email }}" class="form-control"></div>
-                      <div class="col-md-6"><label class="form-label small">Telefon</label><input type="text" name="mech_{{ m.pk }}-phone" value="{{ m.phone }}" class="form-control"></div>
-                    </div>
-                    <div class="mechanic-actions">
-                      <button class="btn btn-sm btn-outline-light" type="submit"><i class="bi bi-save me-1"></i>Salvează</button>
-                      <a class="btn btn-sm btn-outline-danger" href="#" onclick="event.preventDefault(); if(confirm('Sigur vrei să ștergi acest mecanic?')) { document.getElementById('delete-mechanic-{{ m.pk }}').submit(); }"><i class="bi bi-trash me-1"></i>Șterge</a>
-                    </div>
-                  </form>
-                  <form id="delete-mechanic-{{ m.pk }}" method="post" action="{% url 'services:mechanic_delete' m.pk %}" class="d-none">{% csrf_token %}</form>
-                </div>
-              {% endfor %}
-            {% else %}
-              <div class="dashboard-empty">Încă nu ai mecanici adăugați pentru acest service.</div>
-            {% endif %}
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  </section>
   {# ─── FIN secțiune mecanici ─── #}
 
   {# ─── SERVICE-URI: secțiune separată, full width ─── #}
@@ -517,8 +372,7 @@
             </div>
             <div class="d-flex gap-2 flex-wrap mt-3">
               <a class="btn btn-sm btn-outline-light" href="{% url 'services:detail' c.slug %}">Vezi</a>
-              <a class="btn btn-sm btn-outline-warning" href="{% url 'services:owner_booking_create' c.pk %}">Programare nouă</a>
-              <a class="btn btn-sm btn-nav-cta" href="{% url 'services:manage_profile' c.pk %}">Editează profilul</a>
+                            <a class="btn btn-sm btn-nav-cta" href="{% url 'services:manage_profile' c.pk %}">Editează profilul</a>
             </div>
           </div>
         {% endfor %}
@@ -672,22 +526,5 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
-// ── Toggle mecanici ──
-function toggleAdaugaMecanic() {
-  const body = document.getElementById('adauga-mecanic-body');
-  const chevron = document.getElementById('chevron-adauga-mecanic');
-  const btn = document.getElementById('btn-adauga-mecanic');
-  const isHidden = body.style.display === 'none';
-  body.style.display = isHidden ? '' : 'none';
-  chevron.className = isHidden ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
-}
-
-function toggleMecanici() {
-  const list = document.getElementById('mecanici-list');
-  const chevron = document.getElementById('mecanici-chevron');
-  const isHidden = list.style.display === 'none';
-  list.style.display = isHidden ? 'grid' : 'none';
-  if (chevron) chevron.className = isHidden ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
-}
 </script>
 {% endblock %}

@@ -4,13 +4,14 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.models import Car
 from services.models import ServiceCenter, ServiceGarage, ServiceItem, ServiceCategory
 from .ai import estimate_booking_duration, normalize_duration_minutes
 from .forms import BookingForm
-from .models import Booking, BookingAttachment
+from .models import Booking, BookingAttachment, BookingNotification
 
 
 def _extract_manual_duration(request):
@@ -297,3 +298,61 @@ def garaje_disponibile(request, slug):
         'estimate_reason': estimate.get('reason', ''),
         'garages': result,
     })
+
+@login_required
+@require_POST
+def booking_accept_quote(request, pk):
+    booking = get_object_or_404(Booking.objects.select_related('garage', 'center'), pk=pk, user=request.user)
+    if booking.status != Booking.STATUS_QUOTED:
+        messages.info(request, 'Această ofertă nu mai așteaptă răspunsul tău.')
+        return redirect('bookings:my_bookings')
+
+    if booking.garage_id and not booking.garage.is_time_available(
+        booking.booking_date,
+        booking.booking_time,
+        duration_minutes=booking.effective_duration_minutes(),
+        exclude_booking_id=booking.pk,
+        booking_status=Booking.STATUS_CONFIRMED,
+    ):
+        messages.error(request, 'Intervalul nu mai este disponibil. Service-ul trebuie să îți trimită o ofertă nouă.')
+        booking.status = Booking.STATUS_PENDING
+        booking.save(update_fields=['status', 'updated_at'])
+        return redirect('bookings:my_bookings')
+
+    booking.status = Booking.STATUS_CONFIRMED
+    booking.save(update_fields=['status', 'updated_at'])
+    if booking.center.owner_id:
+        BookingNotification.objects.create(
+            recipient=booking.center.owner,
+            booking=booking,
+            kind=BookingNotification.KIND_STATUS_UPDATE,
+            title=f'Clientul a confirmat programarea #{booking.pk} ✅',
+            message=(
+                f'{booking.client_name} a acceptat oferta pentru {booking.booking_date} la '
+                f"{booking.booking_time.strftime('%H:%M')} ({booking.get_duration_display()})."
+            ),
+        )
+    messages.success(request, 'Ai confirmat programarea. Service-ul a rezervat intervalul pentru tine.')
+    return redirect('bookings:my_bookings')
+
+
+@login_required
+@require_POST
+def booking_reject_quote(request, pk):
+    booking = get_object_or_404(Booking.objects.select_related('center'), pk=pk, user=request.user)
+    if booking.status != Booking.STATUS_QUOTED:
+        messages.info(request, 'Această ofertă nu mai așteaptă răspunsul tău.')
+        return redirect('bookings:my_bookings')
+
+    booking.status = Booking.STATUS_CANCELLED
+    booking.save(update_fields=['status', 'updated_at'])
+    if booking.center.owner_id:
+        BookingNotification.objects.create(
+            recipient=booking.center.owner,
+            booking=booking,
+            kind=BookingNotification.KIND_STATUS_UPDATE,
+            title=f'Clientul a refuzat oferta pentru programarea #{booking.pk}',
+            message=f'{booking.client_name} a refuzat oferta trimisă de service.',
+        )
+    messages.info(request, 'Ai refuzat oferta pentru această programare.')
+    return redirect('bookings:my_bookings')

@@ -2,10 +2,12 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.contrib.auth import login
+from django.db import models
 from django.db.models import Avg, Count, Min, Max, Q, Prefetch
 from django.utils import timezone
+from django.urls import reverse
 
-from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite, ServiceGarage, ServiceImage, ServiceMechanic, ReviewImage
+from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite, ServiceGarage, ServiceImage, ServiceMechanic, ReviewImage, ServicePart
 from .forms import (
     ServiceCenterRegisterForm,
     ServiceCenterPublicRegisterForm,
@@ -14,8 +16,16 @@ from .forms import (
     ServiceMechanicForm,
     ServiceOwnerBookingForm,
     ReviewForm,
+    ServicePartForm,
 )
 from bookings.models import Booking, BookingNotification, BookingAttachment
+
+
+def _post_redirect(request, fallback):
+    referer = request.META.get('HTTP_REFERER')
+    if referer:
+        return redirect(referer)
+    return redirect(fallback)
 
 
 def category_list(request):
@@ -225,7 +235,7 @@ def service_register_public(request):
                 messages.info(request, '✅ Contul și service-ul au fost create. Service-ul este în așteptare pentru verificare (date legale completate).')
             else:
                 messages.success(request, '✅ Contul și service-ul au fost create. Bine ai venit în dashboard!')
-            return redirect('services:dashboard')
+            return _post_redirect(request, 'services:dashboard')
         else:
             print("=" * 60)
             print("FORM PUBLIC ERRORS:", form.errors)
@@ -248,7 +258,7 @@ def service_register(request):
                 messages.info(request, '✅ Service-ul a fost înregistrat, dar este în așteptare pentru verificare (date legale completate).')
             else:
                 messages.success(request, '✅ Service-ul a fost înregistrat. Acum poți gestiona programările din dashboard.')
-            return redirect('services:dashboard')
+            return _post_redirect(request, 'services:dashboard')
         else:
             print("=" * 60)
             print("FORM REGISTER ERRORS:", form.errors)
@@ -338,6 +348,8 @@ def service_dashboard(request):
     mechanic_form = ServiceMechanicForm()
     mechanics_by_center = [(center, center.mechanics.order_by('name')) for center in centers]
 
+    low_stock_count = ServicePart.objects.filter(center__in=centers, stock__lte=models.F('minimum_stock')).count()
+
     return render(request, 'services/service_dashboard.html', {
         'centers': centers,
         'pending_bookings': pending,
@@ -347,6 +359,7 @@ def service_dashboard(request):
         'pending_verifications': pending_verifications,
         'mechanic_form': mechanic_form,
         'mechanics_by_center': mechanics_by_center,
+        'low_stock_count': low_stock_count,
     })
 
 
@@ -402,7 +415,7 @@ def mechanic_create(request, pk):
     referer = request.META.get('HTTP_REFERER', '')
     if 'mechanici' in referer:
         return redirect('services:mechanics_list')
-    return redirect('services:dashboard')
+    return _post_redirect(request, 'services:dashboard')
 
 
 @login_required
@@ -463,7 +476,7 @@ def mechanic_delete(request, pk):
         name = mechanic.name
         mechanic.delete()
         messages.success(request, f'Mecanicul {name} a fost șters.')
-    return redirect('services:dashboard')
+    return _post_redirect(request, 'services:dashboard')
 
 
 @login_required
@@ -535,9 +548,28 @@ def booking_detail(request, pk):
                 messages.error(request, 'Fișierele selectate nu sunt imagini sau video valide.')
             return redirect('services:booking_detail', pk=booking.pk)
 
+        if action == 'update_status':
+            new_status = (request.POST.get('status') or '').strip()
+            allowed_statuses = {choice[0] for choice in Booking.STATUS_CHOICES} - {Booking.STATUS_PENDING, Booking.STATUS_CANCELLED, Booking.STATUS_QUOTED}
+            if new_status not in allowed_statuses:
+                messages.error(request, 'Statusul selectat nu este valid.')
+                return redirect('services:booking_detail', pk=booking.pk)
+            booking.status = new_status
+            booking.save(update_fields=['status', 'updated_at'])
+            messages.success(request, f'Statusul programării a fost actualizat la „{booking.get_status_display()}”.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+    history_entries = Booking.objects.filter(
+        center=booking.center,
+        car_vin=booking.car_vin,
+        status=Booking.STATUS_DONE,
+    ).select_related('center').exclude(pk=booking.pk).order_by('-booking_date', '-booking_time', '-created_at')
+
     return render(request, 'services/booking_detail.html', {
         'booking': booking,
         'mechanics': mechanics,
+        'history_entries': history_entries,
+        'status_choices': [choice for choice in Booking.STATUS_CHOICES if choice[0] not in [Booking.STATUS_PENDING, Booking.STATUS_QUOTED, Booking.STATUS_CANCELLED]],
     })
 
 
@@ -590,7 +622,7 @@ def owner_booking_create(request, pk):
                 )
 
             messages.success(request, f'✅ Programarea #{booking.pk} a fost adăugată direct și confirmată.')
-            return redirect('services:dashboard')
+            return _post_redirect(request, 'services:dashboard')
     else:
         form = ServiceOwnerBookingForm(center=center, user=request.user)
 
@@ -677,49 +709,52 @@ def booking_accept(request, pk):
     if request.method == 'POST':
         if booking.status != Booking.STATUS_PENDING:
             messages.info(request, 'Această programare nu mai este în așteptare.')
-            return redirect('services:dashboard')
+            return _post_redirect(request, 'services:dashboard')
 
         raw_duration = (request.POST.get('duration_minutes') or '').strip()
+        raw_price = (request.POST.get('estimated_price') or '').strip().replace(',', '.')
         if not raw_duration:
-            messages.error(request, 'Selectează durata care blochează garajul înainte să accepți programarea.')
-            return redirect('services:dashboard')
+            messages.error(request, 'Selectează durata înainte să trimiți oferta către client.')
+            return _post_redirect(request, 'services:dashboard')
+        if not raw_price:
+            messages.error(request, 'Completează și un preț aproximativ înainte să trimiți oferta către client.')
+            return _post_redirect(request, 'services:dashboard')
         try:
             duration_minutes = int(raw_duration)
         except ValueError:
             messages.error(request, 'Durata selectată nu este validă.')
-            return redirect('services:dashboard')
+            return _post_redirect(request, 'services:dashboard')
+        try:
+            estimated_price = float(raw_price)
+        except ValueError:
+            messages.error(request, 'Prețul aproximativ nu este valid.')
+            return _post_redirect(request, 'services:dashboard')
 
         allowed_durations = {30 * step for step in range(1, 17)}
         if duration_minutes not in allowed_durations:
             messages.error(request, 'Durata trebuie să fie selectată din 30 în 30 de minute.')
-            return redirect('services:dashboard')
+            return _post_redirect(request, 'services:dashboard')
+        if estimated_price < 0:
+            messages.error(request, 'Prețul aproximativ nu poate fi negativ.')
+            return _post_redirect(request, 'services:dashboard')
 
-        if booking.garage_id and not booking.garage.is_time_available(
-            booking.booking_date,
-            booking.booking_time,
-            duration_minutes=duration_minutes,
-            exclude_booking_id=booking.pk,
-            booking_status=Booking.STATUS_CONFIRMED,
-        ):
-            messages.error(request, 'Garajul nu mai este disponibil pe tot intervalul selectat.')
-            return redirect('services:dashboard')
-
-        booking.status = Booking.STATUS_CONFIRMED
+        booking.status = Booking.STATUS_QUOTED
         booking.duration_minutes = duration_minutes
-        booking.save(update_fields=['status', 'duration_minutes', 'updated_at'])
+        booking.estimated_price = estimated_price
+        booking.save(update_fields=['status', 'duration_minutes', 'estimated_price', 'updated_at'])
         if booking.user:
             BookingNotification.objects.create(
                 recipient=booking.user,
                 booking=booking,
                 kind=BookingNotification.KIND_STATUS_UPDATE,
-                title=f"Programarea #{booking.pk} a fost acceptată ✅",
+                title=f'Ofertă nouă pentru programarea #{booking.pk} 💬',
                 message=(
-                    f"Service-ul {booking.center.name} ți-a confirmat programarea pentru {booking.booking_date} la "
-                    f"{booking.booking_time.strftime('%H:%M')} și a rezervat garajul pentru {booking.get_duration_display()}."
+                    f"{booking.center.name} ți-a trimis un cost aproximativ de {estimated_price:.2f} RON pentru "
+                    f"{booking.booking_date} la {booking.booking_time.strftime('%H:%M')} și o durată estimată de {booking.get_duration_display()}."
                 ),
             )
-        messages.success(request, f'✅ Ai acceptat programarea #{booking.pk} pentru {booking.get_duration_display()}.')
-    return redirect('services:dashboard')
+        messages.success(request, f'Oferta pentru programarea #{booking.pk} a fost trimisă către client.')
+    return _post_redirect(request, 'services:dashboard')
 
 
 @login_required
@@ -764,6 +799,99 @@ def notification_mark_read(request, pk):
 
 
 # ===== MECHANIC INTERFACE =====
+
+
+
+@login_required
+def parts_inventory(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+    centers = centers.order_by('name')
+
+    selected_center = None
+    center_id = (request.GET.get('center') or request.POST.get('center_id') or '').strip()
+    if center_id:
+        try:
+            selected_center = centers.get(pk=center_id)
+        except ServiceCenter.DoesNotExist:
+            selected_center = centers.first()
+    else:
+        selected_center = centers.first()
+
+    if selected_center is None:
+        messages.info(request, 'Adaugă mai întâi un service pentru a gestiona piesele.')
+        return redirect('services:register_service')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add_part':
+            form = ServicePartForm(request.POST)
+            if form.is_valid():
+                part = form.save(commit=False)
+                part.center = selected_center
+                part.save()
+                messages.success(request, 'Piesa a fost adăugată în stoc.')
+                return redirect(f"{reverse('services:parts_inventory')}?center={selected_center.pk}")
+        elif action == 'update_stock':
+            part = get_object_or_404(ServicePart, pk=request.POST.get('part_id'), center__in=centers)
+            try:
+                stock = int(request.POST.get('stock', part.stock))
+                minimum_stock = int(request.POST.get('minimum_stock', part.minimum_stock))
+            except (TypeError, ValueError):
+                messages.error(request, 'Valorile pentru stoc trebuie să fie numere întregi.')
+            else:
+                part.stock = max(stock, 0)
+                part.minimum_stock = max(minimum_stock, 0)
+                part.save(update_fields=['stock', 'minimum_stock', 'updated_at'])
+                messages.success(request, 'Stocul piesei a fost actualizat.')
+                return redirect(f"{reverse('services:parts_inventory')}?center={part.center_id}")
+        elif action == 'delete_part':
+            part = get_object_or_404(ServicePart, pk=request.POST.get('part_id'), center__in=centers)
+            center_pk = part.center_id
+            part.delete()
+            messages.info(request, 'Piesa a fost ștearsă din stoc.')
+            return redirect(f"{reverse('services:parts_inventory')}?center={center_pk}")
+    else:
+        form = ServicePartForm()
+
+    parts = ServicePart.objects.filter(center=selected_center).order_by('name')
+    return render(request, 'services/parts_inventory.html', {
+        'centers': centers,
+        'selected_center': selected_center,
+        'parts': parts,
+        'form': form,
+        'low_stock_count': parts.filter(stock__lte=models.F('minimum_stock')).count(),
+    })
+
+
+@login_required
+def service_car_history(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+
+    search = (request.GET.get('q') or '').strip()
+    bookings = Booking.objects.filter(
+        center__in=centers,
+        status=Booking.STATUS_DONE,
+    ).select_related('center', 'mechanic').order_by('-booking_date', '-booking_time', '-created_at')
+
+    if search:
+        bookings = bookings.filter(
+            Q(car_plate__icontains=search)
+            | Q(car_vin__icontains=search)
+            | Q(car_brand__icontains=search)
+            | Q(car_model__icontains=search)
+            | Q(client_name__icontains=search)
+        )
+
+    return render(request, 'services/car_history.html', {
+        'bookings': bookings,
+        'centers': centers,
+        'search': search,
+    })
+
 
 @login_required
 def mechanics_list(request):

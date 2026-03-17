@@ -5,7 +5,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from decimal import Decimal, ROUND_HALF_UP
 
-from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage, ServiceMechanic, Review
+from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage, ServiceMechanic, Review, ServicePart
 from bookings.forms import BookingForm
 from bookings.models import Booking
 from accounts.models import Car
@@ -481,3 +481,17 @@ class ServiceOwnerBookingForm(BookingForm):
             self.add_error('booking_time', 'Intervalul ales nu mai este disponibil pentru garajul selectat.')
 
         return cleaned
+
+class ServicePartForm(forms.ModelForm):
+    class Meta:
+        model = ServicePart
+        fields = ['name', 'part_number', 'stock', 'minimum_stock', 'unit', 'shelf', 'notes']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Filtru ulei'}),
+            'part_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Cod piesă (opțional)'}),
+            'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'minimum_stock': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'unit': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'buc'}),
+            'shelf': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Raft A3'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Detalii opționale'}),
+        }

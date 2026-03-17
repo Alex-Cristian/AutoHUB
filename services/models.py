@@ -376,6 +376,36 @@ class ServiceItem(models.Model):
         return "La cerere"
 
 
+class ServicePart(models.Model):
+    center = models.ForeignKey(
+        ServiceCenter, on_delete=models.CASCADE,
+        related_name='parts', verbose_name='Service'
+    )
+    name = models.CharField(max_length=160, verbose_name='Denumire piesă')
+    part_number = models.CharField(max_length=80, blank=True, verbose_name='Cod piesă')
+    stock = models.PositiveIntegerField(default=0, verbose_name='Stoc curent')
+    minimum_stock = models.PositiveIntegerField(default=0, verbose_name='Stoc minim')
+    unit = models.CharField(max_length=20, default='buc', verbose_name='Unitate')
+    shelf = models.CharField(max_length=80, blank=True, verbose_name='Raft / locație')
+    notes = models.TextField(blank=True, verbose_name='Observații')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Piesă service'
+        verbose_name_plural = 'Piese service'
+        ordering = ['name']
+        unique_together = ['center', 'name', 'part_number']
+
+    def __str__(self):
+        code = f" ({self.part_number})" if self.part_number else ''
+        return f"{self.name}{code} - {self.center.name}"
+
+    @property
+    def is_low_stock(self):
+        return self.stock <= self.minimum_stock
+
+
 class Review(models.Model):
     RATING_CHOICES = [(i, f'{i} ★') for i in range(1, 6)]
 
