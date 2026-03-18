@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Istoric {{ car.make }} {{ car.model }} — AutoEMG{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+      <h1 class="mb-1">Istoric pentru {{ car.make }} {{ car.model }}</h1>
+      <p class="text-muted-custom mb-0">{{ car.plate_number }} • VIN: {{ car.vin }}</p>
+    </div>
+    <a href="{% url 'accounts:cars' %}" class="btn btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Înapoi la mașini</a>
+  </div>
+
+  <div class="row g-3">
+    {% for booking in history %}
+    <div class="col-12">
+      <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+        <div class="d-flex flex-wrap justify-content-between gap-3 mb-3">
+          <div>
+            <h4 class="mb-1">{{ booking.center.name }}</h4>
+            <div class="text-muted-custom small">{{ booking.booking_date|date:"d.m.Y" }} • {{ booking.booking_time|time:"H:i" }}</div>
+          </div>
+          <span class="badge bg-success">Finalizată</span>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="small text-muted-custom">Ce s-a făcut</div>
+            <div class="fw-semibold">{{ booking.used_services|default:booking.problem_description|linebreaksbr }}</div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-muted-custom">Observații service</div>
+            <div>{{ booking.additional_description|default:'—'|linebreaksbr }}</div>
+          </div>
+          <div class="col-md-2">
+            <div class="small text-muted-custom">Mecanic</div>
+            <div>{{ booking.mechanic.name|default:'—' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12"><div class="p-4 bg-dark2 border rounded-xl text-muted-custom" style="border-color:var(--ah-border) !important;">Nu există încă intervenții finalizate pentru această mașină.</div></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

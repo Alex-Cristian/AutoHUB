@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+{% block title %}Mecanici — Dashboard AutoEMG{% endblock %}
+
+{% block extra_css %}
+<style>
+.mechanic-card {
+  cursor: pointer;
+  transition: border-color .2s, transform .15s, box-shadow .2s;
+}
+.mechanic-card:hover {
+  border-color: var(--ah-red) !important;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(230,57,70,0.15);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'services:dashboard' %}" class="text-red text-decoration-none">Dashboard</a></li>
+      <li class="breadcrumb-item active text-muted-custom">Mecanici</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <h1 class="section-title mb-1">Mecanici</h1>
+      <p class="text-muted-custom small mb-0">Gestionează echipa de mecanici din service-urile tale.</p>
+    </div>
+  </div>
+
+  {% for center in centers %}
+  <div class="mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-bold mb-0"><i class="bi bi-building me-2 text-red"></i>{{ center.name }}</h5>
+      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addMechanicModal{{ center.pk }}">
+        <i class="bi bi-plus-lg me-1"></i>Adaugă mecanic
+      </button>
+    </div>
+
+    <div class="row g-3">
+      {% for mechanic in mechanics %}
+      {% if mechanic.center_id == center.pk %}
+
+      <!-- Card mecanic — click → profil -->
+      <div class="col-md-4 col-lg-3">
+        <div class="rounded-xl p-3 h-100 d-flex flex-column mechanic-card"
+             style="background:var(--ah-dark2);border:1px solid var(--ah-border);"
+             onclick="window.location='{% url 'services:mechanic_profile' mechanic.pk %}'">
+
+          <div class="text-center mb-3">
+            <div class="mx-auto rounded-circle overflow-hidden" style="width:64px;height:64px;background:var(--ah-dark3);border:2px solid var(--ah-border);">
+              {% if mechanic.photo %}
+                <img src="{{ mechanic.photo.url }}" style="width:100%;height:100%;object-fit:cover;">
+              {% else %}
+                <div class="d-flex align-items-center justify-content-center h-100">
+                  <i class="bi bi-person-fill" style="font-size:2rem;color:var(--ah-muted);"></i>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="text-center flex-grow-1">
+            <h6 class="fw-bold mb-1">{{ mechanic.name }}</h6>
+            {% if mechanic.specialization %}
+              <p class="text-orange small mb-2">{{ mechanic.specialization }}</p>
+            {% endif %}
+            {% if mechanic.garage %}
+              <p class="small mb-1"><i class="bi bi-house-gear me-1 text-red"></i><span class="text-muted-custom">{{ mechanic.garage.name }}</span></p>
+            {% endif %}
+            {% if mechanic.phone %}
+              <p class="text-muted-custom small mb-2"><i class="bi bi-telephone me-1"></i>{{ mechanic.phone }}</p>
+            {% endif %}
+            {% if mechanic.service_categories.all %}
+            <div class="d-flex flex-wrap justify-content-center gap-1 mb-2">
+              {% for cat in mechanic.service_categories.all %}
+              <span class="badge" style="background:var(--ah-dark3);border:1px solid var(--ah-border);color:#ccc;font-size:0.65rem;">{{ cat.name }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+            <div class="d-flex justify-content-center gap-3 mb-3">
+              <div class="text-center">
+                <p class="fw-bold text-white mb-0">{{ mechanic.active_bookings_count }}</p>
+                <p class="text-muted-custom" style="font-size:0.7rem;">Active</p>
+              </div>
+              <div class="text-center">
+                <p class="fw-bold text-white mb-0">{{ mechanic.completed_bookings_count }}</p>
+                <p class="text-muted-custom" style="font-size:0.7rem;">Finalizate</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Modal editare mecanic {{ mechanic.pk }} -->
+      <div class="modal fade" id="editMechanicModal{{ mechanic.pk }}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+            <div class="modal-header" style="border-color:var(--ah-border);">
+              <h5 class="modal-title fw-bold">
+                <i class="bi bi-pencil-square text-red me-2"></i>Editează — {{ mechanic.name }}
+              </h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'services:mechanic_update' mechanic.pk %}" enctype="multipart/form-data">
+              {% csrf_token %}
+              <div class="modal-body">
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Nume <span class="text-red">*</span></label>
+                    <input type="text" name="name" class="form-control" value="{{ mechanic.name }}" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Specializare</label>
+                    <input type="text" name="specialization" class="form-control" value="{{ mechanic.specialization|default:'' }}" placeholder="ex: Mecanică motor">
+                  </div>
+                </div>
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Telefon</label>
+                    <input type="text" name="phone" class="form-control" value="{{ mechanic.phone|default:'' }}" placeholder="07xx xxx xxx">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control" value="{{ mechanic.email|default:'' }}" placeholder="mecanic@service.ro">
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Garaj alocat</label>
+                  <select name="garage" class="form-select">
+                    <option value="">— Fără garaj fix —</option>
+                    {% for garage in center.garages.all %}
+                    <option value="{{ garage.pk }}" {% if mechanic.garage_id == garage.pk %}selected{% endif %}>
+                      {{ garage.name }} ({{ garage.category.name }})
+                    </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Categorii servicii</label>
+                  <div class="d-flex flex-wrap gap-2 mt-1 p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+                    {% for cat in center.categories.all %}
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="service_categories"
+                             value="{{ cat.pk }}" id="ecat_{{ mechanic.pk }}_{{ cat.pk }}"
+                             {% if cat in mechanic.service_categories.all %}checked{% endif %}>
+                      <label class="form-check-label small" for="ecat_{{ mechanic.pk }}_{{ cat.pk }}">{{ cat.name }}</label>
+                    </div>
+                    {% endfor %}
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Status disponibilitate</label>
+                  <div class="d-flex flex-wrap gap-3 p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="availability_status" value="available"
+                             id="avail_{{ mechanic.pk }}"
+                             {% if not mechanic.availability_status or mechanic.availability_status == 'available' %}checked{% endif %}>
+                      <label class="form-check-label small" for="avail_{{ mechanic.pk }}"><span class="text-success">● Disponibil</span></label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="availability_status" value="on_leave"
+                             id="leave_{{ mechanic.pk }}"
+                             {% if mechanic.availability_status == 'on_leave' %}checked{% endif %}>
+                      <label class="form-check-label small" for="leave_{{ mechanic.pk }}"><span class="text-warning">● Concediu</span></label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="availability_status" value="unavailable"
+                             id="unavail_{{ mechanic.pk }}"
+                             {% if mechanic.availability_status == 'unavailable' %}checked{% endif %}>
+                      <label class="form-check-label small" for="unavail_{{ mechanic.pk }}"><span class="text-danger">● Indisponibil</span></label>
+                    </div>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Fotografie profil</label>
+                  {% if mechanic.photo %}
+                  <div class="d-flex align-items-center gap-3 mb-2">
+                    <img src="{{ mechanic.photo.url }}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:1px solid var(--ah-border);">
+                    <span class="small text-muted-custom">Poză existentă — încarcă una nouă pentru a o înlocui</span>
+                  </div>
+                  {% endif %}
+                  <input type="file" name="photo" class="form-control" accept="image/*">
+                </div>
+              </div>
+              <div class="modal-footer d-flex justify-content-between" style="border-color:var(--ah-border);">
+                <form method="post" action="{% url 'services:mechanic_delete' mechanic.pk %}"
+                      onsubmit="return confirm('Sigur vrei să ștergi mecanicul {{ mechanic.name }}?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-trash me-1"></i>Șterge
+                  </button>
+                </form>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anulează</button>
+                  <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salvează</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {% endif %}
+      {% empty %}
+      {% endfor %}
+    </div>
+
+    {% if not mechanics %}
+    <div class="text-center py-5" style="background:var(--ah-dark2);border:1px solid var(--ah-border);border-radius:12px;">
+      <div style="font-size:3rem;opacity:0.3;">👨‍🔧</div>
+      <h5 class="mt-3 fw-bold">Niciun mecanic adăugat</h5>
+      <p class="text-muted-custom">Adaugă primul mecanic pentru acest service.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Modal adauga mecanic -->
+  <div class="modal fade" id="addMechanicModal{{ center.pk }}" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <div class="modal-header" style="border-color:var(--ah-border);">
+          <h5 class="modal-title fw-bold">Adaugă mecanic — {{ center.name }}</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form method="post" action="{% url 'services:mechanic_create' center.pk %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Nume <span class="text-red">*</span></label>
+              <input type="text" name="name" class="form-control" required placeholder="ex: Ion Popescu">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Specializare</label>
+              <input type="text" name="specialization" class="form-control" placeholder="ex: Mecanica motor, Electrica auto">
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-6">
+                <label class="form-label">Telefon</label>
+                <input type="text" name="phone" class="form-control" placeholder="07xx xxx xxx">
+              </div>
+              <div class="col-6">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-control" placeholder="mecanic@service.ro">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Garaj alocat</label>
+              <select name="garage" class="form-select">
+                <option value="">— Fara garaj fix —</option>
+                {% for garage in center.garages.all %}
+                <option value="{{ garage.pk }}">{{ garage.name }} ({{ garage.category.name }})</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Categorii servicii</label>
+              <div class="d-flex flex-wrap gap-2 mt-1">
+                {% for cat in center.categories.all %}
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox" name="service_categories" value="{{ cat.pk }}" id="cat_{{ center.pk }}_{{ cat.pk }}">
+                  <label class="form-check-label small" for="cat_{{ center.pk }}_{{ cat.pk }}">{{ cat.name }}</label>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Fotografie</label>
+              <input type="file" name="photo" class="form-control" accept="image/*">
+            </div>
+          </div>
+          <div class="modal-footer" style="border-color:var(--ah-border);">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anulează</button>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Adaugă</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+{% endblock %}

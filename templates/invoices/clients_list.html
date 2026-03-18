@@ -1,0 +1,452 @@
+{% extends 'base.html' %}
+{% block title %}Clienți — AutoEMG{% endblock %}
+
+{% block extra_css %}
+<style>
+  .cl-shell { background: none; }
+
+  /* ── Hero ── */
+  .cl-hero {
+    background: linear-gradient(135deg, rgba(230,57,70,0.13), rgba(18,18,18,0.98) 50%, rgba(244,162,97,0.07));
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 24px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .cl-kicker {
+    display: inline-flex; align-items: center; gap:.5rem;
+    padding:.38rem .75rem; border-radius:999px;
+    background: rgba(255,255,255,0.06); color:#ccc; font-size:.82rem;
+    margin-bottom:.85rem;
+  }
+
+  /* ── Stats ── */
+  .cl-stat-row { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: .75rem; margin-bottom: 1.25rem; }
+  .cl-stat {
+    background: rgba(22,22,22,0.9); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 18px; padding: 1rem;
+  }
+  .cl-stat-val { font-size: 1.8rem; font-weight: 800; font-family: 'Barlow Condensed', sans-serif; line-height: 1; }
+  .cl-stat-label { font-size: .8rem; color: var(--ah-muted); margin-top:.2rem; }
+
+  /* ── Search ── */
+  .cl-search-wrap { position: relative; }
+  .cl-search-wrap i { position: absolute; left:1rem; top:50%; transform:translateY(-50%); color:var(--ah-muted); pointer-events:none; }
+  .cl-search-input {
+    width: 100%;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 14px; color: #fff;
+    padding: .75rem 1rem .75rem 2.75rem; font-size: .95rem;
+    transition: border-color .2s, background .2s;
+  }
+  .cl-search-input::placeholder { color: var(--ah-muted); }
+  .cl-search-input:focus { outline:none; border-color: rgba(230,57,70,0.55); background: rgba(255,255,255,0.07); }
+
+  /* ── Tabel ── */
+  .cl-table-wrap {
+    background: rgba(22,22,22,0.92);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 22px; overflow: hidden;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.22);
+  }
+  .cl-table { width: 100%; border-collapse: collapse; }
+  .cl-table thead tr { background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .cl-table th { padding:.85rem 1rem; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--ah-muted); white-space:nowrap; }
+  .cl-table td { padding:.85rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align:middle; font-size:.9rem; }
+  .cl-table tbody tr { transition: background .15s; cursor: pointer; }
+  .cl-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+  .cl-table tbody tr:last-child td { border-bottom: none; }
+  .cl-table tbody tr.row-hidden { display: none; }
+
+  .cell-name { font-weight: 700; color: #fff; }
+  .cell-name-count { font-size: .78rem; color: var(--ah-muted); margin-top:.1rem; }
+  .cell-contact { font-size: .88rem; color: #ccc; }
+  .cell-contact-email { font-size: .78rem; color: var(--ah-muted); margin-top:.1rem; }
+  .cell-booking-id { font-weight: 700; color: var(--ah-red); }
+  .cell-booking-date { font-size: .8rem; color: var(--ah-muted); margin-top:.1rem; }
+
+  .cl-empty { padding: 3rem 1rem; text-align:center; color:var(--ah-muted); }
+  .cl-empty-icon { font-size:2.5rem; opacity:.3; margin-bottom:.75rem; }
+
+  @media (max-width: 767.98px) {
+    .cl-stat-row { grid-template-columns: repeat(2, 1fr); }
+    .col-hide-sm { display: none; }
+    .cl-table th, .cl-table td { padding: .7rem .6rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5 cl-shell">
+
+  {# ── Hero ── #}
+  <div class="cl-hero">
+    <span class="cl-kicker"><i class="bi bi-people"></i> Clienți AutoEMG</span>
+    <div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3">
+      <div>
+        <h1 class="mb-1">Clienți</h1>
+        <p class="text-muted-custom mb-0">Din programările tale. De aici poți emite rapid o factură.</p>
+      </div>
+      <a href="{% url 'invoices:create' %}" class="btn btn-nav-cta flex-shrink-0">
+        <i class="bi bi-file-earmark-plus me-1"></i>Factură nouă
+      </a>
+    </div>
+  </div>
+
+  {# ── Stats ── #}
+  <div class="cl-stat-row">
+    <div class="cl-stat">
+      <div class="cl-stat-val">{{ clients|length }}</div>
+      <div class="cl-stat-label">Clienți unici</div>
+    </div>
+    <div class="cl-stat">
+      <div class="cl-stat-val" id="stat-visible">{{ clients|length }}</div>
+      <div class="cl-stat-label">Afișați acum</div>
+    </div>
+    <div class="cl-stat">
+      <div class="cl-stat-val" style="color:#4ade80;">
+        {% with total=0 %}
+          {% for c in clients %}{% endfor %}
+          {{ clients|length }}
+        {% endwith %}
+      </div>
+      <div class="cl-stat-label">Total programări</div>
+    </div>
+  </div>
+
+  {# ── Search ── #}
+  <div class="d-flex flex-column flex-md-row gap-3 mb-3 align-items-md-center">
+    <div class="cl-search-wrap flex-grow-1">
+      <i class="bi bi-search"></i>
+      <input
+        type="text"
+        id="cl-search"
+        class="cl-search-input"
+        placeholder="Caută după nume, telefon, email..."
+        autocomplete="off"
+      >
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+      <span class="small text-muted-custom">
+        <span id="visible-count">{{ clients|length }}</span> clienți
+      </span>
+      <button class="btn btn-sm btn-outline-light" id="clear-search" style="display:none;" onclick="clearSearch()">
+        <i class="bi bi-x me-1"></i>Șterge
+      </button>
+    </div>
+  </div>
+
+  {# ── Filtre avansate ── #}
+  <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+
+    {# Calendar dată #}
+    <div style="position:relative;">
+      <button type="button" id="cl-date-btn"
+              class="btn btn-sm btn-outline-light d-flex align-items-center gap-2"
+              onclick="toggleClCal()">
+        <i class="bi bi-calendar2"></i>
+        <span id="cl-date-label">Luna curentă</span>
+        <i class="bi bi-chevron-down" style="font-size:.7rem;"></i>
+      </button>
+      <div id="cl-cal-popup" style="display:none;position:absolute;z-index:999;top:calc(100% + 4px);left:0;
+           background:var(--ah-dark2);border:1px solid var(--ah-border);border-radius:18px;
+           padding:1rem;box-shadow:0 16px 40px rgba(0,0,0,0.4);width:270px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <button type="button" class="btn btn-sm btn-outline-light px-2 py-1" onclick="clCalPrev()">←</button>
+          <span id="cl-cal-month" style="font-weight:700;font-size:.9rem;"></span>
+          <button type="button" class="btn btn-sm btn-outline-light px-2 py-1" onclick="clCalNext()">→</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px;">
+          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Lu</div>
+          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Ma</div>
+          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Mi</div>
+          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Jo</div>
+          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Vi</div>
+          <div style="text-align:center;font-size:.68rem;color:#e63946;">Sâ</div>
+          <div style="text-align:center;font-size:.68rem;color:#e63946;">Du</div>
+        </div>
+        <div id="cl-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1" onclick="clSetMonth()">
+            <i class="bi bi-calendar3 me-1"></i>Luna curentă
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1" onclick="clClearDate()">
+            <i class="bi bi-x me-1"></i>Toate
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <select id="cl-sort" class="form-select form-select-sm" style="width:auto;min-width:180px;" onchange="clApply()">
+      <option value="default">Ordine implicită</option>
+      <option value="count-desc">Programări ↓ descrescător</option>
+      <option value="count-asc">Programări ↑ crescător</option>
+      <option value="date-desc">Ultima programare ↓ recent</option>
+      <option value="date-asc">Ultima programare ↑ vechi</option>
+      <option value="name-asc">Nume A→Z</option>
+      <option value="name-desc">Nume Z→A</option>
+    </select>
+    <select id="cl-center-filter" class="form-select form-select-sm" style="width:auto;min-width:180px;" onchange="clApply()">
+      <option value="">Toate service-urile</option>
+      {% for c in clients %}
+        <option value="{{ c.center.name|lower }}">{{ c.center.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="button" id="cl-reset" class="btn btn-sm btn-outline-danger" style="display:none;" onclick="clReset()">
+      <i class="bi bi-x-circle me-1"></i>Reset
+    </button>
+  </div>
+
+  {# ── Tabel ── #}
+  {% if clients %}
+  <div class="cl-table-wrap">
+    <table class="cl-table" id="cl-table">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Contact</th>
+          <th class="col-hide-sm">Ultima programare</th>
+          <th class="col-hide-sm">Service</th>
+          <th style="text-align:right;">Acțiuni</th>
+        </tr>
+      </thead>
+      <tbody id="cl-tbody">
+        {% for c in clients %}
+        <tr
+          class="cl-row"
+          data-search="{{ c.name|lower }} {{ c.phone }} {{ c.email|lower }}"
+          data-count="{{ c.count }}"
+          data-date="{{ c.last_booking.booking_date|date:'Y-m-d' }}"
+          data-center="{{ c.center.name|lower }}"
+        >
+          <td>
+            <div class="cell-name">{{ c.name }}</div>
+            <div class="cell-name-count">{{ c.count }} programări</div>
+          </td>
+          <td>
+            <div class="cell-contact">{{ c.phone|default:"—" }}</div>
+            <div class="cell-contact-email">{{ c.email|default:"" }}</div>
+          </td>
+          <td class="col-hide-sm">
+            <div class="cell-booking-id">#{{ c.last_booking.pk }}</div>
+            <div class="cell-booking-date">{{ c.last_booking.booking_date|date:"d.m.Y" }} · {{ c.last_booking.booking_time|time:"H:i" }}</div>
+          </td>
+          <td class="col-hide-sm">
+            <div class="small text-white fw-semibold">{{ c.center.name }}</div>
+            <div class="small text-muted-custom">{{ c.center.get_city_display }}</div>
+          </td>
+          <td onclick="event.stopPropagation()" style="text-align:right;">
+            <a href="{% url 'invoices:create' %}?booking={{ c.last_booking.pk }}"
+               class="btn btn-sm btn-nav-cta">
+              <i class="bi bi-file-earmark-text me-1"></i>Emite factură
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="cl-empty" id="cl-no-results" style="display:none;">
+      <div class="cl-empty-icon"><i class="bi bi-search"></i></div>
+      <div class="fw-semibold text-white mb-1">Niciun client găsit</div>
+      <div class="small">Încearcă alt termen — nume, telefon sau email.</div>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="cl-table-wrap">
+    <div class="cl-empty">
+      <div class="cl-empty-icon"><i class="bi bi-people"></i></div>
+      <div class="fw-semibold text-white mb-1">Nu există clienți încă</div>
+      <div class="small">Clienții apar automat din programările tale.</div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+// ── Calendar clienți ──
+const clToday = new Date();
+let clCalCur = new Date(clToday.getFullYear(), clToday.getMonth(), 1);
+let clFilterMode = 'month'; // 'month' | 'day' | 'all'
+let clFilterMonth = clToday.getMonth();
+let clFilterYear  = clToday.getFullYear();
+let clFilterDay   = null;
+
+function toggleClCal() {
+  const popup = document.getElementById('cl-cal-popup');
+  const isOpen = popup.style.display !== 'none';
+  popup.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderClCal();
+}
+function clCalPrev() { clCalCur = new Date(clCalCur.getFullYear(), clCalCur.getMonth()-1, 1); renderClCal(); }
+function clCalNext() { clCalCur = new Date(clCalCur.getFullYear(), clCalCur.getMonth()+1, 1); renderClCal(); }
+
+function renderClCal() {
+  const label = clCalCur.toLocaleDateString('ro-RO', {month:'long', year:'numeric'});
+  document.getElementById('cl-cal-month').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+  const grid = document.getElementById('cl-cal-grid');
+  grid.innerHTML = '';
+  const datesWithClients = new Set(Array.from(document.querySelectorAll('.cl-row')).map(r => r.dataset.date).filter(Boolean));
+  let startDow = new Date(clCalCur.getFullYear(), clCalCur.getMonth(), 1).getDay();
+  startDow = startDow === 0 ? 6 : startDow - 1;
+  for (let i = 0; i < startDow; i++) grid.appendChild(document.createElement('div'));
+  const daysInMonth = new Date(clCalCur.getFullYear(), clCalCur.getMonth()+1, 0).getDate();
+  const isCurrentMonthView = clCalCur.getFullYear() === clFilterYear && clCalCur.getMonth() === clFilterMonth;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${clCalCur.getFullYear()}-${String(clCalCur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isSelDay = clFilterMode === 'day' && clFilterDay === dateStr;
+    const isSelMonth = clFilterMode === 'month' && isCurrentMonthView;
+    const hasC = datesWithClients.has(dateStr);
+    const cell = document.createElement('div');
+    cell.style.cssText = 'text-align:center;padding:4px 2px;border-radius:8px;font-size:12px;position:relative;cursor:pointer;';
+    if (isSelDay) { cell.style.background='var(--ah-red)'; cell.style.color='#fff'; cell.style.fontWeight='700'; }
+    else if (isSelMonth) { cell.style.background='rgba(230,57,70,0.15)'; cell.style.color='#e8e8e8'; }
+    else if (hasC) { cell.style.color='#e8e8e8'; cell.style.fontWeight='600'; }
+    else { cell.style.color='var(--ah-muted)'; }
+    const num = document.createElement('div');
+    num.textContent = d;
+    cell.appendChild(num);
+    if (hasC) {
+      const dot = document.createElement('div');
+      dot.style.cssText = `width:4px;height:4px;border-radius:50%;margin:1px auto 0;background:${isSelDay?'#fff':'var(--ah-red)'};`;
+      cell.appendChild(dot);
+    }
+    cell.onmouseover = () => { if (!isSelDay) cell.style.background='rgba(255,255,255,0.08)'; };
+    cell.onmouseout  = () => { if (!isSelDay) cell.style.background = isSelMonth ? 'rgba(230,57,70,0.15)' : ''; };
+    cell.onclick = () => {
+      clFilterMode = 'day';
+      clFilterDay  = dateStr;
+      const dl = new Date(dateStr+'T00:00:00').toLocaleDateString('ro-RO', {day:'numeric', month:'long', year:'numeric'});
+      document.getElementById('cl-date-label').textContent = dl;
+      document.getElementById('cl-cal-popup').style.display = 'none';
+      clApply();
+    };
+    grid.appendChild(cell);
+  }
+}
+
+function clSetMonth() {
+  clFilterMode  = 'month';
+  clFilterMonth = clCalCur.getMonth();
+  clFilterYear  = clCalCur.getFullYear();
+  clFilterDay   = null;
+  const label = clCalCur.toLocaleDateString('ro-RO', {month:'long', year:'numeric'});
+  document.getElementById('cl-date-label').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+  document.getElementById('cl-cal-popup').style.display = 'none';
+  clApply();
+}
+
+function clClearDate() {
+  clFilterMode = 'all';
+  clFilterDay  = null;
+  document.getElementById('cl-date-label').textContent = 'Toate datele';
+  document.getElementById('cl-cal-popup').style.display = 'none';
+  clApply();
+}
+
+document.addEventListener('click', function(e) {
+  const popup = document.getElementById('cl-cal-popup');
+  const btn   = document.getElementById('cl-date-btn');
+  if (popup && !popup.contains(e.target) && btn && !btn.contains(e.target)) {
+    popup.style.display = 'none';
+  }
+});
+
+(function () {
+  const rows      = Array.from(document.querySelectorAll('.cl-row'));
+  const searchEl  = document.getElementById('cl-search');
+  const noResults = document.getElementById('cl-no-results');
+  const visCount  = document.getElementById('visible-count');
+  const statVis   = document.getElementById('stat-visible');
+  const clearBtn  = document.getElementById('clear-search');
+  const tbody     = document.getElementById('cl-tbody');
+
+  // Dedup center options
+  const centerSel = document.getElementById('cl-center-filter');
+  if (centerSel) {
+    const seen = new Set();
+    Array.from(centerSel.options).forEach(opt => {
+      if (opt.value && seen.has(opt.value)) opt.remove();
+      else seen.add(opt.value);
+    });
+  }
+
+  function clApply() {
+    const q         = (searchEl?.value || '').trim().toLowerCase();
+    const sortVal   = document.getElementById('cl-sort')?.value || 'default';
+    const centerVal = document.getElementById('cl-center-filter')?.value || '';
+
+    // Sortare
+    const sorted = rows.slice().sort((a, b) => {
+      if (sortVal === 'count-desc') return parseInt(b.dataset.count) - parseInt(a.dataset.count);
+      if (sortVal === 'count-asc')  return parseInt(a.dataset.count) - parseInt(b.dataset.count);
+      if (sortVal === 'date-desc')  return (b.dataset.date||'').localeCompare(a.dataset.date||'');
+      if (sortVal === 'date-asc')   return (a.dataset.date||'').localeCompare(b.dataset.date||'');
+      if (sortVal === 'name-asc')   return (a.dataset.search||'').localeCompare(b.dataset.search||'');
+      if (sortVal === 'name-desc')  return (b.dataset.search||'').localeCompare(a.dataset.search||'');
+      return 0;
+    });
+    sorted.forEach(r => tbody.appendChild(r));
+
+    // Filtrare cu dată
+    let visible = 0;
+    sorted.forEach(row => {
+      const searchMatch = !q || row.dataset.search.includes(q);
+      const centerMatch = !centerVal || row.dataset.center === centerVal;
+      let dateMatch = true;
+      if (clFilterMode === 'day') {
+        dateMatch = row.dataset.date === clFilterDay;
+      } else if (clFilterMode === 'month') {
+        const rowDate = row.dataset.date || '';
+        const prefix = `${clFilterYear}-${String(clFilterMonth+1).padStart(2,'0')}`;
+        dateMatch = rowDate.startsWith(prefix);
+      }
+      const show = searchMatch && centerMatch && dateMatch;
+      row.classList.toggle('row-hidden', !show);
+      if (show) visible++;
+    });
+
+    visCount.textContent = visible;
+    if (statVis) statVis.textContent = visible;
+    noResults.style.display = visible === 0 ? 'block' : 'none';
+
+    // Reset btn
+    const resetBtn = document.getElementById('cl-reset');
+    const hasDateFilter = clFilterMode !== 'all';
+    if (resetBtn) resetBtn.style.display = (q || centerVal || sortVal !== 'default' || hasDateFilter) ? 'inline-flex' : 'none';
+    if (clearBtn) clearBtn.style.display = q ? 'inline-flex' : 'none';
+  }
+
+  window.clApply = clApply;
+
+  window.clReset = function() {
+    if (searchEl) searchEl.value = '';
+    document.getElementById('cl-sort').value = 'default';
+    document.getElementById('cl-center-filter').value = '';
+    clFilterMode = 'all';
+    clFilterDay  = null;
+    document.getElementById('cl-date-label').textContent = 'Toate datele';
+    document.getElementById('cl-reset').style.display = 'none';
+    clApply();
+  };
+
+  window.clearSearch = function () {
+    if (searchEl) searchEl.value = '';
+    clApply();
+    searchEl.focus();
+  };
+
+  if (searchEl) searchEl.addEventListener('input', clApply);
+
+  // Setează label luna curentă
+  const initLabel = clToday.toLocaleDateString('ro-RO', {month:'long', year:'numeric'});
+  const dateLabel = document.getElementById('cl-date-label');
+  if (dateLabel) dateLabel.textContent = initLabel.charAt(0).toUpperCase() + initLabel.slice(1);
+  document.getElementById('cl-reset').style.display = 'inline-flex';
+
+  clApply();
+})();
+</script>
+{% endblock %}

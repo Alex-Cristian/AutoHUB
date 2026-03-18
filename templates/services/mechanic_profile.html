@@ -1,0 +1,742 @@
+{% extends 'base.html' %}
+{% block title %}{{ mechanic.name }} — Profil Mecanic{% endblock %}
+
+{% block extra_css %}
+<style>
+  .mp-table { width:100%; border-collapse:collapse; }
+  .mp-table thead tr { background:rgba(255,255,255,0.04); border-bottom:1px solid rgba(255,255,255,0.08); }
+  .mp-table th { padding:.75rem 1rem; font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--ah-muted); white-space:nowrap; }
+  .mp-table td { padding:.85rem 1rem; border-bottom:1px solid rgba(255,255,255,0.05); vertical-align:middle; font-size:.9rem; }
+  .mp-table tbody tr { cursor:pointer; transition:background .15s; }
+  .mp-table tbody tr:hover { background:rgba(255,255,255,0.04); }
+  .mp-table tbody tr:last-child td { border-bottom:none; }
+  .mp-wrap { background:rgba(22,22,22,0.92); border:1px solid rgba(255,255,255,0.07); border-radius:20px; overflow:hidden; }
+  .mp-empty { padding:3rem 1rem; text-align:center; color:var(--ah-muted); }
+
+  .status-pill { display:inline-flex; align-items:center; gap:.3rem; padding:.3rem .65rem; border-radius:999px; font-size:.75rem; font-weight:700; white-space:nowrap; }
+  .status-pill.confirmed   { background:rgba(34,197,94,0.15);  color:#4ade80; border:1px solid rgba(34,197,94,0.3); }
+  .status-pill.in_progress { background:rgba(249,115,22,0.15); color:#fb923c; border:1px solid rgba(249,115,22,0.3); }
+  .status-pill.done        { background:rgba(99,102,241,0.15); color:#a5b4fc; border:1px solid rgba(99,102,241,0.3); }
+  .status-pill.pending     { background:rgba(234,179,8,0.15);  color:#fde047; border:1px solid rgba(234,179,8,0.3); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'services:dashboard' %}" class="text-red text-decoration-none">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'services:mechanics_list' %}" class="text-red text-decoration-none">Mecanici</a></li>
+      <li class="breadcrumb-item active text-muted-custom">{{ mechanic.name }}</li>
+    </ol>
+  </nav>
+
+  <!-- Header mecanic -->
+  <div class="rounded-xl p-4 mb-4 d-flex align-items-center gap-4 flex-wrap" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+    <div style="width:80px;height:80px;border-radius:50%;background:var(--ah-dark3);border:2px solid var(--ah-red);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+      {% if mechanic.photo %}
+        <img src="{{ mechanic.photo.url }}" style="width:100%;height:100%;object-fit:cover;">
+      {% else %}
+        <i class="bi bi-person-fill" style="font-size:2.5rem;color:var(--ah-muted);"></i>
+      {% endif %}
+    </div>
+    <div class="flex-grow-1">
+      <h2 class="fw-bold mb-1">{{ mechanic.name }}</h2>
+      <p class="text-muted-custom mb-1">
+        <i class="bi bi-building me-1 text-red"></i>{{ mechanic.center.name }}
+        {% if mechanic.specialization %}· <span class="text-orange">{{ mechanic.specialization }}</span>{% endif %}
+      </p>
+      {% if mechanic.garage %}
+      <p class="small mb-1">
+        <i class="bi bi-house-gear me-1 text-red"></i>Garaj: <strong class="text-white">{{ mechanic.garage.name }}</strong>
+      </p>
+      {% endif %}
+      <div class="d-flex gap-3 flex-wrap">
+        <span class="small"><i class="bi bi-tools text-red me-1"></i><strong class="text-white">{{ active_bookings|length }}</strong> active</span>
+        <span class="small"><i class="bi bi-check-circle me-1" style="color:#4ade80;"></i><strong class="text-white">{{ done_bookings|length }}</strong> finalizate</span>
+        {% if mechanic.phone %}<span class="small"><i class="bi bi-telephone text-red me-1"></i>{{ mechanic.phone }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editMechanicModal">
+        <i class="bi bi-pencil me-1"></i>Editează
+      </button>
+      <form method="post" action="{% url 'services:mechanic_delete' mechanic.pk %}"
+            onsubmit="return confirm('Sigur vrei să ștergi mecanicul {{ mechanic.name }}?')">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-trash me-1"></i>Șterge
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-3" style="border-color:var(--ah-border);">
+    <li class="nav-item">
+      <a class="nav-link active" href="#" onclick="showTab('active',this)">
+        <i class="bi bi-clock me-1"></i>Lucrări active
+        {% if active_bookings %}<span class="badge bg-danger ms-1">{{ active_bookings|length }}</span>{% endif %}
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="#" onclick="showTab('done',this)">
+        <i class="bi bi-check-circle me-1"></i>Finalizate
+      </a>
+    </li>
+  </ul>
+
+  <!-- Tabel lucrări active -->
+  <div id="section-active">
+    {% if active_bookings %}
+
+    <!-- Filtre mecanic -->
+    <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+      <div style="position:relative;">
+        <button type="button" id="mp-date-btn"
+                class="btn btn-sm btn-outline-light d-flex align-items-center gap-2"
+                onclick="toggleMpCal()">
+          <i class="bi bi-calendar2"></i>
+          <span id="mp-date-label">Azi</span>
+          <i class="bi bi-chevron-down" style="font-size:.7rem;"></i>
+        </button>
+        <div id="mp-cal-popup" style="display:none;position:absolute;z-index:999;top:calc(100% + 4px);left:0;
+             background:var(--ah-dark2);border:1px solid var(--ah-border);border-radius:18px;
+             padding:1rem;box-shadow:0 16px 40px rgba(0,0,0,0.4);width:270px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <button type="button" class="btn btn-sm btn-outline-light px-2 py-1" onclick="mpCalPrev()">←</button>
+            <span id="mp-cal-month" style="font-weight:700;font-size:.9rem;"></span>
+            <button type="button" class="btn btn-sm btn-outline-light px-2 py-1" onclick="mpCalNext()">→</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px;">
+            <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Lu</div>
+            <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Ma</div>
+            <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Mi</div>
+            <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Jo</div>
+            <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Vi</div>
+            <div style="text-align:center;font-size:.68rem;color:#e63946;">Sâ</div>
+            <div style="text-align:center;font-size:.68rem;color:#e63946;">Du</div>
+          </div>
+          <div id="mp-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
+          <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2" onclick="mpShowAll()">
+            <i class="bi bi-list-ul me-1"></i>Toate zilele
+          </button>
+        </div>
+      </div>
+
+      <select id="mp-sort" class="form-select form-select-sm" style="width:auto;min-width:160px;"
+              onchange="mpApplyFilters()">
+        <option value="time-asc" selected>Oră ↑ crescător</option>
+        <option value="time-desc">Oră ↓ descrescător</option>
+        <option value="date-asc">Dată ↑ crescător</option>
+        <option value="date-desc">Dată ↓ descrescător</option>
+      </select>
+
+      <span class="small text-muted-custom ms-1" id="mp-count"></span>
+    </div>
+
+    <div class="mp-wrap">
+      <div id="mp-no-results" style="display:none;" class="mp-empty">
+        <div class="small">Nicio programare pentru filtrele selectate.</div>
+      </div>
+      <table class="mp-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Mașină</th>
+            <th>Client</th>
+            <th>Data</th>
+            <th>Status</th>
+            <th style="text-align:right;">Acțiuni</th>
+          </tr>
+        </thead>
+        <tbody id="mp-tbody">
+          {% for booking in active_bookings %}
+          <tr class="mp-row"
+              data-date="{{ booking.booking_date|date:'Y-m-d' }}"
+              data-time="{{ booking.booking_time|time:'H:i' }}"
+              onclick="openBookingModal('modal-booking-{{ booking.pk }}')">
+            <td><span style="color:var(--ah-muted);font-weight:600;">#{{ booking.pk }}</span></td>
+            <td>
+              <div class="fw-semibold text-white">{{ booking.car_brand }} {{ booking.car_model }}</div>
+              <div class="small text-muted-custom">{{ booking.car_plate }}</div>
+            </td>
+            <td>
+              <div class="text-white">{{ booking.client_name }}</div>
+              <div class="small text-muted-custom">{{ booking.client_phone }}</div>
+            </td>
+            <td>
+              <div class="text-white">{{ booking.booking_date|date:"d.m.Y" }}</div>
+              <div class="small text-muted-custom">{{ booking.booking_time|time:"H:i" }}</div>
+            </td>
+            <td>
+              <span class="status-pill {{ booking.status }}">
+                {{ booking.get_status_icon }} {{ booking.get_status_display }}
+              </span>
+            </td>
+            <td style="text-align:right;" onclick="event.stopPropagation()">
+              <button class="btn btn-sm btn-outline-light"
+                      onclick="openBookingModal('modal-booking-{{ booking.pk }}')">
+                <i class="bi bi-arrow-right"></i>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="mp-wrap">
+      <div class="mp-empty">
+        <div style="font-size:2.5rem;opacity:.3;">✅</div>
+        <div class="fw-semibold text-white mt-2 mb-1">Nicio lucrare activă</div>
+        <div class="small">Mecanicul nu are programări active momentan.</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Tabel lucrări finalizate -->
+  <div id="section-done" style="display:none;">
+    {% if done_bookings %}
+    <div class="mp-wrap">
+      <table class="mp-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Mașină</th>
+            <th>Client</th>
+            <th>Data</th>
+            <th>Reparație</th>
+            <th style="text-align:right;">Detalii</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for booking in done_bookings %}
+          <tr onclick="openBookingModal('modal-booking-{{ booking.pk }}')">
+            <td><span style="color:var(--ah-muted);font-weight:600;">#{{ booking.pk }}</span></td>
+            <td>
+              <div class="fw-semibold text-white">{{ booking.car_brand }} {{ booking.car_model }}</div>
+              <div class="small text-muted-custom">{{ booking.car_plate }}</div>
+            </td>
+            <td>
+              <div class="text-white">{{ booking.client_name }}</div>
+              <div class="small text-muted-custom">{{ booking.client_phone }}</div>
+            </td>
+            <td>
+              <div class="text-white">{{ booking.booking_date|date:"d.m.Y" }}</div>
+            </td>
+            <td>
+              {% with wl=booking.work_log_obj %}
+                {% if wl and wl.repair_description %}
+                  <span class="small text-muted-custom">{{ wl.repair_description|truncatechars:50 }}</span>
+                {% else %}
+                  <span class="small text-muted-custom">—</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+            <td style="text-align:right;" onclick="event.stopPropagation()">
+              <button class="btn btn-sm btn-outline-light"
+                      onclick="openBookingModal('modal-booking-{{ booking.pk }}')">
+                <i class="bi bi-arrow-right"></i>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="mp-wrap">
+      <div class="mp-empty">
+        <div class="small">Nicio lucrare finalizată încă.</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODALURI DETALII PROGRAMARE (unul per booking)
+════════════════════════════════════════════════════════════ -->
+{% for booking in active_bookings %}
+{% with wl=booking.work_log_obj %}
+<div class="modal fade" id="modal-booking-{{ booking.pk }}" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+      <div class="modal-header" style="border-color:var(--ah-border);">
+        <div>
+          <h5 class="modal-title fw-bold mb-0">
+            <i class="bi bi-car-front text-red me-2"></i>
+            {{ booking.car_brand }} {{ booking.car_model }} · {{ booking.car_plate }}
+          </h5>
+          <div class="small text-muted-custom mt-1">
+            #{{ booking.pk }} · {{ booking.client_name }} · {{ booking.booking_date|date:"d.m.Y" }} la {{ booking.booking_time|time:"H:i" }}
+          </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Info mașină + client -->
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="p-3 rounded-3 h-100" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="small fw-bold text-muted-custom text-uppercase mb-2">Client</div>
+              <div class="fw-bold text-white">{{ booking.client_name }}</div>
+              <div class="small text-muted-custom"><i class="bi bi-telephone me-1"></i>{{ booking.client_phone }}</div>
+              {% if booking.client_email %}<div class="small text-muted-custom">{{ booking.client_email }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 rounded-3 h-100" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="small fw-bold text-muted-custom text-uppercase mb-2">Mașină</div>
+              <div class="fw-bold text-white">{{ booking.car_brand }} {{ booking.car_model }} {{ booking.car_year }}</div>
+              <div class="small text-muted-custom">{{ booking.car_plate }} · {{ booking.car_fuel }}</div>
+              {% if booking.car_vin %}<div class="small text-muted-custom">VIN: {{ booking.car_vin }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 rounded-3 h-100" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="small fw-bold text-muted-custom text-uppercase mb-2">Problema clientului</div>
+              <div class="small text-white">{{ booking.problem_description|default:"—" }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schimbă status -->
+        <div class="d-flex gap-2 mb-4 flex-wrap align-items-center">
+          <span class="small text-muted-custom me-2">Schimbă status:</span>
+          {% if booking.status == 'confirmed' %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_status">
+            <input type="hidden" name="booking_id" value="{{ booking.pk }}">
+            <input type="hidden" name="new_status" value="in_progress">
+            <button type="submit" class="btn btn-warning btn-sm"><i class="bi bi-play-fill me-1"></i>Începe lucrul</button>
+          </form>
+          {% elif booking.status == 'in_progress' %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_status">
+            <input type="hidden" name="booking_id" value="{{ booking.pk }}">
+            <input type="hidden" name="new_status" value="done">
+            <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check-lg me-1"></i>Marchează finalizat</button>
+          </form>
+          {% endif %}
+          <span class="status-pill {{ booking.status }} ms-2">{{ booking.get_status_icon }} {{ booking.get_status_display }}</span>
+        </div>
+
+        <!-- Fișă de lucru -->
+        <div class="p-3 rounded-3 mb-4" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+          <div class="small fw-bold text-muted-custom text-uppercase mb-3"><i class="bi bi-file-text text-red me-1"></i>Fișă de lucru</div>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save_work_log">
+            <input type="hidden" name="booking_id" value="{{ booking.pk }}">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label small">Descriere reparație</label>
+                <textarea name="repair_description" class="form-control" rows="3"
+                  placeholder="ex: S-a înlocuit filtrul de ulei...">{% if wl %}{{ wl.repair_description }}{% endif %}</textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label small">Piese folosite</label>
+                <textarea name="parts_used" class="form-control" rows="2"
+                  placeholder="ex: Filtru ulei Mann W713...">{% if wl %}{{ wl.parts_used }}{% endif %}</textarea>
+              </div>
+            </div>
+            {% if wl and wl.started_at %}
+            <div class="small text-muted-custom mt-2"><i class="bi bi-play-fill text-warning me-1"></i>Început: {{ wl.started_at|date:"d M Y H:i" }}</div>
+            {% endif %}
+            {% if wl and wl.finished_at %}
+            <div class="small text-muted-custom mt-1"><i class="bi bi-check-circle text-success me-1"></i>Finalizat: {{ wl.finished_at|date:"d M Y H:i" }}</div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-sm mt-3"><i class="bi bi-save me-1"></i>Salvează fișa</button>
+          </form>
+        </div>
+
+        <!-- Poze intrare / ieșire -->
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="small fw-bold text-muted-custom text-uppercase mb-3"><i class="bi bi-camera text-red me-1"></i>Poze intrare</div>
+              {% if wl %}
+              <div class="d-flex flex-wrap gap-2 mb-3">
+                {% for photo in wl.photos.all %}
+                  {% if photo.photo_type == 'before' %}
+                  <div class="position-relative">
+                    <img src="{{ photo.photo.url }}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--ah-border);">
+                    <form method="post" class="position-absolute top-0 end-0" style="margin:2px;">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete_photo">
+                      <input type="hidden" name="photo_id" value="{{ photo.pk }}">
+                      <button type="submit" class="btn btn-danger p-0" style="width:18px;height:18px;font-size:9px;line-height:1;border-radius:4px;">×</button>
+                    </form>
+                  </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+              {% endif %}
+              <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="upload_photos">
+                <input type="hidden" name="booking_id" value="{{ booking.pk }}">
+                <input type="hidden" name="photo_type" value="before">
+                <input type="file" name="photos" class="form-control form-control-sm mb-2" multiple accept="image/*">
+                <button type="submit" class="btn btn-outline-primary btn-sm w-100"><i class="bi bi-upload me-1"></i>Adaugă</button>
+              </form>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="small fw-bold text-muted-custom text-uppercase mb-3"><i class="bi bi-camera-fill me-1" style="color:#4ade80;"></i>Poze ieșire</div>
+              {% if wl %}
+              <div class="d-flex flex-wrap gap-2 mb-3">
+                {% for photo in wl.photos.all %}
+                  {% if photo.photo_type == 'after' %}
+                  <div class="position-relative">
+                    <img src="{{ photo.photo.url }}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--ah-border);">
+                    <form method="post" class="position-absolute top-0 end-0" style="margin:2px;">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete_photo">
+                      <input type="hidden" name="photo_id" value="{{ photo.pk }}">
+                      <button type="submit" class="btn btn-danger p-0" style="width:18px;height:18px;font-size:9px;line-height:1;border-radius:4px;">×</button>
+                    </form>
+                  </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+              {% endif %}
+              <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="upload_photos">
+                <input type="hidden" name="booking_id" value="{{ booking.pk }}">
+                <input type="hidden" name="photo_type" value="after">
+                <input type="file" name="photos" class="form-control form-control-sm mb-2" multiple accept="image/*">
+                <button type="submit" class="btn btn-outline-success btn-sm w-100"><i class="bi bi-upload me-1"></i>Adaugă</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Poze în timpul lucrării -->
+        <div class="p-3 rounded-3 mt-3" style="background:var(--ah-dark3);border:1px solid rgba(249,115,22,0.25);">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-camera-video" style="color:#fb923c;"></i>
+            <div>
+              <div class="small fw-bold text-white">Poze în timpul lucrării</div>
+              <div class="small text-muted-custom">Vizibile clientului — arată transparența și profesionalismul</div>
+            </div>
+            <span class="badge ms-auto" style="background:rgba(249,115,22,0.2);color:#fb923c;border:1px solid rgba(249,115,22,0.3);font-size:.7rem;">
+              👁 Client vede
+            </span>
+          </div>
+
+          {% if wl %}
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            {% for photo in wl.photos.all %}
+              {% if photo.photo_type == 'during' %}
+              <div class="position-relative">
+                <img src="{{ photo.photo.url }}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid rgba(249,115,22,0.3);">
+                <form method="post" class="position-absolute top-0 end-0" style="margin:2px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_photo">
+                  <input type="hidden" name="photo_id" value="{{ photo.pk }}">
+                  <button type="submit" class="btn btn-danger p-0" style="width:18px;height:18px;font-size:9px;line-height:1;border-radius:4px;">×</button>
+                </form>
+              </div>
+              {% endif %}
+            {% endfor %}
+            {% if not wl.photos.filter %}
+            <div class="small text-muted-custom py-2">Nicio poză adăugată încă.</div>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="upload_photos">
+            <input type="hidden" name="booking_id" value="{{ booking.pk }}">
+            <input type="hidden" name="photo_type" value="during">
+            <input type="file" name="photos" class="form-control form-control-sm mb-2" multiple accept="image/*">
+            <button type="submit" class="btn btn-sm w-100" style="background:rgba(249,115,22,0.15);color:#fb923c;border:1px solid rgba(249,115,22,0.35);">
+              <i class="bi bi-upload me-1"></i>Adaugă poze lucrare
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endwith %}
+{% endfor %}
+
+{% for booking in done_bookings %}
+{% with wl=booking.work_log_obj %}
+<div class="modal fade" id="modal-booking-{{ booking.pk }}" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+      <div class="modal-header" style="border-color:var(--ah-border);">
+        <div>
+          <h5 class="modal-title fw-bold mb-0">
+            <i class="bi bi-car-front text-red me-2"></i>
+            {{ booking.car_brand }} {{ booking.car_model }} · {{ booking.car_plate }}
+          </h5>
+          <div class="small text-muted-custom mt-1">#{{ booking.pk }} · {{ booking.client_name }} · {{ booking.booking_date|date:"d.m.Y" }}</div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <div class="p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="small fw-bold text-muted-custom mb-2">Client</div>
+              <div class="fw-bold text-white">{{ booking.client_name }}</div>
+              <div class="small text-muted-custom">{{ booking.client_phone }}</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="small fw-bold text-muted-custom mb-2">Mașină</div>
+              <div class="fw-bold text-white">{{ booking.car_brand }} {{ booking.car_model }} {{ booking.car_year }}</div>
+              <div class="small text-muted-custom">{{ booking.car_plate }}</div>
+            </div>
+          </div>
+        </div>
+        {% if wl %}
+        <div class="p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+          <div class="small fw-bold text-muted-custom mb-2">Fișă de lucru</div>
+          {% if wl.repair_description %}<div class="small text-white mb-1">{{ wl.repair_description }}</div>{% endif %}
+          {% if wl.parts_used %}<div class="small text-muted-custom">Piese: {{ wl.parts_used }}</div>{% endif %}
+          {% if wl.started_at %}<div class="small text-muted-custom mt-1"><i class="bi bi-play-fill text-warning me-1"></i>{{ wl.started_at|date:"d M Y H:i" }}</div>{% endif %}
+          {% if wl.finished_at %}<div class="small text-muted-custom"><i class="bi bi-check-circle text-success me-1"></i>{{ wl.finished_at|date:"d M Y H:i" }}</div>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endwith %}
+{% endfor %}
+
+<!-- Modal editare mecanic -->
+<div class="modal fade" id="editMechanicModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+      <div class="modal-header" style="border-color:var(--ah-border);">
+        <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square text-red me-2"></i>Editează — {{ mechanic.name }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'services:mechanic_update' mechanic.pk %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Nume <span class="text-red">*</span></label>
+              <input type="text" name="name" class="form-control" value="{{ mechanic.name }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Specializare</label>
+              <input type="text" name="specialization" class="form-control" value="{{ mechanic.specialization|default:'' }}" placeholder="ex: Mecanică motor">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Telefon</label>
+              <input type="text" name="phone" class="form-control" value="{{ mechanic.phone|default:'' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input type="email" name="email" class="form-control" value="{{ mechanic.email|default:'' }}">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Garaj alocat</label>
+            <select name="garage" class="form-select">
+              <option value="">— Fără garaj fix —</option>
+              {% for garage in mechanic.center.garages.all %}
+              <option value="{{ garage.pk }}" {% if mechanic.garage_id == garage.pk %}selected{% endif %}>{{ garage.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Categorii servicii</label>
+            <div class="d-flex flex-wrap gap-2 p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              {% for cat in mechanic.center.categories.all %}
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="service_categories"
+                       value="{{ cat.pk }}" id="edit_cat_{{ cat.pk }}"
+                       {% if cat in mechanic.service_categories.all %}checked{% endif %}>
+                <label class="form-check-label small" for="edit_cat_{{ cat.pk }}">{{ cat.name }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Status disponibilitate</label>
+            <div class="d-flex flex-wrap gap-3 p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="availability_status" value="available" id="s_avail"
+                       {% if not mechanic.availability_status or mechanic.availability_status == 'available' %}checked{% endif %}>
+                <label class="form-check-label small" for="s_avail"><span class="text-success">● Disponibil</span></label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="availability_status" value="on_leave" id="s_leave"
+                       {% if mechanic.availability_status == 'on_leave' %}checked{% endif %}>
+                <label class="form-check-label small" for="s_leave"><span class="text-warning">● Concediu</span></label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="availability_status" value="unavailable" id="s_unavail"
+                       {% if mechanic.availability_status == 'unavailable' %}checked{% endif %}>
+                <label class="form-check-label small" for="s_unavail"><span class="text-danger">● Indisponibil</span></label>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Fotografie profil</label>
+            {% if mechanic.photo %}
+            <div class="d-flex align-items-center gap-3 mb-2">
+              <img src="{{ mechanic.photo.url }}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">
+              <span class="small text-muted-custom">Încarcă una nouă pentru a o înlocui</span>
+            </div>
+            {% endif %}
+            <input type="file" name="photo" class="form-control" accept="image/*">
+          </div>
+        </div>
+        <div class="modal-footer" style="border-color:var(--ah-border);">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anulează</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salvează</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(tab, el) {
+  event.preventDefault();
+  document.getElementById('section-active').style.display = tab === 'active' ? 'block' : 'none';
+  document.getElementById('section-done').style.display   = tab === 'done'   ? 'block' : 'none';
+  document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function openBookingModal(id) {
+  new bootstrap.Modal(document.getElementById(id)).show();
+}
+
+// ── Filtre mecanic profil ──
+const today = new Date();
+const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+let mpFilterDate = todayStr;
+let mpCalCur = new Date(today.getFullYear(), today.getMonth(), 1);
+
+function toggleMpCal() {
+  const popup = document.getElementById('mp-cal-popup');
+  const isOpen = popup.style.display !== 'none';
+  popup.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderMpCal();
+}
+
+function mpCalPrev() { mpCalCur = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth()-1, 1); renderMpCal(); }
+function mpCalNext() { mpCalCur = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth()+1, 1); renderMpCal(); }
+
+function renderMpCal() {
+  const label = mpCalCur.toLocaleDateString('ro-RO', {month:'long', year:'numeric'});
+  document.getElementById('mp-cal-month').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+  const grid = document.getElementById('mp-cal-grid');
+  grid.innerHTML = '';
+  const datesWithRows = new Set(Array.from(document.querySelectorAll('.mp-row')).map(r => r.dataset.date));
+  let startDow = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth(), 1).getDay();
+  startDow = startDow === 0 ? 6 : startDow - 1;
+  for (let i = 0; i < startDow; i++) grid.appendChild(document.createElement('div'));
+  const daysInMonth = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth()+1, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${mpCalCur.getFullYear()}-${String(mpCalCur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isSel = mpFilterDate === dateStr;
+    const isToday = dateStr === todayStr;
+    const hasRows = datesWithRows.has(dateStr);
+    const cell = document.createElement('div');
+    cell.style.cssText = 'text-align:center;padding:4px 2px;border-radius:8px;font-size:12px;position:relative;cursor:pointer;';
+    if (isSel) { cell.style.background = 'var(--ah-red)'; cell.style.color = '#fff'; cell.style.fontWeight = '700'; }
+    else if (isToday) { cell.style.border = '1px solid var(--ah-red)'; cell.style.color = 'var(--ah-red)'; cell.style.fontWeight = '700'; }
+    else if (hasRows) { cell.style.color = '#e8e8e8'; cell.style.fontWeight = '600'; }
+    else { cell.style.color = 'var(--ah-muted)'; }
+    const num = document.createElement('div');
+    num.textContent = d;
+    cell.appendChild(num);
+    if (hasRows) {
+      const dot = document.createElement('div');
+      dot.style.cssText = `width:4px;height:4px;border-radius:50%;margin:1px auto 0;background:${isSel?'#fff':'var(--ah-red)'};`;
+      cell.appendChild(dot);
+    }
+    cell.onmouseover = () => { if (!isSel) cell.style.background = 'rgba(255,255,255,0.08)'; };
+    cell.onmouseout = () => { if (!isSel) cell.style.background = ''; };
+    cell.onclick = () => {
+      mpFilterDate = dateStr;
+      const dl = new Date(dateStr+'T00:00:00').toLocaleDateString('ro-RO', {day:'numeric', month:'long'});
+      document.getElementById('mp-date-label').textContent = dl;
+      document.getElementById('mp-cal-popup').style.display = 'none';
+      mpApplyFilters();
+    };
+    grid.appendChild(cell);
+  }
+}
+
+function mpShowAll() {
+  mpFilterDate = null;
+  document.getElementById('mp-date-label').textContent = 'Toate zilele';
+  document.getElementById('mp-cal-popup').style.display = 'none';
+  mpApplyFilters();
+}
+
+function mpApplyFilters() {
+  const rows = Array.from(document.querySelectorAll('.mp-row'));
+  const sortVal = document.getElementById('mp-sort')?.value || 'time-asc';
+  const tbody = document.getElementById('mp-tbody');
+  const noResults = document.getElementById('mp-no-results');
+
+  // Sortare
+  rows.sort((a, b) => {
+    if (sortVal === 'time-asc')  return (a.dataset.time||'').localeCompare(b.dataset.time||'');
+    if (sortVal === 'time-desc') return (b.dataset.time||'').localeCompare(a.dataset.time||'');
+    const da = (a.dataset.date||'') + (a.dataset.time||'');
+    const db = (b.dataset.date||'') + (b.dataset.time||'');
+    if (sortVal === 'date-asc')  return da.localeCompare(db);
+    if (sortVal === 'date-desc') return db.localeCompare(da);
+    return 0;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+
+  // Filtrare dată
+  let visible = 0;
+  rows.forEach(row => {
+    const show = !mpFilterDate || row.dataset.date === mpFilterDate;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  const countEl = document.getElementById('mp-count');
+  if (countEl) countEl.textContent = `${visible} programări`;
+  if (noResults) noResults.style.display = visible === 0 ? 'block' : 'none';
+}
+
+// Închide calendar la click afară
+document.addEventListener('click', function(e) {
+  const popup = document.getElementById('mp-cal-popup');
+  const btn = document.getElementById('mp-date-btn');
+  if (popup && !popup.contains(e.target) && btn && !btn.contains(e.target)) {
+    popup.style.display = 'none';
+  }
+});
+
+// Inițializare: dată azi + oră crescătoare
+document.addEventListener('DOMContentLoaded', function() {
+  mpApplyFilters();
+});
+</script>
+{% endblock %}
