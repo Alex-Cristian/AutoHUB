@@ -17,3 +17,31 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+
+  - type: cron
+    name: autohub-booking-reminders
+    env: python
+    schedule: "0 9 * * *"
+    buildCommand: pip install -r requirements.txt && python manage.py migrate
+    startCommand: python manage.py send_booking_reminders
+    envVars:
+      - key: DEBUG
+        value: False
+      - key: ALLOWED_HOSTS
+        value: autoemg.com,www.autoemg.com
+      - key: USE_CLOUDINARY
+        value: True
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: TWILIO_SMS_ENABLED
+        value: True

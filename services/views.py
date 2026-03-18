@@ -19,6 +19,11 @@ from .forms import (
     ServicePartForm,
 )
 from bookings.models import Booking, BookingNotification, BookingAttachment
+from core.services.sms_service import (
+    send_booking_completed_sms,
+    send_booking_confirmation_sms,
+    send_booking_started_sms,
+)
 
 
 def _post_redirect(request, fallback):
@@ -621,7 +626,11 @@ def owner_booking_create(request, pk):
                     ),
                 )
 
-            messages.success(request, f'✅ Programarea #{booking.pk} a fost adăugată direct și confirmată.')
+            sms_sent = send_booking_confirmation_sms(booking)
+            if sms_sent:
+                messages.success(request, f'✅ Programarea #{booking.pk} a fost adăugată direct, confirmată și notificată prin SMS.')
+            else:
+                messages.success(request, f'✅ Programarea #{booking.pk} a fost adăugată direct și confirmată.')
             return _post_redirect(request, 'services:dashboard')
     else:
         form = ServiceOwnerBookingForm(center=center, user=request.user)
@@ -753,7 +762,11 @@ def booking_accept(request, pk):
                     f"{booking.booking_date} la {booking.booking_time.strftime('%H:%M')} și o durată estimată de {booking.get_duration_display()}."
                 ),
             )
-        messages.success(request, f'Oferta pentru programarea #{booking.pk} a fost trimisă către client.')
+        sms_sent = send_booking_confirmation_sms(booking)
+        if sms_sent:
+            messages.success(request, f'Oferta pentru programarea #{booking.pk} a fost trimisă către client și SMS-ul a fost expediat.')
+        else:
+            messages.success(request, f'Oferta pentru programarea #{booking.pk} a fost trimisă către client.')
     return _post_redirect(request, 'services:dashboard')
 
 
@@ -972,17 +985,20 @@ def mechanic_profile(request, pk):
             if new_status in allowed:
                 booking.status = new_status
                 booking.save(update_fields=['status', 'updated_at'])
+                sms_sent = False
                 if new_status == 'in_progress':
                     wl, _ = MechanicWorkLog.objects.get_or_create(booking=booking, mechanic=mechanic)
                     if not wl.started_at:
                         from django.utils import timezone
                         wl.started_at = timezone.now()
                         wl.save(update_fields=['started_at'])
+                    sms_sent = send_booking_started_sms(booking)
                 if new_status == 'done':
                     wl, _ = MechanicWorkLog.objects.get_or_create(booking=booking, mechanic=mechanic)
                     from django.utils import timezone
                     wl.finished_at = timezone.now()
                     wl.save(update_fields=['finished_at'])
+                    sms_sent = send_booking_completed_sms(booking)
                 if booking.user:
                     status_labels = {'in_progress': 'în lucru', 'done': 'finalizată'}
                     BookingNotification.objects.create(
@@ -992,7 +1008,10 @@ def mechanic_profile(request, pk):
                         title=f"Programarea #{booking.pk} este acum {status_labels.get(new_status, new_status)}",
                         message=f"{booking.center.name}: mecanicul {mechanic.name} a actualizat statusul programării tale.",
                     )
-                messages.success(request, 'Statusul a fost actualizat.')
+                if sms_sent:
+                    messages.success(request, 'Statusul a fost actualizat și SMS-ul a fost trimis clientului.')
+                else:
+                    messages.success(request, 'Statusul a fost actualizat.')
             return redirect('services:mechanic_profile', pk=pk)
 
     active_list = list(active_bookings)
