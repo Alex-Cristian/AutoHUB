@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Acceptare documente legale — AutoEMG{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+      <div class="rounded-xl p-4 p-md-5" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
+        <div class="mb-4 text-center">
+          <h2 class="fw-bold mb-0">Acceptare documente legale</h2>
+        </div>
+
+        <ul class="small text-muted-custom ps-3 mb-4">
+          <li><a href="{% url 'core:terms' %}" class="text-red text-decoration-none" target="_blank">Termeni și condiții</a></li>
+          <li><a href="{% url 'core:privacy' %}" class="text-red text-decoration-none" target="_blank">Politica de confidențialitate</a></li>
+          <li><a href="{% url 'core:cookies' %}" class="text-red text-decoration-none" target="_blank">Politica cookie</a></li>
+        </ul>
+
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ next_url }}">
+          <div class="form-check mb-4">
+            <input class="form-check-input" type="checkbox" id="accept_terms" name="accept_terms" required>
+            <label class="form-check-label" for="accept_terms">
+              Confirm că am citit și accept documentele legale afișate mai sus.
+            </label>
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg w-100">
+            <i class="bi bi-check2-circle me-2"></i>Acceptă și continuă
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

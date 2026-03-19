@@ -1,0 +1,629 @@
+{% extends 'base.html' %}
+{% block title %}Programare la {{ center.name }} — AutoHub{% endblock %}
+
+{% block extra_css %}
+<style>
+  .bc-shell {
+    background: none;
+  }
+  .bc-hero {
+    background: linear-gradient(135deg, rgba(230,57,70,0.13), var(--ah-dark2) 50%, rgba(244,162,97,0.07));
+    border: 1px solid var(--ah-border);
+    border-radius: 24px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .bc-card {
+    background: var(--ah-dark2);
+    border: 1px solid var(--ah-border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .bc-sec {
+    font-size: .75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--ah-red); margin-bottom: 1rem;
+  }
+  .car-card {
+    border: 1px solid var(--ah-border); border-radius: 14px;
+    padding: .85rem 1rem; cursor: pointer; transition: all .15s;
+    background: var(--ah-dark3); user-select: none;
+  }
+  .car-card:hover { border-color: rgba(230,57,70,0.4); }
+  .car-card.selected { border-color: var(--ah-red); background: rgba(230,57,70,0.08); }
+  .domain-chip {
+    display: inline-flex; align-items: center; gap: .5rem;
+    padding: .55rem 1.1rem; border-radius: 999px;
+    border: 1px solid var(--ah-border);
+    background: var(--ah-dark3); color: var(--ah-text-soft);
+    font-size: .9rem; cursor: pointer; transition: all .15s;
+  }
+  .domain-chip:hover { border-color: rgba(230,57,70,0.5); color:var(--ah-text); background:rgba(230,57,70,0.08); }
+  .domain-chip.active { background: var(--ah-red); border-color: var(--ah-red); color: #fff; }
+  #id_problem_description {
+    background: var(--ah-dark3); border: 1px solid var(--ah-border);
+    border-radius: 14px; color: var(--ah-text); font-size: .92rem;
+    padding: .85rem 1rem; resize: vertical; min-height: 100px;
+    width: 100%; transition: border-color .15s;
+  }
+  #id_problem_description:focus { border-color: rgba(230,57,70,0.5); outline:none; background:var(--ah-dark4); }
+  .ai-badge {
+    display: inline-flex; align-items: center; gap: .45rem;
+    padding: .45rem 1rem; border-radius: 999px;
+    background: rgba(230,57,70,0.12); border: 1px solid rgba(230,57,70,0.25);
+    color: #f4a261; font-size: .85rem; font-weight: 600;
+  }
+  .ai-thinking {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .4rem .9rem; border-radius: 999px;
+    background: var(--ah-dark3); border: 1px solid var(--ah-border);
+    color: var(--ah-muted); font-size: .82rem;
+  }
+  @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+  .ai-dots span { animation: pulse 1.2s ease-in-out infinite; }
+  .ai-dots span:nth-child(2) { animation-delay:.2s; }
+  .ai-dots span:nth-child(3) { animation-delay:.4s; }
+  .date-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+  .date-row::-webkit-scrollbar { display: none; }
+  .date-card {
+    flex: 0 0 auto; width: 62px; text-align: center;
+    padding: .65rem .4rem; border-radius: 14px;
+    border: 1px solid var(--ah-border);
+    background: var(--ah-dark3); cursor: pointer; transition: all .15s;
+  }
+  .date-card:hover { border-color: rgba(230,57,70,0.4); background: rgba(230,57,70,0.07); }
+  .date-card.active { border-color: var(--ah-red); background: rgba(230,57,70,0.15); }
+  .date-card .dn { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing:.05em; color: var(--ah-muted); }
+  .date-card .dd { font-size: 1.4rem; font-weight: 700; line-height:1.1; color: var(--ah-text); }
+  .date-card .dm { font-size: .7rem; color: var(--ah-muted); }
+  .date-card.active .dn, .date-card.active .dd, .date-card.active .dm { color: var(--ah-red); }
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: .85rem; }
+  .cal-nav-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid var(--ah-border);
+    background: var(--ah-dark3); color: var(--ah-text-soft);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all .13s; font-size: .9rem;
+  }
+  .cal-nav-btn:hover { border-color: var(--ah-red); color: var(--ah-red); background: rgba(230,57,70,0.08); }
+  .cal-month-label { font-size: .95rem; font-weight: 700; color: var(--ah-text); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; }
+  .cal-dow {
+    text-align: center; font-size: .68rem; font-weight: 700;
+    color: var(--ah-muted); padding: 4px 0;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .cal-dow.weekend { color: rgba(230,57,70,0.6); }
+  .cal-day {
+    text-align: center; padding: 7px 4px; border-radius: 10px;
+    font-size: .88rem; cursor: pointer; transition: all .13s;
+    border: 1px solid transparent; color: var(--ah-text-soft);
+  }
+  .cal-day:hover:not(.past):not(.empty) { background: rgba(230,57,70,0.12); border-color: rgba(230,57,70,0.3); color: var(--ah-text); }
+  .cal-day.past { color: var(--ah-muted); cursor: default; opacity: .4; }
+  .cal-day.empty { cursor: default; }
+  .cal-day.today { border-color: rgba(230,57,70,0.5); color: var(--ah-red); font-weight: 700; }
+  .cal-day.selected { background: var(--ah-red); border-color: var(--ah-red); color: #fff; font-weight: 700; }
+  .cal-day.weekend:not(.past):not(.empty) { color: rgba(230,57,70,0.8); }
+  .cal-day.weekend.selected { color: #fff; }
+  .btn-toggle-cal {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .4rem .9rem; border-radius: 8px;
+    border: 1px solid var(--ah-border);
+    background: var(--ah-dark3); color: var(--ah-muted);
+    font-size: .8rem; cursor: pointer; transition: all .13s; margin-top: .75rem;
+  }
+  .btn-toggle-cal:hover { border-color: rgba(230,57,70,0.4); color: var(--ah-red); }
+  .garage-block {
+    border: 1px solid var(--ah-border); border-radius: 18px;
+    overflow: hidden; background: var(--ah-dark2); margin-bottom: .85rem;
+    transition: border-color .2s;
+  }
+  .garage-block.picked { border-color: rgba(230,57,70,0.5); }
+  .g-head {
+    padding: 1rem 1.2rem; display:flex; align-items:flex-start;
+    justify-content:space-between; gap:1rem;
+    border-bottom: 1px solid var(--ah-border);
+  }
+  .g-name { font-size:1rem; font-weight:700; color:var(--ah-text); }
+  .g-meta { font-size:.78rem; color:var(--ah-muted); margin-top:2px; }
+  .g-badge { display:inline-flex; align-items:center; gap:.3rem;
+    padding:.25rem .7rem; border-radius:999px; font-size:.72rem; font-weight:600; white-space:nowrap; }
+  .b-free { background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.3); color:#4ade80; }
+  .b-few  { background:rgba(234,179,8,0.12);  border:1px solid rgba(234,179,8,0.3);  color:#facc15; }
+  .b-full { background:rgba(239,68,68,0.12);  border:1px solid rgba(239,68,68,0.3);  color:#f87171; }
+  .slots-area { padding: .9rem 1.2rem; }
+  .slots-row  { display:flex; flex-wrap:wrap; gap:6px; }
+  .slot-btn {
+    padding:.38rem .75rem; border-radius:10px;
+    border:1px solid var(--ah-border);
+    background:var(--ah-dark3); color:var(--ah-text-soft);
+    font-size:.85rem; cursor:pointer; transition:all .13s;
+  }
+  .slot-btn:hover { border-color:rgba(230,57,70,0.5); color:var(--ah-text); background:rgba(230,57,70,0.1); }
+  .slot-btn.selected { background:var(--ah-red); border-color:var(--ah-red); color:#fff; font-weight:700; }
+  .no-slots { font-size:.82rem; color:var(--ah-muted); font-style:italic; }
+  .confirm-bar {
+    position:sticky; bottom:1rem;
+    background:var(--ah-dark2);
+    border:1px solid rgba(230,57,70,0.3);
+    border-radius:18px; padding:1rem 1.25rem;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:1rem; flex-wrap:wrap;
+    box-shadow:0 4px 16px rgba(0,0,0,0.4);
+    backdrop-filter:blur(12px); margin-top:1rem;
+  }
+  .confirm-lbl { font-size:.75rem; color:var(--ah-muted); font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
+  .confirm-val { font-size:.95rem; color:var(--ah-text); font-weight:600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5 bc-shell" style="max-width:820px;">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'services:list' %}" class="text-red text-decoration-none">Service-uri</a></li>
+      <li class="breadcrumb-item"><a href="{{ center.get_absolute_url }}" class="text-red text-decoration-none">{{ center.name }}</a></li>
+      <li class="breadcrumb-item active text-muted-custom">Programare nouă</li>
+    </ol>
+  </nav>
+
+  <div class="bc-hero">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      {% if center.card_image %}
+        <img src="{{ center.card_image.url }}" style="width:56px;height:56px;border-radius:14px;object-fit:cover;border:1px solid var(--ah-border);">
+      {% else %}
+        <div style="width:56px;height:56px;border-radius:14px;background:var(--ah-dark3);border:1px solid var(--ah-border);display:flex;align-items:center;justify-content:center;">
+          <i class="bi bi-tools text-red" style="font-size:1.4rem;"></i>
+        </div>
+      {% endif %}
+      <div>
+        <h1 class="mb-0" style="font-size:1.6rem;">Programare la {{ center.name }}</h1>
+        <div class="small text-muted-custom mt-1">
+          <i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}
+          <span class="mx-2">·</span>
+          <i class="bi bi-telephone me-1 text-red"></i>{{ center.phone }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" id="booking-form">
+    {% csrf_token %}
+    <input type="hidden" name="booking_date" id="id_booking_date">
+    <input type="hidden" name="booking_time" id="id_booking_time">
+    <input type="hidden" name="garage"        id="id_garage">
+    <input type="hidden" name="saved_car"     id="id_saved_car">
+
+    <!-- MAȘINA -->
+    <div class="bc-card">
+      <div class="bc-sec"><i class="bi bi-car-front me-2"></i>Datele mașinii</div>
+      {% if cars %}
+      <div class="mb-3">
+        <div class="small text-muted-custom mb-2">Mașinile tale salvate — apasă pentru a selecta:</div>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {% for car in cars %}
+          <div class="car-card"
+               data-pk="{{ car.pk }}"
+               data-brand="{{ car.make }}"
+               data-model="{{ car.model }}"
+               data-year="{{ car.year|default:'' }}"
+               data-fuel="{{ car.fuel|default:'' }}"
+               data-plate="{{ car.plate_number }}"
+               data-vin="{{ car.vin|default:'' }}"
+               onclick="toggleCar(this)">
+            <div class="fw-semibold text-white small">{{ car.make }} {{ car.model }}</div>
+            <div class="small text-muted-custom">{{ car.plate_number }}{% if car.year %} · {{ car.year }}{% endif %}</div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="small mb-3" style="color:rgba(255,255,255,0.25);">— sau completează manual —</div>
+      </div>
+      {% endif %}
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label">Marcă <span class="text-red">*</span></label>{{ form.car_brand }}</div>
+        <div class="col-md-6"><label class="form-label">Model <span class="text-red">*</span></label>{{ form.car_model }}</div>
+        <div class="col-md-4"><label class="form-label">An fabricație <span class="text-red">*</span></label>{{ form.car_year }}</div>
+        <div class="col-md-4"><label class="form-label">Combustibil</label>{{ form.car_fuel }}</div>
+        <div class="col-md-4"><label class="form-label">Nr. înmatriculare <span class="text-red">*</span></label>{{ form.car_plate }}</div>
+        <div class="col-12">
+          <label class="form-label">VIN <span class="text-red">*</span> <span class="text-muted-custom small">(17 caractere)</span></label>
+          {{ form.car_vin }}
+        </div>
+        {% if user.is_authenticated %}
+        <div class="col-12" id="save-car-row">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="save_car" value="1" id="save_car_check">
+            <label class="form-check-label small text-muted-custom" for="save_car_check">Salvează mașina în contul meu pentru programări viitoare</label>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- DATE CONTACT -->
+    <div class="bc-card">
+      <div class="bc-sec"><i class="bi bi-person me-2"></i>Date de contact</div>
+      <div class="row g-3">
+        <div class="col-md-4"><label class="form-label">Nume complet <span class="text-red">*</span></label>{{ form.client_name }}</div>
+        <div class="col-md-4"><label class="form-label">Telefon <span class="text-red">*</span></label>{{ form.client_phone }}</div>
+        <div class="col-md-4"><label class="form-label">Email</label>{{ form.client_email }}</div>
+      </div>
+    </div>
+
+    <!-- DOMENIU -->
+    <div class="bc-card">
+      <div class="bc-sec"><i class="bi bi-grid me-2"></i>Alege domeniul</div>
+      <div class="d-flex flex-wrap gap-2">
+        {% for cat in categories %}
+        <button type="button"
+                class="domain-chip{% if forloop.first %} active{% endif %}"
+                data-slug="{{ cat.slug }}"
+                onclick="selectDomain(this)">
+          <span>{{ cat.icon }}</span><span>{{ cat.name }}</span>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- DESCRIERE + AI -->
+    <div class="bc-card">
+      <div class="bc-sec"><i class="bi bi-chat-text me-2"></i>Descrie ce ai nevoie</div>
+      <textarea name="problem_description" id="id_problem_description"
+        placeholder="Ex: Am un zgomot ciudat la pornire, cred că e de la curea distribuție. Frânele mai scârțâie și ele..."
+        rows="4"></textarea>
+      <div class="small text-muted-custom mt-2">
+        <i class="bi bi-info-circle me-1"></i>Cu cât descrii mai detaliat, cu atât AI-ul estimează mai precis durata.
+      </div>
+      <div class="mt-3" id="ai-area" style="min-height:34px;">
+        <div class="ai-thinking" id="ai-thinking" style="display:none;">
+          <i class="bi bi-cpu me-1"></i>AI estimează durata
+          <span class="ai-dots"><span>•</span><span>•</span><span>•</span></span>
+        </div>
+        <div id="ai-result" style="display:none;">
+          <span class="ai-badge"><i class="bi bi-clock-fill"></i>Durată estimată: <strong id="ai-dur">—</strong></span>
+          <div class="small text-muted-custom mt-1" id="ai-why"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATA -->
+    <div class="bc-card">
+      <div class="bc-sec"><i class="bi bi-calendar2-week me-2"></i>Alege data</div>
+      <div class="date-row" id="date-row"></div>
+      <button type="button" class="btn-toggle-cal" onclick="toggleCal()">
+        <i class="bi bi-calendar3" id="cal-toggle-icon"></i>
+        <span id="cal-toggle-label">Navighează pe calendar</span>
+      </button>
+      <div id="cal-full" style="display:none; margin-top:1rem;">
+        <div class="cal-nav">
+          <div class="cal-nav-btn" onclick="calMove(-1)"><i class="bi bi-chevron-left"></i></div>
+          <div class="cal-month-label" id="cal-month-lbl"></div>
+          <div class="cal-nav-btn" onclick="calMove(1)"><i class="bi bi-chevron-right"></i></div>
+        </div>
+        <div class="cal-grid">
+          <div class="cal-dow">Lun</div>
+          <div class="cal-dow">Mar</div>
+          <div class="cal-dow">Mie</div>
+          <div class="cal-dow">Joi</div>
+          <div class="cal-dow">Vin</div>
+          <div class="cal-dow weekend">Sâm</div>
+          <div class="cal-dow weekend">Dum</div>
+        </div>
+        <div class="cal-grid" id="cal-days"></div>
+      </div>
+    </div>
+
+    <!-- GARAJE -->
+    <div class="bc-card" id="card-garaje" style="display:none;">
+      <div class="bc-sec"><i class="bi bi-building me-2"></i>Alege service-ul și ora</div>
+      <div id="g-loading" class="small text-muted-custom py-2" style="display:none;">
+        <i class="bi bi-hourglass-split me-1"></i>Se verifică disponibilitatea...
+      </div>
+      <div id="g-list"></div>
+      <div id="g-empty" style="display:none;" class="small text-muted-custom py-2">
+        <i class="bi bi-calendar-x me-1"></i>Nicio oră disponibilă în această zi pentru domeniul ales.
+      </div>
+    </div>
+
+    <!-- POZE -->
+    <div class="bc-card">
+      <div class="bc-sec"><i class="bi bi-camera me-2"></i>Poze / video (opțional)</div>
+      {{ form.attachments }}
+      <div class="small text-muted-custom mt-2">Max 50MB per fișier.</div>
+    </div>
+
+    {% if form.errors %}
+    <div class="alert alert-danger rounded-3 mb-3">
+      <i class="bi bi-exclamation-triangle me-2"></i><strong>Corectează erorile:</strong>
+      <ul class="mb-0 mt-2 small">
+        {% for field in form %}{% for error in field.errors %}<li><strong>{{ field.label }}:</strong> {{ error }}</li>{% endfor %}{% endfor %}
+        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- CONFIRM BAR -->
+    <div class="confirm-bar" id="confirm-bar" style="display:none;">
+      <div>
+        <div class="confirm-lbl">Programarea ta</div>
+        <div class="confirm-val" id="confirm-val">—</div>
+      </div>
+      <button type="submit" class="btn btn-nav-cta px-4 py-2" style="font-size:.95rem;">
+        <i class="bi bi-calendar-check me-2"></i>Confirmă programarea
+      </button>
+    </div>
+
+    <div class="d-flex gap-3 align-items-center mt-2 mb-5">
+      <a href="{{ center.get_absolute_url }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Înapoi
+      </a>
+    </div>
+  </form>
+</div>
+
+<script>
+const SLUG = '{{ center.slug|escapejs }}';
+let S = { domain:'', desc:'', dur:60, date:'', garageId:null, garageName:'', slot:'' };
+let selectedCarPk = null;
+let calCurYear, calCurMonth, calOpen = false;
+
+const DAYS         = ['Dum','Lun','Mar','Mie','Joi','Vin','Sâm'];
+const MONTHS_SHORT = ['Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_LONG  = ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
+
+function fmtDur(m) {
+  const h=Math.floor(m/60), r=m%60;
+  if(h&&r) return h+'h '+r+'min';
+  if(h) return h+(h===1?' oră':' ore');
+  return m+' min';
+}
+
+function fmtDateStr(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+/* MAȘINI */
+function toggleCar(el) {
+  const pk = el.dataset.pk;
+  if (selectedCarPk === pk) {
+    el.classList.remove('selected');
+    selectedCarPk = null;
+    document.getElementById('id_saved_car').value = '';
+    clearCarForm();
+    return;
+  }
+  document.querySelectorAll('.car-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedCarPk = pk;
+  const f = document.getElementById('booking-form');
+  const set = (n,v) => { const e=f.querySelector('[name="'+n+'"]'); if(e) e.value=v||''; };
+  set('car_brand',el.dataset.brand); set('car_model',el.dataset.model);
+  set('car_year',el.dataset.year);   set('car_fuel',el.dataset.fuel);
+  set('car_plate',el.dataset.plate); set('car_vin',el.dataset.vin);
+  document.getElementById('id_saved_car').value = pk;
+  const sr = document.getElementById('save-car-row');
+  if (sr) sr.style.display = 'none';
+}
+
+function clearCarForm() {
+  const f = document.getElementById('booking-form');
+  ['car_brand','car_model','car_year','car_fuel','car_plate','car_vin'].forEach(n=>{
+    const e=f.querySelector('[name="'+n+'"]'); if(e) e.value='';
+  });
+  const sr = document.getElementById('save-car-row');
+  if (sr) sr.style.display = 'block';
+}
+
+/* DOMENIU */
+function selectDomain(el) {
+  document.querySelectorAll('.domain-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  S.domain=el.dataset.slug; S.slot=''; S.garageId=null; S.garageName='';
+  document.getElementById('id_booking_time').value='';
+  document.getElementById('id_garage').value='';
+  hideGaraje();
+  if (S.date) fetchGaraje();
+  updateConfirm();
+}
+
+/* INIT */
+let aiT = null;
+document.addEventListener('DOMContentLoaded', () => {
+  const fc = document.querySelector('.domain-chip.active');
+  if (fc) S.domain = fc.dataset.slug;
+
+  ['car_brand','car_model','car_year','car_plate','car_vin'].forEach(n => {
+    const el = document.getElementById('booking-form').querySelector('[name="'+n+'"]');
+    if (el) el.addEventListener('input', () => {
+      if (selectedCarPk) {
+        document.querySelectorAll('.car-card').forEach(c=>c.classList.remove('selected'));
+        selectedCarPk = null;
+        document.getElementById('id_saved_car').value='';
+        const sr = document.getElementById('save-car-row');
+        if (sr) sr.style.display='block';
+      }
+    });
+  });
+
+  document.getElementById('id_problem_description').addEventListener('input', function(){
+    S.desc=this.value.trim();
+    clearTimeout(aiT);
+    if (S.desc.length>8) {
+      document.getElementById('ai-thinking').style.display='inline-flex';
+      document.getElementById('ai-result').style.display='none';
+      aiT=setTimeout(fetchDur,900);
+    } else {
+      document.getElementById('ai-thinking').style.display='none';
+      document.getElementById('ai-result').style.display='none';
+    }
+  });
+
+  buildDateScroll();
+  const today = new Date();
+  calCurYear=today.getFullYear(); calCurMonth=today.getMonth();
+  renderCal();
+  updateConfirm();
+});
+
+function fetchDur() {
+  fetch(`/bookings/programare/${SLUG}/durata/?${new URLSearchParams({problem_description:S.desc})}`)
+    .then(r=>r.json()).then(d=>{
+      document.getElementById('ai-thinking').style.display='none';
+      if(d.minutes){
+        S.dur=d.minutes;
+        document.getElementById('ai-dur').textContent=fmtDur(d.minutes);
+        document.getElementById('ai-why').textContent=d.reason||'';
+        document.getElementById('ai-result').style.display='block';
+        if(S.date) fetchGaraje();
+      }
+    }).catch(()=>{ document.getElementById('ai-thinking').style.display='none'; });
+}
+
+/* DATE SCROLL */
+function buildDateScroll() {
+  const row=document.getElementById('date-row');
+  const today=new Date(); today.setHours(0,0,0,0);
+  for(let i=0;i<14;i++){
+    const d=new Date(today); d.setDate(today.getDate()+i);
+    const ds=fmtDateStr(d);
+    const el=document.createElement('div');
+    el.className='date-card'; el.dataset.date=ds;
+    el.innerHTML=`<div class="dn">${DAYS[d.getDay()]}</div><div class="dd">${d.getDate()}</div><div class="dm">${MONTHS_SHORT[d.getMonth()]}</div>${i===0?'<div style="font-size:.6rem;color:var(--ah-red)">azi</div>':''}`;
+    el.addEventListener('click',()=>selectDate(ds));
+    row.appendChild(el);
+  }
+}
+
+/* CALENDAR */
+function toggleCal() {
+  calOpen=!calOpen;
+  document.getElementById('cal-full').style.display=calOpen?'block':'none';
+  document.getElementById('cal-toggle-icon').className=calOpen?'bi bi-chevron-up':'bi bi-calendar3';
+  document.getElementById('cal-toggle-label').textContent=calOpen?'Ascunde calendarul':'Navighează pe calendar';
+}
+
+function calMove(dir) {
+  calCurMonth+=dir;
+  if(calCurMonth>11){calCurMonth=0;calCurYear++;}
+  if(calCurMonth<0){calCurMonth=11;calCurYear--;}
+  renderCal();
+}
+
+function renderCal() {
+  document.getElementById('cal-month-lbl').textContent=MONTHS_LONG[calCurMonth]+' '+calCurYear;
+  const grid=document.getElementById('cal-days');
+  grid.innerHTML='';
+  const today=new Date(); today.setHours(0,0,0,0);
+  let startDow=new Date(calCurYear,calCurMonth,1).getDay();
+  startDow=startDow===0?6:startDow-1;
+  const daysInMonth=new Date(calCurYear,calCurMonth+1,0).getDate();
+  for(let i=0;i<startDow;i++){
+    const e=document.createElement('div'); e.className='cal-day empty'; grid.appendChild(e);
+  }
+  for(let d=1;d<=daysInMonth;d++){
+    const date=new Date(calCurYear,calCurMonth,d);
+    const ds=fmtDateStr(date);
+    const dow=date.getDay();
+    const isWeekend=dow===0||dow===6;
+    const isPast=date<today;
+    const isToday=date.getTime()===today.getTime();
+    const el=document.createElement('div');
+    let cls='cal-day';
+    if(isPast) cls+=' past';
+    else if(isWeekend) cls+=' weekend';
+    if(isToday) cls+=' today';
+    if(ds===S.date) cls+=' selected';
+    el.className=cls; el.textContent=d;
+    if(!isPast) el.addEventListener('click',()=>selectDate(ds));
+    grid.appendChild(el);
+  }
+}
+
+/* SELECTARE DATĂ */
+function selectDate(ds) {
+  S.date=ds; S.slot=''; S.garageId=null;
+  document.getElementById('id_booking_date').value=ds;
+  document.getElementById('id_booking_time').value='';
+  document.getElementById('id_garage').value='';
+  document.querySelectorAll('.date-card').forEach(el=>{
+    el.classList.toggle('active',el.dataset.date===ds);
+  });
+  renderCal();
+  const sc=document.querySelector(`.date-card[data-date="${ds}"]`);
+  if(sc) sc.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+  updateConfirm();
+  fetchGaraje();
+}
+
+/* GARAJE */
+function hideGaraje() {
+  document.getElementById('card-garaje').style.display='none';
+  document.getElementById('g-list').innerHTML='';
+}
+
+function fetchGaraje() {
+  if(!S.date||!S.domain) return;
+  document.getElementById('card-garaje').style.display='block';
+  document.getElementById('g-loading').style.display='block';
+  document.getElementById('g-list').innerHTML='';
+  document.getElementById('g-empty').style.display='none';
+  fetch(`/bookings/programare/${SLUG}/garaje/?${new URLSearchParams({category:S.domain,date:S.date,problem_description:S.desc})}`)
+    .then(r=>r.json()).then(data=>{
+      document.getElementById('g-loading').style.display='none';
+      const gs=data.garages||[];
+      if(!gs.length){document.getElementById('g-empty').style.display='block';return;}
+      renderGaraje(gs,data.duration_minutes);
+    }).catch(()=>{document.getElementById('g-loading').style.display='none';});
+}
+
+function renderGaraje(gs,durMin) {
+  const list=document.getElementById('g-list'); list.innerHTML='';
+  gs.forEach(g=>{
+    const n=g.slots_count;
+    let bc='b-free',bt=n+' locuri libere';
+    if(n===0){bc='b-full';bt='Complet ocupat';}
+    else if(n<=3){bc='b-few';bt=n+' locuri libere';}
+    const durLbl=durMin?` · ~${fmtDur(durMin)}`:'';
+    const slotsHtml=g.slots.length===0
+      ?`<div class="no-slots"><i class="bi bi-calendar-x me-1"></i>Nicio oră disponibilă.</div>`
+      :`<div class="small text-muted-custom mb-2" style="font-size:.75rem;"><i class="bi bi-clock me-1"></i>Program ${g.open_time}–${g.close_time}${durLbl}</div>
+        <div class="slots-row">${g.slots.map(s=>`<button type="button" class="slot-btn" onclick="pickSlot(this,${g.id},'${g.name.replace(/'/g,"\\'")}','${s}')">${s}</button>`).join('')}</div>`;
+    const block=document.createElement('div');
+    block.className='garage-block'; block.id='gb-'+g.id;
+    block.innerHTML=`
+      <div class="g-head">
+        <div><div class="g-name">${g.name}</div><div class="g-meta">${g.category}</div></div>
+        <span class="g-badge ${bc}">${bt}</span>
+      </div>
+      <div class="slots-area">${slotsHtml}</div>`;
+    list.appendChild(block);
+  });
+}
+
+function pickSlot(btn,gid,gname,slot) {
+  document.querySelectorAll('.slot-btn').forEach(b=>b.classList.remove('selected'));
+  document.querySelectorAll('.garage-block').forEach(b=>b.classList.remove('picked'));
+  btn.classList.add('selected');
+  document.getElementById('gb-'+gid)?.classList.add('picked');
+  S.garageId=gid; S.garageName=gname; S.slot=slot;
+  document.getElementById('id_garage').value=gid;
+  document.getElementById('id_booking_time').value=slot;
+  updateConfirm();
+}
+
+/* CONFIRM BAR */
+function updateConfirm() {
+  const bar=document.getElementById('confirm-bar');
+  if(S.slot){
+    bar.style.display='flex';
+    const d=new Date(S.date+'T00:00:00');
+    const dl=d.toLocaleDateString('ro-RO',{weekday:'long',day:'numeric',month:'long'});
+    document.getElementById('confirm-val').textContent=S.garageName+' · '+dl+' la '+S.slot;
+  } else {
+    bar.style.display='none';
+  }
+}
+</script>
+{% endblock %}

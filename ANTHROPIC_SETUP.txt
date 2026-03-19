@@ -1,0 +1,13 @@
+SETUP OPENAI PENTRU SCANARE DOCUMENTE
+
+1. În .env setează:
+   OPENAI_API_KEY=cheia_ta
+   OPENAI_MODEL=gpt-4.1-mini
+
+2. Instalează dependențele:
+   pip install -r requirements.txt
+
+3. Repornește serverul:
+   python manage.py runserver
+
+4. Dacă vrei alt model, schimbă OPENAI_MODEL în .env.

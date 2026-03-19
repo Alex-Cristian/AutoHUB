@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ro" data-bs-theme="dark" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}AutoEMG — Marketplace Service Auto{% endblock %}</title>
+  <meta name="description" content="{% block meta_desc %}Găsește cel mai bun service auto din orașul tău. Programează online rapid și simplu.{% endblock %}">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --ah-red: #e63946;
+      --ah-red-dark: #c1121f;
+      --ah-orange: #f4a261;
+      --ah-dark: #0d0d0d;
+      --ah-dark2: #161616;
+      --ah-dark3: #1e1e1e;
+      --ah-dark4: #2a2a2a;
+      --ah-muted: #888;
+      --ah-border: #333;
+      --ah-text: #e8e8e8;
+      --ah-text-soft: #cfcfcf;
+      --ah-card-shadow: 0 8px 32px rgba(230,57,70,0.15);
+      --ah-navbar-bg: rgba(13,13,13,0.97);
+    }
+    html[data-theme='light'] {
+      --ah-dark: #f4f6f8;
+      --ah-dark2: #ffffff;
+      --ah-dark3: #eef2f6;
+      --ah-dark4: #dce4ec;
+      --ah-muted: #5f6b76;
+      --ah-border: #cfd7df;
+      --ah-text: #15202b;
+      --ah-text-soft: #2f3e4a;
+      --ah-card-shadow: 0 10px 28px rgba(21, 32, 43, 0.08);
+      --ah-navbar-bg: rgba(255,255,255,0.96);
+    }
+    * { box-sizing: border-box; }
+    body { font-family: 'Barlow', sans-serif; background-color: var(--ah-dark); color: var(--ah-text); min-height: 100vh; transition: background-color .2s ease, color .2s ease; }
+    h1, h2, h3, h4, h5, h6, .display-1, .display-2, .display-3, .display-4, .display-5 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+    .navbar-autohub { background: var(--ah-navbar-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--ah-border); padding: 0.6rem 0; position: sticky; top: 0; z-index: 1030; }
+    .navbar-brand { font-family: 'Barlow Condensed', sans-serif; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.03em; color: var(--ah-text) !important; }
+    .navbar-brand span.accent { color: var(--ah-red); }
+    .navbar-autohub .nav-link { color: var(--ah-text-soft) !important; font-weight: 500; font-size: 0.92rem; padding: 0.4rem 0.8rem !important; border-radius: 6px; transition: color 0.2s, background 0.2s; }
+    .navbar-autohub .nav-link:hover, .navbar-autohub .nav-link.active { color: var(--ah-text) !important; background: var(--ah-dark4); }
+    .btn-nav-cta { background: var(--ah-red); color: #fff !important; font-weight: 600; border-radius: 8px; padding: 0.4rem 1rem !important; font-size: 0.9rem; transition: background 0.2s, transform 0.1s; }
+    .btn-nav-cta:hover { background: var(--ah-red-dark); transform: translateY(-1px); }
+    .navbar-search { max-width: 340px; flex: 1; }
+    .navbar-search input { background: var(--ah-dark3); border: 1px solid var(--ah-border); color: var(--ah-text); border-radius: 8px 0 0 8px; font-size: 0.9rem; }
+    .navbar-search input::placeholder { color: var(--ah-muted); }
+    .navbar-search input:focus { background: var(--ah-dark4); box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.35); border-color: var(--ah-red); }
+    .navbar-search .btn-search { background: var(--ah-red); border: none; border-radius: 0 8px 8px 0; color: #fff; padding: 0.45rem 0.8rem; }
+    .service-card { background: var(--ah-dark2); border: 1px solid var(--ah-border); border-radius: 12px; transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s; overflow: hidden; }
+    .service-card:hover { border-color: var(--ah-red); transform: translateY(-3px); box-shadow: var(--ah-card-shadow); }
+    a.service-card { display: flex; color: inherit; text-decoration: none; cursor: pointer; }
+    a.service-card:hover { border-color: var(--ah-red); transform: translateY(-3px); box-shadow: var(--ah-card-shadow); color: inherit; text-decoration: none; }
+    .service-card .card-img-placeholder { height: 140px; background: linear-gradient(135deg, var(--ah-dark3) 0%, var(--ah-dark4) 100%); display: flex; align-items: center; justify-content: center; font-size: 3rem; }
+    .cat-card { background: var(--ah-dark2); border: 1px solid var(--ah-border); border-radius: 16px; padding: 2rem 1rem; text-align: center; text-decoration: none; color: var(--ah-text); display: block; transition: all 0.25s; }
+    .cat-card:hover { border-color: var(--ah-red); background: var(--ah-dark3); color: var(--ah-text); transform: translateY(-4px); box-shadow: var(--ah-card-shadow); }
+    .cat-card .cat-icon { font-size: 2.8rem; margin-bottom: 0.75rem; display: block; }
+    .cat-card .cat-name { font-family: 'Barlow Condensed', sans-serif; font-size: 1.15rem; font-weight: 700; }
+    .cat-card .cat-count { font-size: 0.8rem; color: var(--ah-muted); margin-top: 0.2rem; }
+    .stars { color: #f4a261; letter-spacing: -1px; }
+    .stars-empty { color: #444; }
+    .badge-featured { background: linear-gradient(90deg, var(--ah-red), var(--ah-orange)); color: #fff; font-size: 0.7rem; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+    .form-control, .form-select { background: var(--ah-dark3) !important; border: 1px solid var(--ah-border) !important; color: var(--ah-text) !important; border-radius: 8px; }
+    .form-control:focus, .form-select:focus { box-shadow: 0 0 0 2px rgba(230,57,70,0.3) !important; border-color: var(--ah-red) !important; }
+    .form-label { color: var(--ah-text-soft); font-weight: 500; font-size: 0.9rem; }
+    .btn-primary { background: var(--ah-red) !important; border-color: var(--ah-red) !important; font-weight: 600; }
+    .btn-primary:hover { background: var(--ah-red-dark) !important; border-color: var(--ah-red-dark) !important; }
+    .btn-outline-primary { border-color: var(--ah-red) !important; color: var(--ah-red) !important; }
+    .btn-outline-primary:hover { background: var(--ah-red) !important; color: #fff !important; }
+    .section-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ah-red); margin-bottom: 0.4rem; }
+    .section-title { font-family: 'Barlow Condensed', sans-serif; font-size: 2.2rem; font-weight: 800; }
+    .filter-sidebar { background: var(--ah-dark2); border: 1px solid var(--ah-border); border-radius: 12px; padding: 1.5rem; position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
+    .filter-sidebar .filter-group { margin-bottom: 1.5rem; }
+    .filter-sidebar .filter-title { font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ah-muted); margin-bottom: 0.75rem; }
+    .map-placeholder { background: var(--ah-dark2); border: 1px solid var(--ah-border); border-radius: 12px; min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ah-muted); text-align: center; }
+    footer { background: var(--ah-dark2); border-top: 1px solid var(--ah-border); padding: 3rem 0 1.5rem; margin-top: 5rem; }
+    footer .footer-brand { font-family: 'Barlow Condensed', sans-serif; font-size: 1.5rem; font-weight: 800; }
+    footer a { color: var(--ah-muted); text-decoration: none; font-size: 0.9rem; }
+    footer a:hover { color: var(--ah-red); }
+    .alert { border-radius: 10px; border: none; font-size: 0.95rem; }
+    .divider-red { width: 48px; height: 3px; background: var(--ah-red); border-radius: 2px; margin: 0.5rem 0 1.5rem; }
+    .text-red { color: var(--ah-red) !important; }
+    .text-orange { color: var(--ah-orange) !important; }
+    .text-muted-custom { color: var(--ah-muted) !important; }
+    .bg-dark2 { background: var(--ah-dark2); }
+    .bg-dark3 { background: var(--ah-dark3); }
+    .rounded-xl { border-radius: 16px !important; }
+    .toast-autohub { background: var(--ah-dark2); border: 1px solid var(--ah-border); color: var(--ah-text); border-radius: 14px; box-shadow: 0 14px 34px rgba(0,0,0,0.35); overflow: hidden; }
+    .toast-autohub.success { border-left: 4px solid #198754; }
+    .toast-autohub.info { border-left: 4px solid #0dcaf0; }
+    .toast-autohub.warning { border-left: 4px solid #ffc107; }
+    .toast-autohub.error, .toast-autohub.danger { border-left: 4px solid #dc3545; }
+    .toast-autohub .toast-header { background: transparent; color: var(--ah-text); border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .toast-container-custom { position: fixed; top: 88px; right: 16px; z-index: 1080; width: min(380px, calc(100vw - 24px)); }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--ah-dark); }
+    .dropdown-menu-dark, .dropdown-menu { background: var(--ah-dark2) !important; border-color: var(--ah-border) !important; }
+    .dropdown-item { color: var(--ah-text) !important; }
+    .dropdown-item:hover, .dropdown-item:focus { background: var(--ah-dark3) !important; color: var(--ah-text) !important; }
+    .btn-theme-toggle { border: 1px solid var(--ah-border); background: var(--ah-dark2); color: var(--ah-text); border-radius: 999px; padding: .45rem .9rem; font-weight: 600; }
+    .btn-theme-toggle:hover { background: var(--ah-dark3); color: var(--ah-text); }
+    .theme-toggle-icon { width: 1rem; display: inline-flex; justify-content: center; }
+    html[data-theme='light'] .text-white { color: var(--ah-text) !important; }
+    html[data-theme='light'] .btn-outline-light { color: var(--ah-text) !important; border-color: var(--ah-border) !important; }
+    html[data-theme='light'] .btn-outline-light:hover { background: var(--ah-dark3) !important; }
+    html[data-theme='light'] .navbar-toggler .text-white { color: var(--ah-text) !important; }
+    html[data-theme='light'] .text-muted-custom { color: var(--ah-muted) !important; }
+    html[data-theme='light'] .alert { color: var(--ah-text); }
+    ::-webkit-scrollbar-thumb { background: var(--ah-dark4); border-radius: 4px; }
+    html[data-theme='light'] ::-webkit-scrollbar-track { background: var(--ah-dark3); }
+    html[data-theme='light'] ::-webkit-scrollbar-thumb { background: var(--ah-dark4); }
+
+    /* ===== LIGHT MODE: CARDURI DASHBOARD / BOOKINGS / CLIENTS ===== */
+    html[data-theme='light'] .dashboard-stat-card,
+    html[data-theme='light'] .dashboard-panel,
+    html[data-theme='light'] .dashboard-booking-card,
+    html[data-theme='light'] .dashboard-action-card,
+    html[data-theme='light'] .dashboard-center-card,
+    html[data-theme='light'] .dashboard-notification-card,
+    html[data-theme='light'] .dashboard-mechanic-card {
+      background: var(--ah-dark2) !important;
+      border: 1px solid var(--ah-border) !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06) !important;
+    }
+    html[data-theme='light'] .dashboard-hero {
+      background: linear-gradient(135deg, rgba(230,57,70,0.08), rgba(244,246,248,0.98) 45%, rgba(244,162,97,0.06)) !important;
+      border: 1px solid var(--ah-border) !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.06) !important;
+    }
+    html[data-theme='light'] .dashboard-shell {
+      background:
+        radial-gradient(circle at top right, rgba(230,57,70,0.06), transparent 22%),
+        radial-gradient(circle at top left, rgba(244,162,97,0.04), transparent 20%) !important;
+    }
+    html[data-theme='light'] .dashboard-kicker {
+      background: rgba(0,0,0,0.05) !important;
+      color: var(--ah-text) !important;
+    }
+    html[data-theme='light'] .dashboard-subtitle { color: var(--ah-muted) !important; }
+    html[data-theme='light'] .dashboard-stat-icon {
+      background: rgba(0,0,0,0.05) !important;
+      color: var(--ah-text) !important;
+    }
+    html[data-theme='light'] .dashboard-chip {
+      color: var(--ah-text-soft) !important;
+      background: rgba(0,0,0,0.04) !important;
+      border: 1px solid var(--ah-border) !important;
+    }
+    html[data-theme='light'] .dashboard-chip:hover {
+      color: var(--ah-text) !important;
+      border-color: rgba(230,57,70,0.4) !important;
+      background: rgba(230,57,70,0.06) !important;
+    }
+    html[data-theme='light'] .dashboard-tag {
+      background: rgba(0,0,0,0.05) !important;
+      color: var(--ah-text-soft) !important;
+    }
+    html[data-theme='light'] .dashboard-meta-box {
+      background: rgba(0,0,0,0.04) !important;
+    }
+    html[data-theme='light'] .dashboard-meta-value { color: var(--ah-text) !important; }
+    html[data-theme='light'] .booking-preview-more {
+      border-color: var(--ah-border) !important;
+      color: var(--ah-muted) !important;
+    }
+
+    /* ===== LIGHT MODE: BOOKINGS LIST ===== */
+    html[data-theme='light'] .blist-shell,
+    html[data-theme='light'] .blist-table-wrap,
+    html[data-theme='light'] .blist-row {
+      background: var(--ah-dark2) !important;
+      border-color: var(--ah-border) !important;
+    }
+    html[data-theme='light'] .blist-filter-btn {
+      color: var(--ah-text-soft) !important;
+      border-color: var(--ah-border) !important;
+      background: var(--ah-dark2) !important;
+    }
+    html[data-theme='light'] .blist-filter-btn:hover {
+      color: var(--ah-text) !important;
+      border-color: rgba(230,57,70,0.4) !important;
+      background: rgba(230,57,70,0.06) !important;
+    }
+    html[data-theme='light'] .blist-filter-btn.active {
+      background: rgba(230,57,70,0.10) !important;
+      border-color: rgba(230,57,70,0.5) !important;
+      color: var(--ah-red) !important;
+    }
+    html[data-theme='light'] .cell-client,
+    html[data-theme='light'] .cell-date,
+    html[data-theme='light'] .blist-table th { color: var(--ah-text) !important; }
+    html[data-theme='light'] .blist-table th.sortable:hover { color: var(--ah-text) !important; }
+
+    /* ===== LIGHT MODE: CLIENTS LIST ===== */
+    html[data-theme='light'] .cl-shell,
+    html[data-theme='light'] .cl-table-wrap,
+    html[data-theme='light'] .cl-card {
+      background: var(--ah-dark2) !important;
+      border-color: var(--ah-border) !important;
+    }
+    html[data-theme='light'] .cell-name { color: var(--ah-text) !important; }
+
+    /* ===== LIGHT MODE: MECHANIC PROFILE ===== */
+    html[data-theme='light'] .mp-wrap {
+      background: var(--ah-dark2) !important;
+      border-color: var(--ah-border) !important;
+    }
+
+    /* ===== LIGHT MODE: MY BOOKINGS ===== */
+    html[data-theme='light'] .mybookings-hero {
+      background: linear-gradient(135deg, rgba(230,57,70,0.06), rgba(244,246,248,0.95) 60%) !important;
+    }
+
+    /* ===== LIGHT MODE: BOOKING CREATE ===== */
+    html[data-theme='light'] .booking-shell,
+    html[data-theme='light'] .step-card {
+      background: var(--ah-dark2) !important;
+      border-color: var(--ah-border) !important;
+    }
+    html[data-theme='light'] .domain-chip {
+      color: var(--ah-text-soft) !important;
+      border-color: var(--ah-border) !important;
+      background: var(--ah-dark2) !important;
+    }
+    html[data-theme='light'] .domain-chip:hover {
+      color: var(--ah-text) !important;
+      border-color: rgba(230,57,70,0.5) !important;
+      background: rgba(230,57,70,0.06) !important;
+    }
+
+    /* ===== LIGHT MODE: FORMULARE REGISTER / PROFILE MANAGE ===== */
+    html[data-theme='light'] #id_categories label,
+    html[data-theme='light'] #profile-id_categories label { color: var(--ah-text) !important; }
+
+    /* ===== GLOBAL: tranziție completă ===== */
+    * { transition-property: background-color, color, border-color; transition-duration: 0.2s; transition-timing-function: ease; }
+    a, button, .btn, input, select, textarea { transition: all 0.2s ease; }
+  </style>
+
+  {% block extra_css %}{% endblock %}
+  <script>
+    (function(){
+      var t = localStorage.getItem('autohub-theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.setAttribute('data-bs-theme', t);
+    })();
+  </script>
+</head>
+<body>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar navbar-autohub navbar-expand-lg">
+  <div class="container">
+    <a class="navbar-brand me-3" href="{% if user.is_authenticated and has_service_center %}{% url 'services:dashboard' %}{% else %}{% url 'core:home' %}{% endif %}">
+      <i class="bi bi-tools me-1 text-red"></i>Auto<span class="accent">EMG</span>
+    </a>
+
+    {% if not has_service_center %}
+    <form class="navbar-search input-group d-none d-lg-flex me-3" action="{% url 'services:list' %}" method="get">
+      <input type="text" name="q" class="form-control" placeholder="Caută service, oraș, serviciu..." value="{{ request.GET.q }}">
+      <button class="btn btn-search" type="submit"><i class="bi bi-search"></i></button>
+    </form>
+    {% endif %}
+
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+      <i class="bi bi-list text-white fs-4"></i>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navMain">
+      {% if not has_service_center %}
+      <ul class="navbar-nav me-auto ms-lg-2">
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'categories' %}active{% endif %}" href="{% url 'services:categories' %}">
+            <i class="bi bi-grid-3x3-gap me-1"></i>Categorii
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'list' %}active{% endif %}" href="{% url 'services:list' %}">
+            <i class="bi bi-search me-1"></i>Service-uri
+          </a>
+        </li>
+        {% if nav_categories %}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Servicii</a>
+          <ul class="dropdown-menu dropdown-menu-dark" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+            {% for cat in nav_categories %}
+            <li><a class="dropdown-item" href="{% url 'services:list' %}?category={{ cat.slug }}">{{ cat.icon }} {{ cat.name }}</a></li>
+            {% endfor %}
+          </ul>
+        </li>
+        {% endif %}
+      </ul>
+      <form class="d-lg-none mb-2 mt-2 input-group" action="{% url 'services:list' %}" method="get">
+        <input type="text" name="q" class="form-control" placeholder="Caută service..." value="{{ request.GET.q }}">
+        <button class="btn btn-search" type="submit"><i class="bi bi-search"></i></button>
+      </form>
+      {% else %}
+      {# ── Navbar service owner ── #}
+      <ul class="navbar-nav me-auto ms-lg-2 service-owner-nav">
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'services:dashboard' %}">
+            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'bookings_list' %}active{% endif %}" href="{% url 'services:bookings_list' %}">
+            <i class="bi bi-calendar2-week me-1"></i>Programări
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'car_history' %}active{% endif %}" href="{% url 'services:car_history' %}">
+            <i class="bi bi-clock-history me-1"></i>Istoric mașini
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'parts_inventory' %}active{% endif %}" href="{% url 'services:parts_inventory' %}">
+            <i class="bi bi-box-seam me-1"></i>Piese
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'mechanics_list' %}active{% endif %}" href="{% url 'services:mechanics_list' %}">
+            <i class="bi bi-people me-1"></i>Mecanici
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" href="{% url 'services:notifications' %}">
+            <i class="bi bi-bell me-1"></i>Notificări
+            {% if service_unread_notifications %}<span class="badge bg-danger ms-1">{{ service_unread_notifications }}</span>{% endif %}
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'invoices:clients' %}">
+            <i class="bi bi-receipt me-1"></i>Facturi
+          </a>
+        </li>
+      </ul>
+      {% endif %}
+
+      <ul class="navbar-nav align-items-center gap-1">
+        <li class="nav-item me-1">
+          <button type="button" class="btn btn-theme-toggle" id="themeToggle" aria-label="Schimbă tema">
+            <span class="theme-toggle-icon"><i class="bi bi-sun-fill"></i></span>
+            <span id="themeToggleLabel">Temă albă</span>
+          </button>
+        </li>
+        {% if user.is_authenticated %}
+          {% if not has_service_center %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'bookings:my_bookings' %}">
+              <i class="bi bi-calendar-check me-1"></i>Programările mele
+            </a>
+          </li>
+          {% endif %}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle d-flex align-items-center gap-1" href="#" data-bs-toggle="dropdown">
+              <span class="rounded-circle bg-danger d-flex align-items-center justify-content-center" style="width:28px;height:28px;font-size:0.85rem;font-weight:700;">{{ user.username|first|upper }}</span>
+              <span class="d-none d-lg-inline">{{ user.username }}</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
+              <li><a class="dropdown-item" href="{% url 'accounts:profile' %}"><i class="bi bi-person me-2"></i>Profilul meu</a></li>
+              {% if not has_service_center %}
+              <li><a class="dropdown-item" href="{% url 'accounts:cars' %}"><i class="bi bi-car-front me-2"></i>Mașinile mele</a></li>
+              {% endif %}
+              {% if user.is_staff %}
+              <li><a class="dropdown-item" href="/admin/"><i class="bi bi-shield-check me-2"></i>Admin</a></li>
+              {% endif %}
+              <li><hr class="dropdown-divider border-secondary"></li>
+              <li><a class="dropdown-item text-danger" href="{% url 'accounts:logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Deconectare</a></li>
+            </ul>
+          </li>
+        {% else %}
+        <li class="nav-item"><a class="nav-link" href="{% url 'accounts:login' %}">Autentificare</a></li>
+        <li class="nav-item"><a class="btn btn-nav-cta" href="{% url 'accounts:register' %}">Înregistrare</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== TOAST MESSAGES ===== -->
+{% if messages %}
+<div class="toast-container-custom">
+  {% for msg in messages %}
+  <div class="toast toast-autohub {{ msg.tags|default:'info' }} mb-3" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="2800">
+    <div class="toast-header">
+      <i class="bi bi-bell-fill text-red me-2"></i>
+      <strong class="me-auto">AutoEMG</strong>
+      <small class="text-muted">acum</small>
+      <button type="button" class="btn-close btn-close-white ms-2" data-bs-dismiss="toast"></button>
+    </div>
+    <div class="toast-body">{{ msg }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- ===== MAIN CONTENT ===== -->
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="container">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-4">
+      <div><div class="footer-brand"><span class="text-red">Auto</span>EMG</div></div>
+      <div class="d-flex flex-column flex-sm-row gap-3 gap-sm-4">
+        <a href="{% url 'core:about' %}">Despre</a>
+        <a href="{% url 'core:terms' %}">Termeni și condiții</a>
+        <a href="{% url 'core:privacy' %}">Politica de confidențialitate</a>
+        <a href="{% url 'core:cookies' %}">Politica cookie</a>
+      </div>
+    </div>
+    <div class="text-muted-custom small mt-4">© AutoEMG</div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}{% endblock %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.toast').forEach(function (el) {
+      new bootstrap.Toast(el).show();
+    });
+
+    const toggleBtn = document.getElementById('themeToggle');
+    const toggleLabel = document.getElementById('themeToggleLabel');
+    const toggleIcon = toggleBtn ? toggleBtn.querySelector('i') : null;
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.setAttribute('data-bs-theme', theme);
+      localStorage.setItem('autohub-theme', theme);
+      if (toggleLabel) toggleLabel.textContent = theme === 'dark' ? 'Temă albă' : 'Temă închisă';
+      if (toggleIcon) toggleIcon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+    }
+
+    applyTheme(localStorage.getItem('autohub-theme') || document.documentElement.getAttribute('data-theme') || 'dark');
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', function () {
+        const current = document.documentElement.getAttribute('data-theme') || 'dark';
+        applyTheme(current === 'dark' ? 'light' : 'dark');
+      });
+    }
+  });
+</script>
+</body>
+</html>
