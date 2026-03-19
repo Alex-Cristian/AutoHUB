@@ -7,7 +7,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse
 
-from autohub.sitemaps import ServiceSitemap, StaticPagesSitemap
+from core.sitemaps import ServiceSitemap, StaticPagesSitemap
 
 
 sitemaps = {
