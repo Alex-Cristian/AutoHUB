@@ -1,5 +1,6 @@
 import requests
 from django import forms
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -112,6 +113,14 @@ class ServiceCenterRegisterForm(forms.ModelForm):
             return Decimal(str(float(val))).quantize(Decimal('0.0000001'), rounding=ROUND_HALF_UP)
         return val
 
+    def clean_accept_terms(self):
+        accepted = self.cleaned_data.get('accept_terms')
+        if not accepted:
+            raise forms.ValidationError(
+                f'Trebuie să accepți Termenii și condițiile, Politica de confidențialitate și Politica cookie (versiunea {settings.LEGAL_DOCUMENTS_VERSION}).'
+            )
+        return accepted
+
     def clean(self):
         cleaned = super().clean()
         any_legal = self._any_legal_data(cleaned)
@@ -170,14 +179,14 @@ class ServiceCenterRegisterForm(forms.ModelForm):
 
 
 class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
-    """Înregistrare service fără login: creează și contul proprietarului."""
-
     owner_first_name = forms.CharField(
         label='Prenume',
+        max_length=150,
         widget=forms.TextInput(attrs={'class': 'form-control'}),
     )
     owner_last_name = forms.CharField(
         label='Nume',
+        max_length=150,
         widget=forms.TextInput(attrs={'class': 'form-control'}),
     )
     owner_email = forms.EmailField(
@@ -194,6 +203,19 @@ class ServiceCenterPublicRegisterForm(ServiceCenterRegisterForm):
         strip=False,
         widget=forms.PasswordInput(attrs={'class': 'form-control'}),
     )
+    accept_terms = forms.BooleanField(
+        required=True,
+        label='Accept documentele legale',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
+    def clean_accept_terms(self):
+        accepted = self.cleaned_data.get('accept_terms')
+        if not accepted:
+            raise forms.ValidationError(
+                f'Trebuie să accepți Termenii și condițiile, Politica de confidențialitate și Politica cookie (versiunea {settings.LEGAL_DOCUMENTS_VERSION}).'
+            )
+        return accepted
 
     def clean_owner_email(self):
         email = (self.cleaned_data.get('owner_email') or '').strip().lower()

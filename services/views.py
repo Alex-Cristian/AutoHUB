@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
@@ -19,6 +20,8 @@ from .forms import (
     ServicePartForm,
 )
 from bookings.models import Booking, BookingNotification, BookingAttachment
+from core.pdf_utils import build_work_order_pdf
+from accounts.views import _record_legal_acceptance
 from core.services.sms_service import (
     send_booking_completed_sms,
     send_booking_confirmation_sms,
@@ -235,6 +238,7 @@ def service_register_public(request):
         form = ServiceCenterPublicRegisterForm(request.POST, request.FILES)
         if form.is_valid():
             center, user = form.save()
+            _record_legal_acceptance(user, request)
             login(request, user)
             if center.verification_status == 'pending':
                 messages.info(request, '✅ Contul și service-ul au fost create. Service-ul este în așteptare pentru verificare (date legale completate).')
@@ -1027,3 +1031,17 @@ def mechanic_profile(request, pk):
         'active_bookings': active_list,
         'done_bookings': done_list,
     })
+
+@login_required
+def booking_rar_pdf(request, pk):
+    booking = get_object_or_404(
+        Booking.objects.select_related('center', 'service_item', 'user', 'garage', 'mechanic'),
+        pk=pk,
+    )
+    if not (request.user.is_staff or booking.center.owner_id == request.user.id):
+        return redirect('core:home')
+
+    pdf_bytes = build_work_order_pdf(booking)
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="fisa-interventie-{booking.pk}.pdf"'
+    return response

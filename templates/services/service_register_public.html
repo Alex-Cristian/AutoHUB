@@ -7,7 +7,6 @@
       <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
           <h1 class="mb-1">Înregistrare firmă/service</h1>
-          <p class="text-muted-custom mb-0">Creezi contul proprietarului și alegi din start toate categoriile de care ai nevoie.</p>
         </div>
         <a href="{% url 'services:list' %}" class="btn btn-outline-light rounded-xl"><i class="bi bi-arrow-left me-1"></i>Înapoi</a>
       </div>
@@ -29,7 +28,7 @@
               <h4 class="mb-3"><i class="bi bi-building me-2 text-red"></i>Date service</h4>
               <div class="row g-3">
                 {% for field in form %}
-                  {% if field.name != 'owner_first_name' and field.name != 'owner_last_name' and field.name != 'owner_email' and field.name != 'password1' and field.name != 'password2' %}
+                  {% if field.name != 'owner_first_name' and field.name != 'owner_last_name' and field.name != 'owner_email' and field.name != 'password1' and field.name != 'password2' and field.name != 'accept_terms' %}
                     <div class="col-12" id="wrap_{{ field.name }}">
                       <label class="form-label">{{ field.label }}</label>
                       {{ field }}
@@ -38,16 +37,22 @@
                   {% endif %}
                 {% endfor %}
               </div>
+              <div class="mt-4 pt-3 border-top" style="border-color:var(--ah-border) !important;">
+                <div class="form-check">
+                  {{ form.accept_terms }}
+                  <label class="form-check-label small" for="{{ form.accept_terms.id_for_label }}">
+                    Sunt de acord cu <a href="{% url 'core:terms' %}" class="text-red text-decoration-none" target="_blank">Termenii și condițiile</a>,
+                    <a href="{% url 'core:privacy' %}" class="text-red text-decoration-none" target="_blank">Politica de confidențialitate</a> și
+                    <a href="{% url 'core:cookies' %}" class="text-red text-decoration-none" target="_blank">Politica cookie</a>.
+                  </label>
+                </div>
+                {% for err in form.accept_terms.errors %}<div class="text-danger small mt-1">{{ err }}</div>{% endfor %}
+              </div>
               <button class="btn btn-nav-cta mt-4" type="submit"><i class="bi bi-check2-circle me-1"></i>Creează contul și service-ul</button>
             </form>
           </div>
         </div>
-        <div class="col-lg-5">
-          <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
-            <h5 class="mb-3">După înregistrare</h5>
-            <p class="small text-muted-custom mb-0">În dashboard vei avea o pagină de profil pentru service unde poți adăuga garaje, galerie foto și poza de card.</p>
-          </div>
-        </div>
+
       </div>
     </div>
   </div>

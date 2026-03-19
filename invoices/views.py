@@ -3,6 +3,7 @@ from collections import OrderedDict
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Max
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -11,6 +12,7 @@ from services.models import ServiceCenter
 
 from .forms import InvoiceForm, InvoiceLineFormSet
 from .models import Invoice
+from core.pdf_utils import build_invoice_pdf
 
 
 def _owned_centers(user):
@@ -169,3 +171,16 @@ def invoice_finalize(request, pk):
         messages.success(request, '✅ Factura a fost finalizată.')
 
     return redirect('invoices:detail', pk=invoice.pk)
+
+
+@login_required
+def invoice_pdf(request, pk):
+    invoice = get_object_or_404(Invoice, pk=pk)
+    if not (request.user.is_staff or invoice.center.owner_id == request.user.id):
+        return redirect('services:dashboard')
+
+    pdf_bytes = build_invoice_pdf(invoice)
+    filename = f"factura-{invoice.invoice_no or invoice.pk}.pdf"
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="{filename}"'
+    return response

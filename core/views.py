@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.db.models import Avg, Count, Q
 from services.models import ServiceCategory, ServiceCenter, CITY_CHOICES
@@ -31,3 +32,16 @@ def home(request):
 
 def about(request):
     return render(request, 'core/about.html')
+
+
+
+def terms(request):
+    return render(request, "legal/terms.html")
+
+
+def privacy(request):
+    return render(request, "legal/privacy.html")
+
+
+def cookies(request):
+    return render(request, "legal/cookies.html")

@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 
@@ -18,10 +19,15 @@ class RegisterForm(UserCreationForm):
         required=True,
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email'})
     )
+    accept_terms = forms.BooleanField(
+        required=True,
+        label='Accept documentele legale',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
 
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'username', 'email', 'password1', 'password2']
+        fields = ['first_name', 'last_name', 'username', 'email', 'password1', 'password2', 'accept_terms']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nume utilizator'}),
         }
@@ -34,6 +40,14 @@ class RegisterForm(UserCreationForm):
         self.fields['password2'].widget = forms.PasswordInput(
             attrs={'class': 'form-control', 'placeholder': 'Confirmă parola'}
         )
+
+    def clean_accept_terms(self):
+        accepted = self.cleaned_data.get('accept_terms')
+        if not accepted:
+            raise forms.ValidationError(
+                f'Trebuie să accepți Termenii și condițiile, Politica de confidențialitate și Politica cookie (versiunea {settings.LEGAL_DOCUMENTS_VERSION}).'
+            )
+        return accepted
 
     def clean_email(self):
         email = self.cleaned_data['email']

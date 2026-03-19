@@ -139,3 +139,29 @@ class CarExpiryProfile(models.Model):
             'class': 'secondary',
             'icon': 'bi-dash-circle',
         }
+
+
+class LegalAcceptance(models.Model):
+    """Evidență pentru acceptarea documentelor legale de către utilizator."""
+
+    DOCUMENT_SET_DEFAULT = 'platform'
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='legal_acceptance',
+        verbose_name='Utilizator',
+    )
+    document_set = models.CharField(max_length=30, default=DOCUMENT_SET_DEFAULT, verbose_name='Set documente')
+    terms_version = models.CharField(max_length=30, verbose_name='Versiune termeni')
+    privacy_version = models.CharField(max_length=30, verbose_name='Versiune confidențialitate')
+    cookies_version = models.CharField(max_length=30, verbose_name='Versiune cookie')
+    accepted_at = models.DateTimeField(default=timezone.now, verbose_name='Acceptat la')
+    ip_address = models.GenericIPAddressField(blank=True, null=True, verbose_name='Adresă IP')
+
+    class Meta:
+        verbose_name = 'Acceptare documente legale'
+        verbose_name_plural = 'Acceptări documente legale'
+
+    def __str__(self):
+        return f"{self.user} · {self.document_set} · {self.terms_version}"

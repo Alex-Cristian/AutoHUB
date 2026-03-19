@@ -4,6 +4,7 @@ from django.contrib.auth import login, logout
 from django.db import models
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.conf import settings
 from django.http import JsonResponse
@@ -16,7 +17,7 @@ import requests as http_requests
 
 from services.models import Favorite
 from .forms import RegisterForm, LoginForm, CarForm, CarExpiryProfileForm
-from .models import Car, CarExpiryProfile
+from .models import Car, CarExpiryProfile, LegalAcceptance
 
 
 STAR_POSITIONS = [
@@ -31,6 +32,39 @@ ALLOWED_DOCUMENT_TYPES = {'ITP', 'RCA', 'ROVINIETA', 'CASCO', 'TRUSA', 'EXTINCTO
 ALLOWED_CONFIDENCE = {'high', 'medium', 'low'}
 
 
+def _client_ip(request):
+    forwarded = (request.META.get('HTTP_X_FORWARDED_FOR') or '').split(',')[0].strip()
+    return forwarded or request.META.get('REMOTE_ADDR')
+
+
+def _record_legal_acceptance(user, request):
+    LegalAcceptance.objects.update_or_create(
+        user=user,
+        defaults={
+            'document_set': 'platform',
+            'terms_version': settings.LEGAL_DOCUMENTS_VERSION,
+            'privacy_version': settings.LEGAL_DOCUMENTS_VERSION,
+            'cookies_version': settings.LEGAL_DOCUMENTS_VERSION,
+            'accepted_at': timezone.now(),
+            'ip_address': _client_ip(request),
+        },
+    )
+
+
+def _has_current_legal_acceptance(user):
+    acceptance = getattr(user, 'legal_acceptance', None)
+    if not acceptance:
+        return False
+    current = settings.LEGAL_DOCUMENTS_VERSION
+    return all([
+        acceptance.terms_version == current,
+        acceptance.privacy_version == current,
+        acceptance.cookies_version == current,
+    ])
+
+
+
+
 def register_view(request):
     if request.user.is_authenticated:
         return redirect('core:home')
@@ -38,6 +72,7 @@ def register_view(request):
         form = RegisterForm(request.POST)
         if form.is_valid():
             user = form.save()
+            _record_legal_acceptance(user, request)
             login(request, user)
             messages.success(request, f'Bun venit, {user.first_name}! Contul tău a fost creat.')
             return redirect('core:home')
@@ -54,6 +89,9 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
+            if not _has_current_legal_acceptance(user):
+                messages.warning(request, 'Pentru a continua, trebuie să accepți documentele legale actualizate.')
+                return redirect('accounts:accept_legal')
             messages.success(request, f'Bun venit înapoi, {user.first_name or user.username}!')
             next_url = request.GET.get('next')
             return redirect(next_url or 'core:home')
@@ -66,6 +104,23 @@ def logout_view(request):
     logout(request)
     messages.info(request, 'Ai fost deconectat.')
     return redirect('core:home')
+
+
+@login_required
+def accept_legal_view(request):
+    if request.method == 'POST':
+        accepted = request.POST.get('accept_terms') == 'on'
+        if accepted:
+            _record_legal_acceptance(request.user, request)
+            messages.success(request, 'Documentele legale au fost acceptate cu succes.')
+            next_url = request.GET.get('next') or request.POST.get('next')
+            return redirect(next_url or 'core:home')
+        messages.error(request, 'Trebuie să bifezi acceptarea pentru a continua.')
+
+    return render(request, 'accounts/accept_legal.html', {
+        'legal_version': settings.LEGAL_DOCUMENTS_VERSION,
+        'next_url': request.GET.get('next', ''),
+    })
 
 
 @login_required
