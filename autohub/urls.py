@@ -1,10 +1,29 @@
+from pathlib import Path
+
 from django.contrib import admin
+from django.contrib.sitemaps.views import sitemap
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import HttpResponse
+
+from autohub.sitemaps import ServiceSitemap, StaticPagesSitemap
+
+
+sitemaps = {
+    'static': StaticPagesSitemap,
+    'services': ServiceSitemap,
+}
+
+
+def robots_txt(request):
+    robots_path = Path(settings.BASE_DIR) / 'static' / 'robots.txt'
+    return HttpResponse(robots_path.read_text(encoding='utf-8'), content_type='text/plain')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='sitemap'),
+    path('robots.txt', robots_txt, name='robots_txt'),
     path('', include('core.urls', namespace='core')),
     path('accounts/', include('accounts.urls', namespace='accounts')),
     path('services/', include('services.urls', namespace='services')),
