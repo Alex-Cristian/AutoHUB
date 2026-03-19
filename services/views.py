@@ -129,6 +129,8 @@ def service_list(request):
         'price_desc': F('min_price').desc(nulls_last=True),
         'reviews': F('review_count').desc(nulls_last=True),
         'name': F('name').asc(),
+        # 'distance' e tratat client-side cu JS/GPS - server face fallback la rating
+        'distance': F('avg_rating').desc(nulls_last=True),
     }
     qs = qs.order_by(sort_options.get(sort_by, F('avg_rating').desc(nulls_last=True)))
 

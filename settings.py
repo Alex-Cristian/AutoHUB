@@ -13,6 +13,15 @@ DEBUG = False
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
+# ===== CSRF & SESSION — fix mobil =====
+CSRF_COOKIE_AGE = 31449600          # 1 an — token nu mai expiră între page load și submit
+CSRF_COOKIE_HTTPONLY = False         # permite browserului mobil să citească cookie-ul
+CSRF_COOKIE_SAMESITE = 'Lax'        # compatibil cu redirect-uri și browsere mobile
+SESSION_COOKIE_AGE = 2592000        # 30 zile — userii rămân logați
+SESSION_SAVE_EVERY_REQUEST = True   # resetează timer-ul la fiecare request
+SESSION_COOKIE_SAMESITE = 'Lax'     # compatibil cu browsere mobile
+CSRF_TRUSTED_ORIGINS = [h.strip() for h in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if h.strip()]
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -64,9 +73,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'autohub.wsgi.application'
-
-import os
-import dj_database_url
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 

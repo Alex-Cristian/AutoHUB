@@ -18,23 +18,41 @@
         <form method="post">
           {% csrf_token %}
           <div class="mb-3">
-            <label class="form-label">Nume utilizator</label>
-            {{ form.username }}
+            <label class="form-label text-white" for="id_username">Nume utilizator</label>
+            <input
+              type="text"
+              name="username"
+              id="id_username"
+              class="form-control form-control-lg"
+              style="min-height:48px; font-size:16px; background:var(--ah-dark); border-color:var(--ah-border); color:#fff;"
+              autocomplete="username"
+              value="{{ form.username.value|default:'' }}"
+            >
             {% if form.username.errors %}
             <div class="text-danger small mt-1">{{ form.username.errors|join:" " }}</div>
             {% endif %}
           </div>
+
           <div class="mb-4">
-            <label class="form-label">Parolă</label>
-            {{ form.password }}
+            <label class="form-label text-white" for="id_password">Parolă</label>
+            <input
+              type="password"
+              name="password"
+              id="id_password"
+              class="form-control form-control-lg"
+              style="min-height:48px; font-size:16px; background:var(--ah-dark); border-color:var(--ah-border); color:#fff;"
+              autocomplete="current-password"
+            >
             {% if form.password.errors %}
             <div class="text-danger small mt-1">{{ form.password.errors|join:" " }}</div>
             {% endif %}
           </div>
+
           {% if form.non_field_errors %}
           <div class="alert alert-danger">{{ form.non_field_errors }}</div>
           {% endif %}
-          <button type="submit" class="btn btn-primary w-100 btn-lg">
+
+          <button type="submit" class="btn btn-primary w-100" style="min-height:52px; font-size:17px;">
             <i class="bi bi-box-arrow-in-right me-2"></i>Autentificare
           </button>
         </form>

@@ -540,16 +540,23 @@
   }
 
   function aplicaFiltre() {
-    localStorage.removeItem('sort_dist_activ');
+    // Daca "Aproape de mine" e activ, il transmitem ca sort in URL
+    const distActiv = localStorage.getItem('sort_dist_activ') === 'true';
+    if (distActiv) {
+      document.getElementById('hiddenSort').value = 'distance';
+    } else {
+      localStorage.removeItem('sort_dist_activ');
+      document.getElementById('hiddenSort').value = pendingSort;
+    }
     document.getElementById('hiddenCategory').value = pendingCategory;
     document.getElementById('hiddenRating').value = pendingRating;
-    document.getElementById('hiddenSort').value = pendingSort;
     document.getElementById('filterForm').submit();
   }
 
   function resetFiltre() {
     localStorage.removeItem('sort_dist_activ');
     localStorage.removeItem('dist_radius');
+    razaActiva = 0;
     window.location = "{% url 'services:list' %}";
   }
 
@@ -788,7 +795,7 @@
       status.innerHTML = `<i class="bi bi-x-circle text-danger me-1"></i>${msgs[err.code]||'Eroare.'}`;
       initMap(45.9432, 24.9668, 7);
       addServiceMarkers(SERVICES);
-    }, { enableHighAccuracy:true, timeout:10000, maximumAge:60000 });
+    }, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
   }
 
   function showNearbyList(results) {
@@ -845,8 +852,24 @@
     const loc = getLocatieSalvata();
     if (loc) {
       document.getElementById('locatieStatus').style.display = 'block';
-      document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (din memorie)`;
+      document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-geo-alt text-warning me-1"></i>Se actualizează locația...`;
       document.getElementById('btnResetMap').style.display = 'inline-block';
+      // Cere GPS proaspat in fundal - actualizeaza silentios fara a bloca UI
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const newLat = pos.coords.latitude, newLng = pos.coords.longitude;
+          salveazaLocatia(newLat, newLng);
+          document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (±${Math.round(pos.coords.accuracy)}m)`;
+          if (userMarker) userMarker.setLatLng([newLat, newLng]);
+          afiseazaDistanteCarduri(newLat, newLng);
+          if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(newLat, newLng);
+          if (razaActiva > 0) filtreazaDupaRaza(newLat, newLng, razaActiva);
+        }, () => {
+          document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (din memorie)`;
+        }, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
+      } else {
+        document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (din memorie)`;
+      }
       initMap(loc.lat, loc.lng, 12);
       userMarker = L.marker([loc.lat, loc.lng], {
         draggable: true,
@@ -874,14 +897,16 @@
       afiseazaDistanteCarduri(loc.lat, loc.lng);
     }
 
-    if (localStorage.getItem("sort_dist_activ") === "true" && loc) {
-      // Aplica sortarea dupa distanta DOAR daca nu exista un sort activ din server
-      const urlParams = new URLSearchParams(window.location.search);
-      const serverSort = urlParams.get('sort') || 'rating';
-      if (serverSort === 'rating') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const serverSort = urlParams.get('sort') || 'rating';
+
+    // Daca URL contine sort=distance SAU localStorage are sort_dist_activ, reactiveaza
+    if (serverSort === 'distance' || localStorage.getItem('sort_dist_activ') === 'true') {
+      if (loc) {
+        localStorage.setItem('sort_dist_activ', 'true');
         aplicaSortareDupaDistanta(loc.lat, loc.lng);
       } else {
-        // Exista un sort din server - anuleaza sort_dist_activ
+        // Nu avem locatie - curata starea
         localStorage.removeItem('sort_dist_activ');
       }
     }
