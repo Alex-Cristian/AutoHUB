@@ -16,6 +16,7 @@
         </div>
 
         <form method="post">
+          <input type="hidden" name="legal_version" value="{{ legal_version|default:'2026-03-19' }}">
           {% csrf_token %}
           <div class="row g-3">
             <div class="col-6">
@@ -47,6 +48,17 @@
               <label class="form-label">Confirmă parola</label>
               {{ form.password2 }}
               {% if form.password2.errors %}<div class="text-danger small">{{ form.password2.errors|join:" " }}</div>{% endif %}
+            </div>
+            <div class="col-12">
+              <div class="form-check mt-1">
+                {{ form.accept_terms }}
+                <label class="form-check-label small" for="{{ form.accept_terms.id_for_label }}">
+                  Sunt de acord cu <a href="{% url 'core:terms' %}" class="text-red text-decoration-none" target="_blank">Termenii și condițiile</a>,
+                  <a href="{% url 'core:privacy' %}" class="text-red text-decoration-none" target="_blank">Politica de confidențialitate</a> și
+                  <a href="{% url 'core:cookies' %}" class="text-red text-decoration-none" target="_blank">Politica cookie</a>.
+                </label>
+              </div>
+              {% if form.accept_terms.errors %}<div class="text-danger small">{{ form.accept_terms.errors|join:" " }}</div>{% endif %}
             </div>
           </div>
 

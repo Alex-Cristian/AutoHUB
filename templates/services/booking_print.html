@@ -31,13 +31,14 @@
 <body>
   <div class="actions">
     <a href="{% url 'services:booking_detail' booking.pk %}" class="btn">Înapoi la programare</a>
+    <a href="{% url 'services:booking_rar_pdf' booking.pk %}" class="btn" target="_blank">PDF</a>
     <a href="#" onclick="window.print(); return false;" class="btn">Print</a>
   </div>
   <div class="page">
     <div class="topbar">
       <div>
         <div class="brand">{{ booking.center.name }}</div>
-        <div class="muted">Fișă de comandă / AutoEMG</div>
+        <div class="muted">Fișă de comandă / AutoEMG / export intern</div>
       </div>
       <div style="text-align:right;">
         <h2>Programare #{{ booking.pk }}</h2>

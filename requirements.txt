@@ -74,3 +74,5 @@ zopfli==0.4.0
 cloudinary==1.44.1
 django-cloudinary-storage==0.3.0
 twilio==9.10.3
+
+reportlab>=4.0

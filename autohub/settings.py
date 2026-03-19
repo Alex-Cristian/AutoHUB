@@ -36,6 +36,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'core.middleware.LegalAcceptanceRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -134,3 +135,6 @@ else:
             'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
         },
     }
+
+
+LEGAL_DOCUMENTS_VERSION = os.getenv('LEGAL_DOCUMENTS_VERSION', '2026-03-19')

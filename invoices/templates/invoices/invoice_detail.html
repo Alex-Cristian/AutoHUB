@@ -22,6 +22,7 @@
         </form>
       {% endif %}
 
+      <a class="btn btn-outline-warning" href="{% url 'invoices:pdf' invoice.pk %}" target="_blank"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
       <button class="btn btn-nav-cta" type="button" onclick="window.print()">
         <i class="bi bi-printer me-1"></i>Print
       </button>

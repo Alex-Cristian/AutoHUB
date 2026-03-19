@@ -22,6 +22,7 @@ urlpatterns = [
     path('dashboard/notificari/<int:pk>/citit/', views.notification_mark_read, name='notification_read'),
     path('dashboard/programari/<int:pk>/', views.booking_detail, name='booking_detail'),
     path('dashboard/programari/<int:pk>/print/', views.booking_print, name='booking_print'),
+    path('dashboard/programari/<int:pk>/fisa-rar.pdf', views.booking_rar_pdf, name='booking_rar_pdf'),
     path('dashboard/programari/<int:pk>/accepta/', views.booking_accept, name='booking_accept'),
     path('dashboard/programari/<int:pk>/respinge/', views.booking_reject, name='booking_reject'),
     path('dashboard/service/<int:pk>/', views.service_profile_manage, name='manage_profile'),

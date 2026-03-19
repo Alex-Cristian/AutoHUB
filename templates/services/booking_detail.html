@@ -14,6 +14,7 @@
       <a href="{% url 'services:dashboard' %}" class="btn btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
       {% endif %}
       <a href="#work-order" class="btn btn-nav-cta"><i class="bi bi-file-earmark-text me-1"></i>Completează fișa</a>
+      <a href="{% url 'invoices:create' %}?booking={{ booking.pk }}" class="btn btn-outline-success"><i class="bi bi-receipt me-1"></i>Creează factură</a>
     </div>
   </div>
 
@@ -39,7 +40,10 @@
             <h4 class="mb-1"><i class="bi bi-file-earmark-text me-2 text-orange"></i>Detalii suplimentare pentru fișa de comandă</h4>
             <p class="text-muted-custom small mb-0">Poți completa serviciile folosite sau o descriere suplimentară înainte de print. Câmpurile sunt opționale, dar dacă le completezi vor apărea pe fișă.</p>
           </div>
-          <a href="{% url 'services:booking_print' booking.pk %}" class="btn btn-outline-primary"><i class="bi bi-printer me-1"></i>Deschide fișa pentru print</a>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'services:booking_print' booking.pk %}" class="btn btn-outline-primary"><i class="bi bi-printer me-1"></i>Deschide fișa pentru print</a>
+            <a href="{% url 'services:booking_rar_pdf' booking.pk %}" class="btn btn-outline-warning" target="_blank"><i class="bi bi-filetype-pdf me-1"></i>Export PDF fișă</a>
+          </div>
         </div>
         <form method="post">
           {% csrf_token %}
@@ -56,6 +60,7 @@
             <div class="col-12 d-flex flex-wrap gap-2">
               <button class="btn btn-nav-cta" type="submit"><i class="bi bi-save me-1"></i>Salvează datele fișei</button>
               <a href="{% url 'services:booking_print' booking.pk %}" class="btn btn-outline-light"><i class="bi bi-printer me-1"></i>Printează după salvare</a>
+              <a href="{% url 'services:booking_rar_pdf' booking.pk %}" class="btn btn-outline-warning" target="_blank"><i class="bi bi-filetype-pdf me-1"></i>Descarcă PDF</a>
             </div>
           </div>
         </form>
@@ -230,7 +235,8 @@
         <h5 class="mb-3"><i class="bi bi-file-earmark-text me-2 text-orange"></i>Fișă de comandă</h5>
         <p class="text-muted-custom small mb-3">Fișa finală va include și serviciile/piesele folosite plus descrierea suplimentară, dacă alegi să le completezi. Câmpurile rămân opționale.</p>
         <a href="#work-order" class="btn btn-outline-light w-100 mb-2"><i class="bi bi-pencil-square me-1"></i>Completează detaliile fișei</a>
-        <a href="{% url 'services:booking_print' booking.pk %}" class="btn btn-outline-primary w-100"><i class="bi bi-printer me-1"></i>Deschide pentru print</a>
+        <a href="{% url 'services:booking_print' booking.pk %}" class="btn btn-outline-primary w-100 mb-2"><i class="bi bi-printer me-1"></i>Deschide pentru print</a>
+        <a href="{% url 'services:booking_rar_pdf' booking.pk %}" class="btn btn-outline-warning w-100" target="_blank"><i class="bi bi-filetype-pdf me-1"></i>Export PDF fișă intervenție</a>
       </div>
     </div>
   </div>
