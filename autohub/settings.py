@@ -20,6 +20,8 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'django.contrib.sites',
+    'django.contrib.sitemaps',
     'django.contrib.staticfiles',
     # Local
     'core.apps.CoreConfig',
@@ -80,11 +82,15 @@ LANGUAGE_CODE = 'ro'
 TIME_ZONE = 'Europe/Bucharest'
 USE_I18N = True
 USE_TZ = True
+SITE_ID = 1
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else []
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 USE_CLOUDINARY = os.getenv('USE_CLOUDINARY', 'True').lower() == 'true'
 
