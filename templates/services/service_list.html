@@ -540,16 +540,23 @@
   }
 
   function aplicaFiltre() {
-    localStorage.removeItem('sort_dist_activ');
+    // Daca "Aproape de mine" e activ, il transmitem ca sort in URL
+    const distActiv = localStorage.getItem('sort_dist_activ') === 'true';
+    if (distActiv) {
+      document.getElementById('hiddenSort').value = 'distance';
+    } else {
+      localStorage.removeItem('sort_dist_activ');
+      document.getElementById('hiddenSort').value = pendingSort;
+    }
     document.getElementById('hiddenCategory').value = pendingCategory;
     document.getElementById('hiddenRating').value = pendingRating;
-    document.getElementById('hiddenSort').value = pendingSort;
     document.getElementById('filterForm').submit();
   }
 
   function resetFiltre() {
     localStorage.removeItem('sort_dist_activ');
     localStorage.removeItem('dist_radius');
+    razaActiva = 0;
     window.location = "{% url 'services:list' %}";
   }
 
@@ -890,14 +897,16 @@
       afiseazaDistanteCarduri(loc.lat, loc.lng);
     }
 
-    if (localStorage.getItem("sort_dist_activ") === "true" && loc) {
-      // Aplica sortarea dupa distanta DOAR daca nu exista un sort activ din server
-      const urlParams = new URLSearchParams(window.location.search);
-      const serverSort = urlParams.get('sort') || 'rating';
-      if (serverSort === 'rating') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const serverSort = urlParams.get('sort') || 'rating';
+
+    // Daca URL contine sort=distance SAU localStorage are sort_dist_activ, reactiveaza
+    if (serverSort === 'distance' || localStorage.getItem('sort_dist_activ') === 'true') {
+      if (loc) {
+        localStorage.setItem('sort_dist_activ', 'true');
         aplicaSortareDupaDistanta(loc.lat, loc.lng);
       } else {
-        // Exista un sort din server - anuleaza sort_dist_activ
+        // Nu avem locatie - curata starea
         localStorage.removeItem('sort_dist_activ');
       }
     }
