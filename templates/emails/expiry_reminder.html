@@ -1,0 +1,13 @@
+{% extends "emails/base.html" %}
+{% block email_body %}
+<p style="margin:0 0 16px;">Salut, <strong>{{ greeting_name }}</strong>!</p>
+<p style="margin:0 0 18px;"><strong>{{ document_label }}</strong> pentru <strong>{{ car_summary }}</strong> expira pe <strong>{{ expiry_date_text }}</strong>.</p>
+<p style="margin:0 0 18px;">Ti-am trimis reminderul din timp ca sa poti evita intarzieri, amenzi sau situatii neplacute.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+  <tr>
+    <td align="center" style="border-radius:12px;background:#d92d3a;">
+      <a href="{{ calendar_url }}" style="display:inline-block;padding:14px 22px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#ffffff;">{{ cta_label }}</a>
+    </td>
+  </tr>
+</table>
+{% endblock %}

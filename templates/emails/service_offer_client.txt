@@ -1,0 +1,12 @@
+{% extends "emails/base.txt" %}
+{% block email_body_text %}
+{{ service_name }} ti-a trimis oferta pentru programarea #{{ booking.pk }}.
+
+Data: {{ booking_date_text }} la {{ booking_time_text }}
+Durata estimata: {{ duration_text }}
+Cost aproximativ: {{ estimated_price_text }}
+Masina: {{ car_summary }}
+
+Deschide contul tau pentru a accepta sau refuza oferta:
+{{ my_bookings_url }}
+{% endblock %}

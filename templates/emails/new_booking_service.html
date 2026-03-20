@@ -1,0 +1,24 @@
+{% extends "emails/base.html" %}
+{% block email_body %}
+<p style="margin:0 0 16px;">Salut, <strong>{{ greeting_name }}</strong>!</p>
+<p style="margin:0 0 18px;">Ai primit o programare noua pentru <strong>{{ service_name }}</strong>.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:18px;">
+  <tr><td style="padding:18px 20px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.7;color:#1f2937;">
+    <strong>Client:</strong> {{ client_name }}<br>
+    <strong>Data:</strong> {{ booking_date_text }} la {{ booking_time_text }}<br>
+    <strong>Masina:</strong> {{ car_summary }}<br>
+    <strong>Telefon:</strong> {{ client_phone }}<br>
+    <strong>Email:</strong> {{ client_email }}
+  </td></tr>
+</table>
+{% if problem_description %}
+<p style="margin:0 0 18px;"><strong>Detalii client:</strong><br>{{ problem_description }}</p>
+{% endif %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+  <tr>
+    <td align="center" style="border-radius:12px;background:#d92d3a;">
+      <a href="{{ service_dashboard_url }}" style="display:inline-block;padding:14px 22px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#ffffff;">{{ cta_label }}</a>
+    </td>
+  </tr>
+</table>
+{% endblock %}

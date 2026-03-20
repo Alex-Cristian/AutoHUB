@@ -1,0 +1,9 @@
+{% extends "emails/base.txt" %}
+{% block email_body_text %}
+Contul tau AutoEMG a fost creat cu succes. Confirma adresa de email pentru a-ti activa contul:
+
+{{ verification_url }}
+
+Linkul expira in {{ expiry_hours }} de ore.
+Daca nu ai creat tu acest cont, poti ignora acest mesaj.
+{% endblock %}

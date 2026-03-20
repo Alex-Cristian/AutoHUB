@@ -2,149 +2,234 @@ import logging
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.html import strip_tags
 
 logger = logging.getLogger(__name__)
 
 
-def send_email_safe(subject: str, message: str, to_email: str) -> bool:
-    if not to_email:
-        return False
-    try:
-        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None) or None
-        send_mail(subject, message, from_email, [to_email], fail_silently=False)
-        return True
-    except Exception:
-        logger.exception('Nu am putut trimite email către %s.', to_email)
-        return False
-
-
 def _format_price(price) -> str | None:
-    if price in (None, ''):
+    if price in (None, ""):
         return None
     try:
         amount = Decimal(price)
     except (InvalidOperation, TypeError, ValueError):
         return None
-    return f'{amount:.2f} RON'
+    return f"{amount:.2f} RON"
 
 
 def _date_text(value) -> str:
-    return value.strftime('%d.%m.%Y') if value else 'data necunoscută'
+    return value.strftime("%d.%m.%Y") if value else "Data necunoscuta"
 
 
 def _time_text(value) -> str:
-    return value.strftime('%H:%M') if value else 'ora necunoscută'
+    return value.strftime("%H:%M") if value else "Ora necunoscuta"
 
 
-def _site_url(path: str = '/') -> str:
-    domain = getattr(settings, 'SITE_BASE_URL', '').rstrip('/')
-    if not domain:
-        return path
-    if not path.startswith('/'):
-        path = '/' + path
-    return f'{domain}{path}'
+def _site_url(path: str = "/") -> str:
+    domain = getattr(settings, "SITE_BASE_URL", "").rstrip("/")
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{domain}{path}" if domain else path
+
+
+def _user_display_name(user) -> str:
+    if not user:
+        return "Salut"
+    return getattr(user, "first_name", "") or getattr(user, "username", "") or "Salut"
+
+
+def _service_owner_email(booking) -> str:
+    owner = getattr(getattr(booking, "center", None), "owner", None)
+    return getattr(owner, "email", "") or ""
+
+
+def _booking_context(booking) -> dict:
+    return {
+        "booking": booking,
+        "client_name": booking.client_name,
+        "service_name": getattr(booking.center, "name", "AutoEMG"),
+        "service_owner_name": _user_display_name(getattr(booking.center, "owner", None)),
+        "booking_date_text": _date_text(booking.booking_date),
+        "booking_time_text": _time_text(booking.booking_time),
+        "duration_text": booking.get_duration_display(),
+        "estimated_price_text": _format_price(getattr(booking, "estimated_price", None)) or "Nespecificat",
+        "garage_name": getattr(getattr(booking, "garage", None), "name", "") or "Service",
+        "car_summary": f"{booking.car_brand} {booking.car_model} ({booking.car_plate})",
+        "client_phone": booking.client_phone,
+        "client_email": booking.client_email,
+        "problem_description": booking.problem_description,
+        "booking_detail_url": _site_url(reverse("services:booking_detail", args=[booking.pk])),
+        "my_bookings_url": _site_url(reverse("bookings:my_bookings")),
+        "service_dashboard_url": _site_url(reverse("services:dashboard")),
+    }
+
+
+def _render_plain_text(template_name: str, context: dict) -> str:
+    rendered = render_to_string(template_name, context).strip()
+    return rendered or strip_tags(render_to_string("emails/base.txt", context)).strip()
+
+
+def send_transactional_email(
+    *,
+    to_email: str,
+    subject: str,
+    html_template: str,
+    text_template: str,
+    context: dict,
+) -> bool:
+    if not to_email:
+        logger.warning("Email netrimis: lipseste destinatarul pentru subiectul '%s'.", subject)
+        return False
+
+    payload = {
+        "brand_name": "AutoEMG",
+        "brand_tagline": "Marketplace service auto",
+        "site_url": _site_url("/"),
+        "support_email": getattr(settings, "DEFAULT_FROM_EMAIL", ""),
+        **context,
+    }
+
+    try:
+        text_body = _render_plain_text(text_template, payload)
+        html_body = render_to_string(html_template, payload)
+        message = EmailMultiAlternatives(
+            subject=subject,
+            body=text_body,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None) or None,
+            to=[to_email],
+        )
+        message.attach_alternative(html_body, "text/html")
+        message.send(fail_silently=False)
+        logger.info("Email trimis cu succes catre %s: %s", to_email, subject)
+        return True
+    except Exception:
+        logger.exception("Nu am putut trimite emailul '%s' catre %s.", subject, to_email)
+        return False
 
 
 def send_verification_email(user, token) -> bool:
-    verify_path = reverse('accounts:verify_email', args=[token.token])
-    verify_url = _site_url(verify_path)
-    subject = 'AutoEMG - confirmă adresa de email'
-    message = (
-        f'Salut, {user.first_name or user.username}!\n\n'
-        'Contul tău AutoEMG a fost creat, dar trebuie să îți confirmi adresa de email înainte să te poți autentifica.\n\n'
-        f'Link confirmare: {verify_url}\n\n'
-        f'Linkul expiră în {getattr(settings, "ACCOUNT_VERIFICATION_EXPIRY_HOURS", 24)} de ore. Dacă nu ai creat tu acest cont, poți ignora acest mesaj.'
+    verify_url = _site_url(reverse("accounts:verify_email", args=[token.token]))
+    return send_transactional_email(
+        to_email=user.email,
+        subject="AutoEMG - confirma adresa de email",
+        html_template="emails/account_verification.html",
+        text_template="emails/account_verification.txt",
+        context={
+            "preview_text": "Activeaza-ti contul si confirma adresa de email.",
+            "headline": "Confirma adresa de email",
+            "greeting_name": _user_display_name(user),
+            "verification_url": verify_url,
+            "cta_label": "Confirma emailul",
+            "expiry_hours": getattr(settings, "ACCOUNT_VERIFICATION_EXPIRY_HOURS", 24),
+        },
     )
-    return send_email_safe(subject, message, user.email)
 
 
 def send_expiry_reminder_email(user, car, label: str, expiry_date) -> bool:
-    car_name = f'{car.make} {car.model} ({car.plate_number})'
-    subject = f'AutoEMG - {label} expiră în curând pentru {car.plate_number}'
-    message = (
-        f'Salut, {user.first_name or user.username}!\n\n'
-        f'{label} pentru mașina {car_name} expiră la data de {_date_text(expiry_date)}.\n'
-        'Îți recomandăm să te ocupi din timp ca să eviți problemele sau amenzile.\n\n'
-        f'Vezi calendarul de expirări: {_site_url(reverse("accounts:car_calendar", args=[car.pk]))}'
+    return send_transactional_email(
+        to_email=user.email,
+        subject=f"AutoEMG - {label} expira curand pentru {car.plate_number}",
+        html_template="emails/expiry_reminder.html",
+        text_template="emails/expiry_reminder.txt",
+        context={
+            "preview_text": f"Reminder pentru {label}: expira pe {_date_text(expiry_date)}.",
+            "headline": f"{label} expira in curand",
+            "greeting_name": _user_display_name(user),
+            "document_label": label,
+            "expiry_date_text": _date_text(expiry_date),
+            "car_summary": f"{car.make} {car.model} ({car.plate_number})",
+            "calendar_url": _site_url(reverse("accounts:car_calendar", args=[car.pk])),
+            "cta_label": "Vezi calendarul de expirari",
+        },
     )
-    return send_email_safe(subject, message, user.email)
-
-
-def send_booking_quote_email(booking) -> bool:
-    subject = f'AutoEMG - ofertă nouă pentru programarea #{booking.pk}'
-    price = _format_price(getattr(booking, 'estimated_price', None))
-    message = (
-        f'Salut, {booking.client_name}!\n\n'
-        f'{booking.center.name} a răspuns la programarea ta.\n'
-        f'Data: {_date_text(booking.booking_date)}\n'
-        f'Ora: {_time_text(booking.booking_time)}\n'
-        f'Durată estimată: {booking.get_duration_display()}\n'
-        f'Preț aproximativ: {price or "Nespecificat"}\n\n'
-        f'Poți intra în contul tău pentru a accepta sau refuza oferta: {_site_url(reverse("bookings:my_bookings"))}'
-    )
-    return send_email_safe(subject, message, booking.client_email)
-
-
-def send_booking_started_email(booking) -> bool:
-    subject = f'AutoEMG - a început lucrarea pentru programarea #{booking.pk}'
-    price = _format_price(getattr(booking, 'estimated_price', None))
-    parts = [
-        f'Salut, {booking.client_name}!',
-        '',
-        f'Mecanicul a început lucrul la mașina ta în service-ul {booking.center.name}.',
-        f'Data programării: {_date_text(booking.booking_date)}',
-        f'Ora: {_time_text(booking.booking_time)}',
-    ]
-    if price:
-        parts.append(f'Cost estimativ: {price}')
-    return send_email_safe(subject, '\n'.join(parts), booking.client_email)
-
-
-def send_booking_completed_email(booking) -> bool:
-    subject = f'AutoEMG - lucrarea pentru programarea #{booking.pk} a fost finalizată'
-    price = _format_price(getattr(booking, 'estimated_price', None))
-    parts = [
-        f'Salut, {booking.client_name}!',
-        '',
-        f'Lucrarea pentru mașina ta la {booking.center.name} a fost marcată ca finalizată.',
-        f'Data programării: {_date_text(booking.booking_date)}',
-        f'Ora: {_time_text(booking.booking_time)}',
-    ]
-    if price:
-        parts.append(f'Cost estimativ: {price}')
-    return send_email_safe(subject, '\n'.join(parts), booking.client_email)
 
 
 def send_booking_request_to_service_email(booking) -> bool:
-    owner = getattr(getattr(booking, 'center', None), 'owner', None)
-    if not owner or not owner.email:
+    owner_email = _service_owner_email(booking)
+    if not owner_email:
         return False
-    subject = f'[AutoEMG] Programare nouă #{booking.pk}'
-    message = (
-        f'Ai o programare nouă pentru {booking.center.name}.\n\n'
-        f'Client: {booking.client_name}\n'
-        f'Data/Ora: {_date_text(booking.booking_date)} {_time_text(booking.booking_time)}\n'
-        f'Mașină: {booking.car_brand} {booking.car_model} ({booking.car_plate})\n'
-        f'Telefon: {booking.client_phone}\n'
-        f'Email: {booking.client_email}\n\n'
-        'Intră în dashboard-ul service-ului ca să răspunzi programării.'
+    return send_transactional_email(
+        to_email=owner_email,
+        subject=f"AutoEMG - programare noua #{booking.pk}",
+        html_template="emails/new_booking_service.html",
+        text_template="emails/new_booking_service.txt",
+        context={
+            **_booking_context(booking),
+            "preview_text": f"Ai primit o programare noua pentru {booking.center.name}.",
+            "headline": "Ai primit o programare noua",
+            "greeting_name": _user_display_name(getattr(booking.center, "owner", None)),
+            "cta_label": "Deschide dashboard-ul",
+        },
     )
-    return send_email_safe(subject, message, owner.email)
+
+
+def send_booking_quote_email(booking) -> bool:
+    return send_transactional_email(
+        to_email=booking.client_email,
+        subject=f"AutoEMG - oferta noua pentru programarea #{booking.pk}",
+        html_template="emails/service_offer_client.html",
+        text_template="emails/service_offer_client.txt",
+        context={
+            **_booking_context(booking),
+            "preview_text": f"{booking.center.name} a trimis o oferta pentru programarea ta.",
+            "headline": "Oferta ta este gata",
+            "greeting_name": booking.client_name,
+            "cta_label": "Vezi si raspunde la oferta",
+        },
+    )
 
 
 def send_quote_accepted_to_service_email(booking) -> bool:
-    owner = getattr(getattr(booking, 'center', None), 'owner', None)
-    if not owner or not owner.email:
+    owner_email = _service_owner_email(booking)
+    if not owner_email:
         return False
-    price = _format_price(getattr(booking, 'estimated_price', None))
-    subject = f'[AutoEMG] Clientul a acceptat oferta pentru programarea #{booking.pk}'
-    message = (
-        f'Clientul {booking.client_name} a acceptat oferta trimisă de {booking.center.name}.\n\n'
-        f'Data/Ora: {_date_text(booking.booking_date)} {_time_text(booking.booking_time)}\n'
-        f'Durată estimată: {booking.get_duration_display()}\n'
-        f'Preț aproximativ: {price or "Nespecificat"}\n'
-        f'Mașină: {booking.car_brand} {booking.car_model} ({booking.car_plate})'
+    return send_transactional_email(
+        to_email=owner_email,
+        subject=f"AutoEMG - clientul a acceptat oferta pentru programarea #{booking.pk}",
+        html_template="emails/client_accepted_service.html",
+        text_template="emails/client_accepted_service.txt",
+        context={
+            **_booking_context(booking),
+            "preview_text": f"{booking.client_name} a acceptat oferta trimisa de service.",
+            "headline": "Oferta a fost acceptata",
+            "greeting_name": _user_display_name(getattr(booking.center, "owner", None)),
+            "cta_label": "Vezi programarea",
+        },
     )
-    return send_email_safe(subject, message, owner.email)
+
+
+def send_booking_started_email(booking) -> bool:
+    return send_transactional_email(
+        to_email=booking.client_email,
+        subject=f"AutoEMG - lucrarea a inceput pentru programarea #{booking.pk}",
+        html_template="emails/work_started_client.html",
+        text_template="emails/work_started_client.txt",
+        context={
+            **_booking_context(booking),
+            "preview_text": f"Lucrarea pentru masina ta a inceput la {booking.center.name}.",
+            "headline": "Lucrarea a inceput",
+            "greeting_name": booking.client_name,
+            "cta_label": "Vezi programarile mele",
+            "mechanic_name": getattr(getattr(booking, "mechanic", None), "name", "") or "Mecanicul alocat",
+        },
+    )
+
+
+def send_booking_completed_email(booking) -> bool:
+    return send_transactional_email(
+        to_email=booking.client_email,
+        subject=f"AutoEMG - lucrarea a fost finalizata pentru programarea #{booking.pk}",
+        html_template="emails/work_completed_client.html",
+        text_template="emails/work_completed_client.txt",
+        context={
+            **_booking_context(booking),
+            "preview_text": f"Lucrarea pentru masina ta a fost marcata ca finalizata.",
+            "headline": "Lucrarea a fost finalizata",
+            "greeting_name": booking.client_name,
+            "cta_label": "Vezi istoricul programarii",
+            "mechanic_name": getattr(getattr(booking, "mechanic", None), "name", "") or "Mecanicul alocat",
+        },
+    )

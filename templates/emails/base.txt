@@ -1,0 +1,8 @@
+{{ headline }}
+
+Salut{% if greeting_name %}, {{ greeting_name }}{% endif %}.
+
+{% block email_body_text %}{% endblock %}
+
+AutoEMG
+{{ site_url }}
