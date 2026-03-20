@@ -87,7 +87,10 @@ def login_view(request):
     if request.method == 'POST':
         form = LoginForm(request, data=request.POST)
         if form.is_valid():
-            user = form.get_user()
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            # select_related('legal_acceptance') evită query extra lazy în middleware
+            user = User.objects.select_related('legal_acceptance').get(pk=form.get_user().pk)
             login(request, user)
             if not _has_current_legal_acceptance(user):
                 messages.warning(request, 'Pentru a continua, trebuie să accepți documentele legale actualizate.')
