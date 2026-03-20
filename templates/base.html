@@ -238,9 +238,12 @@
     html[data-theme='light'] #id_categories label,
     html[data-theme='light'] #profile-id_categories label { color: var(--ah-text) !important; }
 
-    /* ===== GLOBAL: tranziție completă ===== */
+    /* ===== GLOBAL: tranziții optimizate pentru mobil ===== */
     * { transition-property: background-color, color, border-color; transition-duration: 0.2s; transition-timing-function: ease; }
-    a, button, .btn, input, select, textarea { transition: all 0.2s ease; }
+    /* transition: all pe butoane cauza delay 300ms pe touch */
+    a, button, .btn { transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease; touch-action: manipulation; }
+    input, select, textarea { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+    button, [type='button'], [type='submit'], a { touch-action: manipulation; }
   </style>
 
   {% block extra_css %}{% endblock %}
