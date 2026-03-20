@@ -9,9 +9,23 @@ load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = 'django-insecure-autohub-marketplace-change-in-production-2024-xyz'
 
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+DEBUG = False
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'ERROR',
+    },
+}
 
 INSTALLED_APPS = [
     'cloudinary',
@@ -31,6 +45,7 @@ INSTALLED_APPS = [
     'invoices.apps.InvoicesConfig',
 ]
 
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -38,7 +53,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'core.middleware.LegalAcceptanceRequiredMiddleware',
+    #'core.middleware.LegalAcceptanceRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -144,3 +159,16 @@ else:
 
 
 LEGAL_DOCUMENTS_VERSION = os.getenv('LEGAL_DOCUMENTS_VERSION', '2026-03-19')
+
+
+SITE_BASE_URL = os.getenv('SITE_BASE_URL', 'http://127.0.0.1:8000')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'AutoEMG <admin@autoemg.com>')
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() == 'true'
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '20'))
+ACCOUNT_VERIFICATION_EXPIRY_HOURS = int(os.getenv('ACCOUNT_VERIFICATION_EXPIRY_HOURS', '24'))

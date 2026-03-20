@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import login, logout
+from django.contrib.auth.models import User
 from django.db import models
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -12,12 +13,14 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 import json
+import secrets
 import re
 import requests as http_requests
 
 from services.models import Favorite
+from core.services.email_service import send_verification_email
 from .forms import RegisterForm, LoginForm, CarForm, CarExpiryProfileForm
-from .models import Car, CarExpiryProfile, LegalAcceptance
+from .models import Car, CarExpiryProfile, LegalAcceptance, EmailVerificationToken
 
 
 STAR_POSITIONS = [
@@ -71,11 +74,21 @@ def register_view(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
         if form.is_valid():
-            user = form.save()
+            user = form.save(commit=False)
+            user.email = (user.email or '').strip().lower()
+            user.is_active = False
+            user.save()
             _record_legal_acceptance(user, request)
-            login(request, user)
-            messages.success(request, f'Bun venit, {user.first_name}! Contul tău a fost creat.')
-            return redirect('core:home')
+            token, _ = EmailVerificationToken.objects.update_or_create(
+                user=user,
+                defaults={'token': secrets.token_urlsafe(32), 'verified_at': None},
+            )
+            sent = send_verification_email(user, token)
+            if sent:
+                messages.success(request, 'Contul a fost creat. Ți-am trimis un email de confirmare. Verifică inbox-ul înainte să te autentifici.')
+            else:
+                messages.warning(request, 'Contul a fost creat, dar emailul de confirmare nu a putut fi trimis. Verifică setările SMTP și încearcă din nou.')
+            return redirect('accounts:login')
     else:
         form = RegisterForm()
     return render(request, 'accounts/register.html', {'form': form})
@@ -85,6 +98,7 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect('core:home')
     if request.method == 'POST':
+        attempted_username = (request.POST.get('username') or '').strip()
         form = LoginForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
@@ -95,6 +109,10 @@ def login_view(request):
             messages.success(request, f'Bun venit înapoi, {user.first_name or user.username}!')
             next_url = request.GET.get('next')
             return redirect(next_url or 'core:home')
+        if attempted_username:
+            inactive_user = User.objects.filter(username__iexact=attempted_username, is_active=False).first()
+            if inactive_user:
+                messages.error(request, 'Contul tău nu este încă verificat pe email. Deschide linkul primit în inbox înainte să te autentifici.')
     else:
         form = LoginForm(request)
     return render(request, 'accounts/login.html', {'form': form})
@@ -1049,3 +1067,26 @@ def car_scan_save(request, pk):
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def verify_email_view(request, token):
+    verification = get_object_or_404(EmailVerificationToken.objects.select_related('user'), token=token)
+    if verification.is_verified:
+        messages.info(request, 'Adresa de email a fost deja confirmată. Te poți autentifica.')
+        return redirect('accounts:login')
+    if verification.is_expired():
+        verification.token = secrets.token_urlsafe(32)
+        verification.created_at = timezone.now()
+        verification.save(update_fields=['token', 'created_at'])
+        send_verification_email(verification.user, verification)
+        messages.error(request, 'Linkul de confirmare a expirat. Ți-am trimis automat unul nou pe email.')
+        return redirect('accounts:login')
+
+    verification.verified_at = timezone.now()
+    verification.save(update_fields=['verified_at'])
+    user = verification.user
+    if not user.is_active:
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+    messages.success(request, 'Email confirmat cu succes. Acum te poți autentifica.')
+    return redirect('accounts:login')
