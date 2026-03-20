@@ -152,7 +152,9 @@
             <div class="col-md-4">
               <div class="p-2 rounded-3 h-100" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
                 {% if attachment.is_image %}
-                  <img src="{{ attachment.file.url }}" alt="Poză programare {{ b.pk }}" class="img-fluid rounded-3 mb-2" style="width:100%;height:220px;object-fit:contain;background:#000;">
+                  <div style="height:200px;border-radius:12px;overflow:hidden;cursor:zoom-in;margin-bottom:.5rem;" onclick="openLightbox('{{ attachment.file.url }}')">
+                    <img src="{{ attachment.file.url }}" alt="Poză programare {{ b.pk }}" style="width:100%;height:100%;object-fit:cover;">
+                  </div>
                 {% else %}
                   <video controls class="w-100 rounded-3 mb-2" style="height:220px;object-fit:contain;background:#000;">
                     <source src="{{ attachment.file.url }}">
@@ -209,5 +211,35 @@ function openPhotoModal(url, label) {
   document.getElementById('photoModalLabel').textContent = label;
   new bootstrap.Modal(document.getElementById('photoModal')).show();
 }
+
+let lbZoomed = false;
+function openLightbox(src) {
+  const lb = document.getElementById('lightbox');
+  const img = document.getElementById('lb-img');
+  img.src = src;
+  img.style.transform = 'scale(1)';
+  lbZoomed = false;
+  lb.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.body.style.overflow = '';
+  lbZoomed = false;
+}
+function toggleZoom(e) {
+  e.stopPropagation();
+  const img = document.getElementById('lb-img');
+  lbZoomed = !lbZoomed;
+  img.style.transform = lbZoomed ? 'scale(2.5)' : 'scale(1)';
+  img.style.cursor = lbZoomed ? 'zoom-out' : 'grab';
+}
+document.addEventListener('keydown', function(e) { if(e.key==='Escape') closeLightbox(); });
 </script>
+
+<div id="lightbox" onclick="closeLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
+  <img id="lb-img" style="max-width:92vw;max-height:92vh;border-radius:12px;transition:transform .25s;cursor:grab;" ondblclick="toggleZoom(event)">
+  <div onclick="closeLightbox()" style="position:fixed;top:1rem;right:1.5rem;color:#fff;font-size:2.2rem;cursor:pointer;line-height:1;user-select:none;">×</div>
+  <div style="position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.45);font-size:.78rem;">Dublu-click pentru zoom · Escape pentru închide</div>
+</div>
 {% endblock %}

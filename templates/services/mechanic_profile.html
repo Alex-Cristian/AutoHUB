@@ -132,7 +132,9 @@
         <option value="date-asc">Dată ↑ crescător</option>
         <option value="date-desc">Dată ↓ descrescător</option>
       </select>
-
+      <button type="button" id="mp-clear-btn" onclick="mpClearFilters()" style="display:none;padding:.3rem .75rem;border-radius:8px;border:1px solid rgba(230,57,70,0.4);background:rgba(230,57,70,0.08);color:var(--ah-red);font-size:.8rem;cursor:pointer;">
+        <i class="bi bi-x-circle me-1"></i>Șterge filtrele
+      </button>
       <span class="small text-muted-custom ms-1" id="mp-count"></span>
     </div>
 
@@ -364,60 +366,42 @@
             <div class="p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
               <div class="small fw-bold text-muted-custom text-uppercase mb-3"><i class="bi bi-camera text-red me-1"></i>Poze intrare</div>
               {% if wl %}
-              <div class="d-flex flex-wrap gap-2 mb-3">
-                {% for photo in wl.photos.all %}
-                  {% if photo.photo_type == 'before' %}
-                  <div class="position-relative">
-                    <img src="{{ photo.photo.url }}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--ah-border);">
-                    <form method="post" class="position-absolute top-0 end-0" style="margin:2px;">
-                      {% csrf_token %}
-                      <input type="hidden" name="action" value="delete_photo">
-                      <input type="hidden" name="photo_id" value="{{ photo.pk }}">
-                      <button type="submit" class="btn btn-danger p-0" style="width:18px;height:18px;font-size:9px;line-height:1;border-radius:4px;">×</button>
-                    </form>
-                  </div>
-                  {% endif %}
-                {% endfor %}
+              <div class="d-flex flex-wrap gap-2 mb-3" id="photos-before-{{ booking.pk }}">
+                {% for photo in wl.photos.all %}{% if photo.photo_type == 'before' %}
+                <div class="position-relative" id="ph-{{ photo.pk }}" style="width:72px;height:72px;">
+                  <img src="{{ photo.photo.url }}" data-lb="{{ photo.photo.url }}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--ah-border);cursor:zoom-in;">
+                  <button type="button" onclick="delPhoto({{ photo.pk }},'ph-{{ photo.pk }}')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:4px;background:rgba(220,38,38,0.9);border:none;color:#fff;font-size:10px;cursor:pointer;line-height:1;">×</button>
+                </div>
+                {% endif %}{% endfor %}
               </div>
               {% endif %}
-              <form method="post" enctype="multipart/form-data">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="upload_photos">
-                <input type="hidden" name="booking_id" value="{{ booking.pk }}">
-                <input type="hidden" name="photo_type" value="before">
-                <input type="file" name="photos" class="form-control form-control-sm mb-2" multiple accept="image/*">
-                <button type="submit" class="btn btn-outline-primary btn-sm w-100"><i class="bi bi-upload me-1"></i>Adaugă</button>
-              </form>
+              <div onclick="document.getElementById('fi-b-{{ booking.pk }}').click()" ondragover="event.preventDefault();this.style.borderColor='var(--ah-red)'" ondragleave="this.style.borderColor='var(--ah-border)'" ondrop="event.preventDefault();this.style.borderColor='var(--ah-border)';doUpload('{{ booking.pk }}','before',event.dataTransfer.files)" style="border:2px dashed var(--ah-border);border-radius:10px;padding:.6rem;text-align:center;cursor:pointer;transition:border-color .2s;">
+                <i class="bi bi-cloud-upload text-muted-custom"></i>
+                <div class="small text-muted-custom" style="font-size:.75rem;">Apasă sau trage pozele</div>
+                <input type="file" id="fi-b-{{ booking.pk }}" accept="image/*" multiple style="display:none;" onchange="doUpload('{{ booking.pk }}','before',this.files);this.value=''">
+              </div>
+              <div id="prog-b-{{ booking.pk }}" class="small text-muted-custom mt-1" style="display:none;"></div>
             </div>
           </div>
           <div class="col-md-6">
             <div class="p-3 rounded-3" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
               <div class="small fw-bold text-muted-custom text-uppercase mb-3"><i class="bi bi-camera-fill me-1" style="color:#4ade80;"></i>Poze ieșire</div>
               {% if wl %}
-              <div class="d-flex flex-wrap gap-2 mb-3">
-                {% for photo in wl.photos.all %}
-                  {% if photo.photo_type == 'after' %}
-                  <div class="position-relative">
-                    <img src="{{ photo.photo.url }}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--ah-border);">
-                    <form method="post" class="position-absolute top-0 end-0" style="margin:2px;">
-                      {% csrf_token %}
-                      <input type="hidden" name="action" value="delete_photo">
-                      <input type="hidden" name="photo_id" value="{{ photo.pk }}">
-                      <button type="submit" class="btn btn-danger p-0" style="width:18px;height:18px;font-size:9px;line-height:1;border-radius:4px;">×</button>
-                    </form>
-                  </div>
-                  {% endif %}
-                {% endfor %}
+              <div class="d-flex flex-wrap gap-2 mb-3" id="photos-after-{{ booking.pk }}">
+                {% for photo in wl.photos.all %}{% if photo.photo_type == 'after' %}
+                <div class="position-relative" id="ph-{{ photo.pk }}" style="width:72px;height:72px;">
+                  <img src="{{ photo.photo.url }}" data-lb="{{ photo.photo.url }}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--ah-border);cursor:zoom-in;">
+                  <button type="button" onclick="delPhoto({{ photo.pk }},'ph-{{ photo.pk }}')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:4px;background:rgba(220,38,38,0.9);border:none;color:#fff;font-size:10px;cursor:pointer;line-height:1;">×</button>
+                </div>
+                {% endif %}{% endfor %}
               </div>
               {% endif %}
-              <form method="post" enctype="multipart/form-data">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="upload_photos">
-                <input type="hidden" name="booking_id" value="{{ booking.pk }}">
-                <input type="hidden" name="photo_type" value="after">
-                <input type="file" name="photos" class="form-control form-control-sm mb-2" multiple accept="image/*">
-                <button type="submit" class="btn btn-outline-success btn-sm w-100"><i class="bi bi-upload me-1"></i>Adaugă</button>
-              </form>
+              <div onclick="document.getElementById('fi-a-{{ booking.pk }}').click()" ondragover="event.preventDefault();this.style.borderColor='#4ade80'" ondragleave="this.style.borderColor='var(--ah-border)'" ondrop="event.preventDefault();this.style.borderColor='var(--ah-border)';doUpload('{{ booking.pk }}','after',event.dataTransfer.files)" style="border:2px dashed var(--ah-border);border-radius:10px;padding:.6rem;text-align:center;cursor:pointer;transition:border-color .2s;">
+                <i class="bi bi-cloud-upload" style="color:#4ade80;"></i>
+                <div class="small text-muted-custom" style="font-size:.75rem;">Apasă sau trage pozele</div>
+                <input type="file" id="fi-a-{{ booking.pk }}" accept="image/*" multiple style="display:none;" onchange="doUpload('{{ booking.pk }}','after',this.files);this.value=''">
+              </div>
+              <div id="prog-a-{{ booking.pk }}" class="small text-muted-custom mt-1" style="display:none;"></div>
             </div>
           </div>
         </div>
@@ -436,36 +420,21 @@
           </div>
 
           {% if wl %}
-          <div class="d-flex flex-wrap gap-2 mb-3">
-            {% for photo in wl.photos.all %}
-              {% if photo.photo_type == 'during' %}
-              <div class="position-relative">
-                <img src="{{ photo.photo.url }}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid rgba(249,115,22,0.3);">
-                <form method="post" class="position-absolute top-0 end-0" style="margin:2px;">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="delete_photo">
-                  <input type="hidden" name="photo_id" value="{{ photo.pk }}">
-                  <button type="submit" class="btn btn-danger p-0" style="width:18px;height:18px;font-size:9px;line-height:1;border-radius:4px;">×</button>
-                </form>
-              </div>
-              {% endif %}
-            {% endfor %}
-            {% if not wl.photos.filter %}
-            <div class="small text-muted-custom py-2">Nicio poză adăugată încă.</div>
-            {% endif %}
+          <div class="d-flex flex-wrap gap-2 mb-3" id="photos-during-{{ booking.pk }}">
+            {% for photo in wl.photos.all %}{% if photo.photo_type == 'during' %}
+            <div class="position-relative" id="ph-{{ photo.pk }}" style="width:80px;height:80px;">
+              <img src="{{ photo.photo.url }}" data-lb="{{ photo.photo.url }}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid rgba(249,115,22,0.3);cursor:zoom-in;">
+              <button type="button" onclick="delPhoto({{ photo.pk }},'ph-{{ photo.pk }}')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:4px;background:rgba(220,38,38,0.9);border:none;color:#fff;font-size:10px;cursor:pointer;line-height:1;">×</button>
+            </div>
+            {% endif %}{% endfor %}
           </div>
           {% endif %}
-
-          <form method="post" enctype="multipart/form-data">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="upload_photos">
-            <input type="hidden" name="booking_id" value="{{ booking.pk }}">
-            <input type="hidden" name="photo_type" value="during">
-            <input type="file" name="photos" class="form-control form-control-sm mb-2" multiple accept="image/*">
-            <button type="submit" class="btn btn-sm w-100" style="background:rgba(249,115,22,0.15);color:#fb923c;border:1px solid rgba(249,115,22,0.35);">
-              <i class="bi bi-upload me-1"></i>Adaugă poze lucrare
-            </button>
-          </form>
+          <div onclick="document.getElementById('fi-d-{{ booking.pk }}').click()" ondragover="event.preventDefault();this.style.borderColor='#fb923c'" ondragleave="this.style.borderColor='rgba(249,115,22,0.35)'" ondrop="event.preventDefault();this.style.borderColor='rgba(249,115,22,0.35)';doUpload('{{ booking.pk }}','during',event.dataTransfer.files)" style="border:2px dashed rgba(249,115,22,0.35);border-radius:10px;padding:.6rem;text-align:center;cursor:pointer;transition:border-color .2s;">
+            <i class="bi bi-cloud-upload" style="color:#fb923c;"></i>
+            <div class="small" style="font-size:.75rem;color:#fb923c;">Apasă sau trage pozele</div>
+            <input type="file" id="fi-d-{{ booking.pk }}" accept="image/*" multiple style="display:none;" onchange="doUpload('{{ booking.pk }}','during',this.files);this.value=''">
+          </div>
+          <div id="prog-d-{{ booking.pk }}" class="small text-muted-custom mt-1" style="display:none;"></div>
         </div>
 
       </div>
@@ -632,7 +601,8 @@ function openBookingModal(id) {
 // ── Filtre mecanic profil ──
 const today = new Date();
 const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-let mpFilterDate = todayStr;
+const MP_KEY = 'mp_filter_{{ mechanic.pk }}';
+let mpFilterDate = localStorage.getItem(MP_KEY) !== null ? localStorage.getItem(MP_KEY) : todayStr;
 let mpCalCur = new Date(today.getFullYear(), today.getMonth(), 1);
 
 function toggleMpCal() {
@@ -641,7 +611,6 @@ function toggleMpCal() {
   popup.style.display = isOpen ? 'none' : 'block';
   if (!isOpen) renderMpCal();
 }
-
 function mpCalPrev() { mpCalCur = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth()-1, 1); renderMpCal(); }
 function mpCalNext() { mpCalCur = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth()+1, 1); renderMpCal(); }
 
@@ -656,30 +625,24 @@ function renderMpCal() {
   for (let i = 0; i < startDow; i++) grid.appendChild(document.createElement('div'));
   const daysInMonth = new Date(mpCalCur.getFullYear(), mpCalCur.getMonth()+1, 0).getDate();
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${mpCalCur.getFullYear()}-${String(mpCalCur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isSel = mpFilterDate === dateStr;
-    const isToday = dateStr === todayStr;
-    const hasRows = datesWithRows.has(dateStr);
+    const ds = `${mpCalCur.getFullYear()}-${String(mpCalCur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isSel = mpFilterDate === ds;
+    const isToday = ds === todayStr;
+    const hasRows = datesWithRows.has(ds);
     const cell = document.createElement('div');
-    cell.style.cssText = 'text-align:center;padding:4px 2px;border-radius:8px;font-size:12px;position:relative;cursor:pointer;';
-    if (isSel) { cell.style.background = 'var(--ah-red)'; cell.style.color = '#fff'; cell.style.fontWeight = '700'; }
-    else if (isToday) { cell.style.border = '1px solid var(--ah-red)'; cell.style.color = 'var(--ah-red)'; cell.style.fontWeight = '700'; }
-    else if (hasRows) { cell.style.color = '#e8e8e8'; cell.style.fontWeight = '600'; }
-    else { cell.style.color = 'var(--ah-muted)'; }
-    const num = document.createElement('div');
-    num.textContent = d;
-    cell.appendChild(num);
-    if (hasRows) {
-      const dot = document.createElement('div');
-      dot.style.cssText = `width:4px;height:4px;border-radius:50%;margin:1px auto 0;background:${isSel?'#fff':'var(--ah-red)'};`;
-      cell.appendChild(dot);
-    }
-    cell.onmouseover = () => { if (!isSel) cell.style.background = 'var(--ah-dark3)'; };
-    cell.onmouseout = () => { if (!isSel) cell.style.background = ''; };
+    cell.style.cssText = 'text-align:center;padding:4px 2px;border-radius:8px;font-size:12px;cursor:pointer;';
+    if (isSel) { cell.style.background='var(--ah-red)'; cell.style.color='#fff'; cell.style.fontWeight='700'; }
+    else if (isToday) { cell.style.border='1px solid var(--ah-red)'; cell.style.color='var(--ah-red)'; cell.style.fontWeight='700'; }
+    else if (hasRows) { cell.style.color='#e8e8e8'; cell.style.fontWeight='600'; }
+    else { cell.style.color='var(--ah-muted)'; }
+    cell.innerHTML = `<div>${d}</div>`;
+    if (hasRows) { const dot = document.createElement('div'); dot.style.cssText=`width:4px;height:4px;border-radius:50%;margin:1px auto 0;background:${isSel?'#fff':'var(--ah-red)'};`; cell.appendChild(dot); }
+    cell.onmouseover = () => { if (!isSel) cell.style.background='var(--ah-dark3)'; };
+    cell.onmouseout  = () => { if (!isSel) cell.style.background=''; };
     cell.onclick = () => {
-      mpFilterDate = dateStr;
-      const dl = new Date(dateStr+'T00:00:00').toLocaleDateString('ro-RO', {day:'numeric', month:'long'});
-      document.getElementById('mp-date-label').textContent = dl;
+      mpFilterDate = ds;
+      localStorage.setItem(MP_KEY, ds);
+      document.getElementById('mp-date-label').textContent = new Date(ds+'T00:00:00').toLocaleDateString('ro-RO',{day:'numeric',month:'long'});
       document.getElementById('mp-cal-popup').style.display = 'none';
       mpApplyFilters();
     };
@@ -688,9 +651,18 @@ function renderMpCal() {
 }
 
 function mpShowAll() {
-  mpFilterDate = null;
+  mpFilterDate = '';
+  localStorage.setItem(MP_KEY, '');
   document.getElementById('mp-date-label').textContent = 'Toate zilele';
   document.getElementById('mp-cal-popup').style.display = 'none';
+  mpApplyFilters();
+}
+
+function mpClearFilters() {
+  mpFilterDate = todayStr;
+  localStorage.setItem(MP_KEY, todayStr);
+  document.getElementById('mp-date-label').textContent = 'Azi';
+  document.getElementById('mp-sort').value = 'time-asc';
   mpApplyFilters();
 }
 
@@ -699,44 +671,123 @@ function mpApplyFilters() {
   const sortVal = document.getElementById('mp-sort')?.value || 'time-asc';
   const tbody = document.getElementById('mp-tbody');
   const noResults = document.getElementById('mp-no-results');
+  const clearBtn = document.getElementById('mp-clear-btn');
 
-  // Sortare
+  // Afișăm butonul Șterge filtrele dacă nu e default (azi + time-asc)
+  if (clearBtn) clearBtn.style.display = (mpFilterDate === todayStr && sortVal === 'time-asc') ? 'none' : 'inline-block';
+
   rows.sort((a, b) => {
     if (sortVal === 'time-asc')  return (a.dataset.time||'').localeCompare(b.dataset.time||'');
     if (sortVal === 'time-desc') return (b.dataset.time||'').localeCompare(a.dataset.time||'');
-    const da = (a.dataset.date||'') + (a.dataset.time||'');
-    const db = (b.dataset.date||'') + (b.dataset.time||'');
-    if (sortVal === 'date-asc')  return da.localeCompare(db);
-    if (sortVal === 'date-desc') return db.localeCompare(da);
-    return 0;
+    const da = (a.dataset.date||'')+(a.dataset.time||''), db = (b.dataset.date||'')+(b.dataset.time||'');
+    return sortVal === 'date-asc' ? da.localeCompare(db) : db.localeCompare(da);
   });
   rows.forEach(r => tbody.appendChild(r));
 
-  // Filtrare dată
   let visible = 0;
   rows.forEach(row => {
     const show = !mpFilterDate || row.dataset.date === mpFilterDate;
     row.style.display = show ? '' : 'none';
     if (show) visible++;
   });
-
   const countEl = document.getElementById('mp-count');
   if (countEl) countEl.textContent = `${visible} programări`;
   if (noResults) noResults.style.display = visible === 0 ? 'block' : 'none';
 }
 
-// Închide calendar la click afară
 document.addEventListener('click', function(e) {
   const popup = document.getElementById('mp-cal-popup');
   const btn = document.getElementById('mp-date-btn');
-  if (popup && !popup.contains(e.target) && btn && !btn.contains(e.target)) {
-    popup.style.display = 'none';
-  }
+  if (popup && !popup.contains(e.target) && btn && !btn.contains(e.target)) popup.style.display = 'none';
 });
 
-// Inițializare: dată azi + oră crescătoare
+// ── AJAX upload poze ──
+const CSRF_TOKEN = (document.cookie.match(/csrftoken=([^;]+)/)||[])[1] || '{{ csrf_token }}';
+
+function doUpload(bookingId, photoType, files) {
+  if (!files || !files.length) return;
+  const prefMap = {before:'b', after:'a', during:'d'};
+  const pref = prefMap[photoType];
+  const progEl = document.getElementById(`prog-${pref}-${bookingId}`);
+  if (progEl) { progEl.style.display='block'; progEl.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Se încarcă...'; }
+
+  const fd = new FormData();
+  fd.append('action', 'upload_photos');
+  fd.append('booking_id', bookingId);
+  fd.append('photo_type', photoType);
+  Array.from(files).forEach(f => fd.append('photos', f));
+
+  fetch(window.location.href, {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF_TOKEN},
+    body: fd
+  })
+  .then(r => r.text())
+  .then(html => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const newEl = doc.getElementById(`photos-${photoType}-${bookingId}`);
+    const oldEl = document.getElementById(`photos-${photoType}-${bookingId}`);
+    if (newEl && oldEl) {
+      oldEl.outerHTML = newEl.outerHTML;
+      // event delegation preia automat imaginile noi cu data-lb
+    }
+    if (progEl) { progEl.innerHTML='<i class="bi bi-check-circle me-1 text-success"></i>Poze adăugate!'; setTimeout(()=>progEl.style.display='none', 2000); }
+  })
+  .catch(() => {
+    if (progEl) { progEl.innerHTML='<i class="bi bi-exclamation-circle me-1 text-danger"></i>Eroare upload.'; setTimeout(()=>progEl.style.display='none', 3000); }
+  });
+}
+
+function delPhoto(photoId, elemId) {
+  if (!confirm('Ștergi această poză?')) return;
+  const fd = new FormData();
+  fd.append('action', 'delete_photo');
+  fd.append('photo_id', photoId);
+  fetch(window.location.href, {method:'POST', headers:{'X-CSRFToken':CSRF_TOKEN}, body:fd})
+  .then(r => { if (r.ok || r.redirected) { const el=document.getElementById(elemId); if(el) el.remove(); } });
+}
+
+// ── Lightbox — event delegation (funcționează și după AJAX) ──
+let lbZoomed = false;
+document.addEventListener('click', function(e) {
+  const img = e.target.closest('img[data-lb]');
+  if (img) openLb(img.dataset.lb);
+});
+function openLb(src) {
+  const img = document.getElementById('mp-lb-img');
+  img.src = src; img.style.transform = 'scale(1)'; img.style.cursor = 'grab';
+  lbZoomed = false;
+  document.getElementById('mp-lightbox').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeLb() {
+  document.getElementById('mp-lightbox').style.display = 'none';
+  document.body.style.overflow = '';
+}
+function lbZoom(e) {
+  e.stopPropagation();
+  lbZoomed = !lbZoomed;
+  const img = document.getElementById('mp-lb-img');
+  img.style.transform = lbZoomed ? 'scale(2.5)' : 'scale(1)';
+  img.style.cursor = lbZoomed ? 'zoom-out' : 'grab';
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeLb(); });
+
+// Inițializare
 document.addEventListener('DOMContentLoaded', function() {
+  if (mpFilterDate && mpFilterDate !== todayStr) {
+    document.getElementById('mp-date-label').textContent = new Date(mpFilterDate+'T00:00:00').toLocaleDateString('ro-RO',{day:'numeric',month:'long'});
+  } else if (!mpFilterDate) {
+    document.getElementById('mp-date-label').textContent = 'Toate zilele';
+  }
   mpApplyFilters();
 });
 </script>
+
+<div id="mp-lightbox" onclick="closeLb()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
+  <img id="mp-lb-img" style="max-width:92vw;max-height:92vh;border-radius:12px;transition:transform .25s;cursor:grab;" ondblclick="lbZoom(event)">
+  <div onclick="closeLb()" style="position:fixed;top:1rem;right:1.5rem;color:#fff;font-size:2.2rem;cursor:pointer;line-height:1;user-select:none;">×</div>
+  <div style="position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.4);font-size:.75rem;">Dublu-click zoom · Escape închide</div>
+</div>
+
 {% endblock %}

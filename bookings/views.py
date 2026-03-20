@@ -106,6 +106,7 @@ def booking_create(request, slug):
             booking = form.save(commit=False)
             booking.center = center
             booking.duration_minutes = _get_duration_estimate_from_request(center, request).get('minutes')
+            booking.wants_offer = request.POST.get('wants_offer') == '1'
             if request.user.is_authenticated:
                 booking.user = request.user
             booking.full_clean()

@@ -376,6 +376,7 @@
             <span class="status-pill {{ b.status }}">
               {{ b.get_status_icon }} {{ b.get_status_display }}
             </span>
+            {% if b.wants_offer %}<br><span style="display:inline-flex;align-items:center;gap:.25rem;margin-top:3px;font-size:.7rem;padding:.2rem .5rem;border-radius:6px;background:rgba(234,179,8,0.15);color:#facc15;border:1px solid rgba(234,179,8,0.35);"><i class="bi bi-tag-fill"></i>Dorește ofertă</span>{% endif %}
           </td>
           <td class="col-mechanic">
             {% if b.mechanic %}

@@ -512,6 +512,9 @@ def booking_detail(request, pk):
             booking.used_services = (request.POST.get('used_services') or '').strip()
             booking.additional_description = (request.POST.get('additional_description') or '').strip()
             booking.save(update_fields=['used_services', 'additional_description', 'updated_at'])
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'ok': True, 'msg': 'Fișa a fost salvată.'})
             messages.success(request, 'Detaliile suplimentare pentru fișa de comandă au fost salvate.')
             return redirect('services:booking_detail', pk=booking.pk)
 
@@ -568,11 +571,17 @@ def booking_detail(request, pk):
             new_status = (request.POST.get('status') or '').strip()
             allowed_statuses = {choice[0] for choice in Booking.STATUS_CHOICES} - {Booking.STATUS_PENDING, Booking.STATUS_CANCELLED, Booking.STATUS_QUOTED}
             if new_status not in allowed_statuses:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    from django.http import JsonResponse
+                    return JsonResponse({'ok': False, 'msg': 'Status invalid.'})
                 messages.error(request, 'Statusul selectat nu este valid.')
                 return redirect('services:booking_detail', pk=booking.pk)
             booking.status = new_status
             booking.save(update_fields=['status', 'updated_at'])
-            messages.success(request, f'Statusul programării a fost actualizat la „{booking.get_status_display()}”.')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse({'ok': True, 'msg': f'Status actualizat: {booking.get_status_display()}', 'status_display': booking.get_status_display(), 'status_badge': booking.get_status_badge()})
+            messages.success(request, f'Statusul programarii a fost actualizat la {booking.get_status_display()}.')
             return redirect('services:booking_detail', pk=booking.pk)
 
     history_entries = Booking.objects.filter(
@@ -581,10 +590,16 @@ def booking_detail(request, pk):
         status=Booking.STATUS_DONE,
     ).select_related('center').exclude(pk=booking.pk).order_by('-booking_date', '-booking_time', '-created_at')
 
+    from .models import MechanicWorkLog
+    work_log = None
+    if booking.mechanic:
+        work_log = MechanicWorkLog.objects.filter(booking=booking, mechanic=booking.mechanic).prefetch_related('photos').first()
+
     return render(request, 'services/booking_detail.html', {
         'booking': booking,
         'mechanics': mechanics,
         'history_entries': history_entries,
+        'work_log': work_log,
         'status_choices': [choice for choice in Booking.STATUS_CHOICES if choice[0] not in [Booking.STATUS_PENDING, Booking.STATUS_QUOTED, Booking.STATUS_CANCELLED]],
     })
 

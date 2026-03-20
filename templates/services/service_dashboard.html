@@ -309,6 +309,12 @@
               </div>
               <span class="badge booking-status-pill bg-{{ b.get_status_badge }}">{{ b.get_status_icon }} {{ b.get_status_display }}</span>
             </div>
+            {% if b.wants_offer %}
+            <div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .85rem;border-radius:10px;background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.4);margin-bottom:.75rem;">
+              <i class="bi bi-tag-fill" style="color:#facc15;font-size:.85rem;flex-shrink:0;"></i>
+              <span style="font-size:.8rem;font-weight:600;color:#facc15;">Clientul dorește ofertă de preț înainte de confirmare</span>
+            </div>
+            {% endif %}
 
             <div class="dashboard-booking-meta">
               <div class="dashboard-meta-box"><div class="dashboard-meta-label">Data și ora</div><div class="dashboard-meta-value">{{ b.booking_date|date:"d.m.Y" }} · {{ b.booking_time|time:"H:i" }}</div></div>
@@ -430,6 +436,7 @@
                 <div class="small text-muted-custom mt-1">{{ b.center.name }}</div>
               </div>
               <span class="badge booking-status-pill bg-{{ b.get_status_badge }}">{{ b.get_status_icon }} {{ b.get_status_display }}</span>
+              {% if b.wants_offer %}<span class="badge ms-1" style="background:rgba(234,179,8,0.2);color:#facc15;border:1px solid rgba(234,179,8,0.4);font-size:.72rem;"><i class="bi bi-tag-fill me-1"></i>Dorește ofertă</span>{% endif %}
             </div>
 
             <div class="dashboard-booking-meta">
