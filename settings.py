@@ -9,7 +9,7 @@ load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = 'django-insecure-autohub-marketplace-change-in-production-2024-xyz'
 
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+DEBUG = False
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'bookings.apps.BookingsConfig',
     'invoices.apps.InvoicesConfig',
 ]
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

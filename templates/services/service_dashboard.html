@@ -109,6 +109,7 @@
     border:1px dashed var(--ah-border); border-radius:20px; padding:1.35rem; color:var(--ah-muted); text-align:center;
     background: var(--ah-dark3);
   }
+  .dashboard-empty strong { display:block; color:var(--ah-text); margin-bottom:.35rem; }
   .mechanic-management-card { padding:1rem; }
   .mechanic-management-card form + form { margin-top:.75rem; }
   .mechanic-actions { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.75rem; }
@@ -411,9 +412,9 @@
           <i class="bi bi-check-circle me-1"></i>Confirmate
           <span class="badge ms-1" style="background:var(--ah-dark4);color:var(--ah-text);" id="count-confirmed">0</span>
         </button>
-        <button class="btn btn-sm btn-outline-light booking-filter-btn" data-filter="completed">
+        <button class="btn btn-sm btn-outline-light booking-filter-btn" data-filter="done">
           <i class="bi bi-check2-all me-1"></i>Finalizate
-          <span class="badge ms-1" style="background:var(--ah-dark4);color:var(--ah-text);" id="count-completed">0</span>
+          <span class="badge ms-1" style="background:var(--ah-dark4);color:var(--ah-text);" id="count-done">0</span>
         </button>
       </div>
 
@@ -489,17 +490,17 @@ document.addEventListener('DOMContentLoaded', function () {
   const noResults = document.getElementById('no-bookings-filter');
 
   // Calculează contoare
-  const counts = { all: cards.length, pending: 0, confirmed: 0, completed: 0 };
+  const counts = { all: cards.length, pending: 0, confirmed: 0, done: 0 };
   cards.forEach(c => {
     const s = c.dataset.status;
     if (s === 'pending') counts.pending++;
     else if (s === 'confirmed') counts.confirmed++;
-    else if (s === 'completed') counts.completed++;
+    else if (s === 'done') counts.done++;
   });
   document.getElementById('count-all').textContent = counts.all;
   document.getElementById('count-pending').textContent = counts.pending;
   document.getElementById('count-confirmed').textContent = counts.confirmed;
-  document.getElementById('count-completed').textContent = counts.completed;
+  document.getElementById('count-done').textContent = counts.done;
 
   buttons.forEach(btn => {
     btn.addEventListener('click', function () {

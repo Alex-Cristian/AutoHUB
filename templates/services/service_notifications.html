@@ -1,23 +1,33 @@
 {% extends 'base.html' %}
-{% block title %}Notificări — AutoEMG{% endblock %}
+{% block title %}Notificari - AutoEMG{% endblock %}
 
 {% block content %}
-<div class="container py-5">
+<div class="container ah-page-shell">
+  <section class="ah-page-header compact">
+    <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+      <div>
+        <div class="ah-page-eyebrow"><i class="bi bi-bell"></i>Comunicare service</div>
+        <h1 class="section-title mb-1">Notificari</h1>
+        <p class="ah-page-subtitle">Programari noi, confirmari si actualizari de status, ordonate clar pentru urmatorul tau pas.</p>
+      </div>
+      <span class="ah-badge-soft"><i class="bi bi-clock-history"></i>{{ notifications|length }} actualizari</span>
+    </div>
+  </section>
+
   <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-      <h1 class="mb-1">Notificări</h1>
-      <p class="text-muted-custom mb-0">Programări noi și actualizări de status.</p>
+      <p class="text-muted-custom mb-0">Marcheaza rapid ce ai verificat deja.</p>
     </div>
     <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}">
       <i class="bi bi-speedometer2 me-1"></i>Dashboard
     </a>
   </div>
 
-  <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
+  <div class="p-4 bg-dark2 border rounded-xl ah-surface-card" style="border-color:var(--ah-border) !important;">
     {% if notifications %}
       <div class="list-group list-group-flush">
         {% for n in notifications %}
-          <div class="list-group-item bg-transparent border-secondary">
+          <div class="list-group-item bg-transparent border-secondary py-3">
             <div class="d-flex align-items-start justify-content-between gap-3">
               <div class="flex-grow-1">
                 <div class="d-flex align-items-center gap-2">
@@ -33,7 +43,7 @@
               </div>
               {% if not n.is_read %}
                 <a class="btn btn-sm btn-outline-light" href="{% url 'services:notification_read' n.pk %}">
-                  Marchează citit
+                  Marcheaza citit
                 </a>
               {% endif %}
             </div>
@@ -41,7 +51,10 @@
         {% endfor %}
       </div>
     {% else %}
-      <div class="text-muted-custom">Nicio notificare încă.</div>
+      <div class="ah-empty-state">
+        <strong>Nicio notificare inca</strong>
+        Totul este linistit acum. Cand apare o actualizare, o vei vedea aici.
+      </div>
     {% endif %}
   </div>
 </div>

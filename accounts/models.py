@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -165,3 +167,51 @@ class LegalAcceptance(models.Model):
 
     def __str__(self):
         return f"{self.user} · {self.document_set} · {self.terms_version}"
+
+
+class EmailVerificationToken(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='email_verification_token',
+        verbose_name='Utilizator',
+    )
+    token = models.CharField(max_length=64, unique=True, default=secrets.token_urlsafe, verbose_name='Token')
+    created_at = models.DateTimeField(auto_now_add=True)
+    verified_at = models.DateTimeField(blank=True, null=True, verbose_name='Verificat la')
+
+    class Meta:
+        verbose_name = 'Token verificare email'
+        verbose_name_plural = 'Token-uri verificare email'
+
+    def __str__(self):
+        return f"Verificare email - {self.user}"
+
+    @property
+    def is_verified(self):
+        return bool(self.verified_at)
+
+    def is_expired(self):
+        expiry_hours = getattr(settings, 'ACCOUNT_VERIFICATION_EXPIRY_HOURS', 24)
+        return self.created_at + timezone.timedelta(hours=expiry_hours) < timezone.now()
+
+
+class CarExpiryReminderLog(models.Model):
+    car = models.ForeignKey(
+        Car,
+        on_delete=models.CASCADE,
+        related_name='expiry_email_logs',
+        verbose_name='Mașină',
+    )
+    document_type = models.CharField(max_length=30, verbose_name='Tip document')
+    expiry_date = models.DateField(verbose_name='Data expirării')
+    sent_at = models.DateTimeField(default=timezone.now, verbose_name='Trimis la')
+
+    class Meta:
+        verbose_name = 'Istoric reminder expirare email'
+        verbose_name_plural = 'Istoric remindere expirare email'
+        unique_together = ('car', 'document_type', 'expiry_date')
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f"{self.car} - {self.document_type} - {self.expiry_date}"

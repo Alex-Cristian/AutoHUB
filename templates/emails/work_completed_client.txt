@@ -1,0 +1,12 @@
+{% extends "emails/base.txt" %}
+{% block email_body_text %}
+Lucrarea pentru masina ta a fost finalizata la {{ service_name }}.
+
+Masina: {{ car_summary }}
+Data programarii: {{ booking_date_text }} la {{ booking_time_text }}
+Mecanic: {{ mechanic_name }}
+Cost estimativ: {{ estimated_price_text }}
+
+Vezi istoricul programarii in contul tau:
+{{ my_bookings_url }}
+{% endblock %}

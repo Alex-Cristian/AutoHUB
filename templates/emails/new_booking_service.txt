@@ -1,0 +1,16 @@
+{% extends "emails/base.txt" %}
+{% block email_body_text %}
+Ai primit o programare noua pentru {{ service_name }}.
+
+Client: {{ client_name }}
+Data: {{ booking_date_text }} la {{ booking_time_text }}
+Masina: {{ car_summary }}
+Telefon: {{ client_phone }}
+Email: {{ client_email }}
+
+{% if problem_description %}Detalii client:
+{{ problem_description }}
+
+{% endif %}Dashboard service:
+{{ service_dashboard_url }}
+{% endblock %}

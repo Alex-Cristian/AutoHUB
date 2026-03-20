@@ -1,0 +1,20 @@
+{% extends "emails/base.html" %}
+{% block email_body %}
+<p style="margin:0 0 16px;">Salut, <strong>{{ greeting_name }}</strong>!</p>
+<p style="margin:0 0 18px;">Lucrarea pentru masina ta a fost marcata ca finalizata la <strong>{{ service_name }}</strong>.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:18px;">
+  <tr><td style="padding:18px 20px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.7;color:#1f2937;">
+    <strong>Masina:</strong> {{ car_summary }}<br>
+    <strong>Data programarii:</strong> {{ booking_date_text }} la {{ booking_time_text }}<br>
+    <strong>Mecanic:</strong> {{ mechanic_name }}<br>
+    <strong>Cost estimativ:</strong> {{ estimated_price_text }}
+  </td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+  <tr>
+    <td align="center" style="border-radius:12px;background:#d92d3a;">
+      <a href="{{ my_bookings_url }}" style="display:inline-block;padding:14px 22px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#ffffff;">{{ cta_label }}</a>
+    </td>
+  </tr>
+</table>
+{% endblock %}

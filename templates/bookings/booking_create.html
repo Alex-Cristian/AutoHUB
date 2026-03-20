@@ -19,6 +19,7 @@
     border-radius: 20px;
     padding: 1.5rem;
     margin-bottom: 1.25rem;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.14);
   }
   .bc-sec {
     font-size: .75rem; font-weight: 700; text-transform: uppercase;
@@ -155,6 +156,14 @@
   }
   .confirm-lbl { font-size:.75rem; color:var(--ah-muted); font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
   .confirm-val { font-size:.95rem; color:var(--ah-text); font-weight:600; }
+  .field-hint-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; margin-top:1rem; }
+  .field-hint-box {
+    border:1px solid var(--ah-border); border-radius:14px; padding:.9rem 1rem;
+    background:linear-gradient(180deg,var(--ah-dark3),rgba(230,57,70,0.05));
+  }
+  .field-hint-box strong { display:block; margin-bottom:.2rem; color:var(--ah-text); font-size:.9rem; }
+  .field-hint-box span { display:block; color:var(--ah-muted); font-size:.8rem; line-height:1.45; }
+  @media (max-width: 767.98px) { .field-hint-grid { grid-template-columns:1fr; } }
 </style>
 {% endblock %}
 
@@ -185,6 +194,20 @@
           <span class="mx-2">·</span>
           <i class="bi bi-telephone me-1 text-red"></i>{{ center.phone }}
         </div>
+      </div>
+    </div>
+    <div class="field-hint-grid">
+      <div class="field-hint-box">
+        <strong>1. Adauga masina</strong>
+        <span>Poti selecta una salvata sau completa manual toate datele.</span>
+      </div>
+      <div class="field-hint-box">
+        <strong>2. Alege ziua si ora</strong>
+        <span>Iti afisam doar sloturile disponibile pentru service-ul selectat.</span>
+      </div>
+      <div class="field-hint-box">
+        <strong>3. Confirma programarea</strong>
+        <span>Primesti apoi oferta si actualizarile de status direct pe email.</span>
       </div>
     </div>
   </div>

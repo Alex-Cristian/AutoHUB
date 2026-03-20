@@ -12,6 +12,7 @@ from services.models import ServiceCenter, ServiceGarage, ServiceItem, ServiceCa
 from .ai import estimate_booking_duration, normalize_duration_minutes
 from .forms import BookingForm
 from .models import Booking, BookingAttachment, BookingNotification
+from core.services.email_service import send_quote_accepted_to_service_email
 
 
 def _extract_manual_duration(request):
@@ -332,6 +333,7 @@ def booking_accept_quote(request, pk):
                 f"{booking.booking_time.strftime('%H:%M')} ({booking.get_duration_display()})."
             ),
         )
+    send_quote_accepted_to_service_email(booking)
     messages.success(request, 'Ai confirmat programarea. Service-ul a rezervat intervalul pentru tine.')
     return redirect('bookings:my_bookings')
 

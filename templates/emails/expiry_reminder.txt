@@ -1,0 +1,7 @@
+{% extends "emails/base.txt" %}
+{% block email_body_text %}
+{{ document_label }} pentru {{ car_summary }} expira pe {{ expiry_date_text }}.
+
+Verifica si actualizeaza calendarul de expirari:
+{{ calendar_url }}
+{% endblock %}
