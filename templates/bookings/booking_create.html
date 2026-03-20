@@ -40,7 +40,7 @@
     font-size: .9rem; cursor: pointer; transition: all .15s;
   }
   .domain-chip:hover { border-color: rgba(230,57,70,0.5); color:var(--ah-text); background:rgba(230,57,70,0.08); }
-  .domain-chip.active { background: var(--ah-red); border-color: var(--ah-red); color: #fff; }
+  .domain-chip.active { background: var(--ah-red); border-color: var(--ah-red); color: #fff; font-weight: 700; box-shadow: 0 0 0 3px rgba(230,57,70,0.25); }
   #id_problem_description {
     background: var(--ah-dark3); border: 1px solid var(--ah-border);
     border-radius: 14px; color: var(--ah-text); font-size: .92rem;
@@ -353,8 +353,59 @@
     <!-- POZE -->
     <div class="bc-card">
       <div class="bc-sec"><i class="bi bi-camera me-2"></i>Poze / video (opțional)</div>
-      {{ form.attachments }}
-      <div class="small text-muted-custom mt-2">Max 50MB per fișier.</div>
+
+      {# input-ul Django ascuns — îl sincronizăm prin JS #}
+      <div style="display:none;">{{ form.attachments }}</div>
+
+      {# zona drag & drop vizibilă #}
+      <div id="upload-area"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="event.preventDefault();this.classList.remove('drag-over');handleDrop(event)"
+           style="border:2px dashed var(--ah-border);border-radius:14px;padding:2rem 1rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--ah-dark3);"
+           onclick="document.getElementById('file-pick').click()">
+        <i class="bi bi-cloud-upload" style="font-size:2rem;color:var(--ah-muted);"></i>
+        <div class="mt-2 small" style="color:var(--ah-muted);">Apasă sau trage fișierele aici</div>
+        <div class="small" style="color:var(--ah-muted);font-size:.75rem;margin-top:4px;">Imagini sau video · Max 50MB per fișier</div>
+      </div>
+
+      {# input separat cu camera + galerie + fișiere #}
+      <input type="file" id="file-pick" accept="image/*,video/*" multiple capture="environment" style="display:none;" onchange="addFiles(this.files)">
+
+      <div class="d-flex gap-2 mt-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('file-pick-cam').click()">
+          <i class="bi bi-camera me-1"></i>Fă o poză
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('file-pick-gal').click()">
+          <i class="bi bi-images me-1"></i>Din galerie / fișiere
+        </button>
+      </div>
+      <input type="file" id="file-pick-cam" accept="image/*,video/*" capture="environment" multiple style="display:none;" onchange="addFiles(this.files)">
+      <input type="file" id="file-pick-gal" accept="image/*,video/*" multiple style="display:none;" onchange="addFiles(this.files)">
+
+      <div id="file-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:.75rem;"></div>
+      <div id="file-count" class="small text-muted-custom mt-1" style="display:none;"></div>
+    </div>
+
+    {# lightbox pentru preview poze #}
+    <div id="lightbox" onclick="closeLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
+      <img id="lb-img" style="max-width:90vw;max-height:90vh;border-radius:12px;transition:transform .2s;cursor:grab;" ondblclick="toggleZoom(event)">
+      <div id="lb-close" style="position:fixed;top:1rem;right:1.2rem;color:#fff;font-size:2rem;cursor:pointer;line-height:1;" onclick="closeLightbox()">×</div>
+    </div>
+
+    <!-- OFERTĂ -->
+    <div class="bc-card">
+      <div class="bc-sec"><i class="bi bi-tag me-2"></i>Ofertă de preț</div>
+      <div id="offer-box" onclick="toggleOffer()" style="display:flex;align-items:flex-start;gap:.75rem;padding:1rem 1.1rem;border-radius:14px;border:2px solid var(--ah-border);background:var(--ah-dark3);cursor:pointer;transition:all .2s;">
+        <div id="ofc-icon" style="width:22px;height:22px;border-radius:6px;border:2px solid var(--ah-border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;background:var(--ah-dark2);transition:all .15s;">
+          <i class="bi bi-check2" id="ofc-check" style="color:#fff;font-size:.75rem;display:none;"></i>
+        </div>
+        <div>
+          <strong style="display:block;font-size:.92rem;color:var(--ah-text);">Doresc ofertă din partea service-ului înainte de confirmare</strong>
+          <span style="display:block;font-size:.8rem;color:var(--ah-muted);margin-top:2px;line-height:1.4;">Service-ul îți va trimite prețul estimat și durata. Tu decizi dacă accepți.</span>
+        </div>
+      </div>
+      <input type="hidden" name="wants_offer" id="id_wants_offer" value="0">
     </div>
 
     {% if form.errors %}
@@ -646,6 +697,129 @@ function updateConfirm() {
     document.getElementById('confirm-val').textContent=S.garageName+' · '+dl+' la '+S.slot;
   } else {
     bar.style.display='none';
+  }
+}
+/* UPLOAD POZE */
+let allFiles = [];
+
+function addFiles(fileList) {
+  Array.from(fileList).forEach(f => {
+    if (!allFiles.find(x => x.name === f.name && x.size === f.size)) {
+      allFiles.push(f);
+    }
+  });
+  syncToForm();
+  renderPreviews();
+}
+
+function handleDrop(e) {
+  addFiles(e.dataTransfer.files);
+}
+
+function removeFile(i) {
+  allFiles.splice(i, 1);
+  syncToForm();
+  renderPreviews();
+}
+
+function syncToForm() {
+  // sincronizăm cu input-ul Django ascuns
+  const input = document.getElementById('id_attachments');
+  if (!input) return;
+  try {
+    const dt = new DataTransfer();
+    allFiles.forEach(f => dt.items.add(f));
+    input.files = dt.files;
+  } catch(e) {}
+}
+
+function renderPreviews() {
+  const container = document.getElementById('file-preview');
+  const countEl = document.getElementById('file-count');
+  if (!container) return;
+  container.innerHTML = '';
+  allFiles.forEach(function(f, i) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;width:80px;height:80px;border-radius:10px;overflow:hidden;border:1px solid var(--ah-border);background:var(--ah-dark2);flex-shrink:0;cursor:pointer;';
+    if (f.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(f);
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+      img.onclick = function(e) { e.stopPropagation(); openLightbox(img.src); };
+      wrap.appendChild(img);
+    } else {
+      wrap.style.display = 'flex';
+      wrap.style.alignItems = 'center';
+      wrap.style.justifyContent = 'center';
+      wrap.innerHTML = '<i class="bi bi-film" style="font-size:1.8rem;color:var(--ah-muted);"></i>';
+    }
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.innerHTML = '×';
+    rm.style.cssText = 'position:absolute;top:2px;right:3px;width:20px;height:20px;border-radius:50%;background:rgba(230,57,70,0.9);border:none;color:#fff;font-size:.9rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;';
+    rm.onclick = function(e) { e.stopPropagation(); removeFile(i); };
+    wrap.appendChild(rm);
+    container.appendChild(wrap);
+  });
+  if (countEl) {
+    countEl.style.display = allFiles.length ? 'block' : 'none';
+    countEl.textContent = allFiles.length + (allFiles.length === 1 ? ' fișier selectat' : ' fișiere selectate');
+  }
+}
+
+/* LIGHTBOX */
+let lbZoomed = false;
+function openLightbox(src) {
+  const lb = document.getElementById('lightbox');
+  const img = document.getElementById('lb-img');
+  img.src = src;
+  img.style.transform = 'scale(1)';
+  lbZoomed = false;
+  lb.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.body.style.overflow = '';
+}
+function toggleZoom(e) {
+  e.stopPropagation();
+  const img = document.getElementById('lb-img');
+  lbZoomed = !lbZoomed;
+  img.style.transform = lbZoomed ? 'scale(2.2)' : 'scale(1)';
+  img.style.cursor = lbZoomed ? 'zoom-out' : 'grab';
+}
+document.addEventListener('keydown', function(e) { if(e.key==='Escape') closeLightbox(); });
+
+document.addEventListener('DOMContentLoaded', function() {
+  const input = document.getElementById('id_attachments');
+  if (input) {
+    input.setAttribute('multiple', true);
+    input.setAttribute('accept', 'image/*,video/*');
+  }
+});
+
+/* OFERTĂ */
+function toggleOffer() {
+  const box = document.getElementById('offer-box');
+  const chk = document.getElementById('ofc-check');
+  const icon = document.getElementById('ofc-icon');
+  const inp = document.getElementById('id_wants_offer');
+  const active = box.style.borderColor === 'var(--ah-red)';
+  if (!active) {
+    box.style.borderColor = 'var(--ah-red)';
+    box.style.background = 'rgba(230,57,70,0.08)';
+    icon.style.background = 'var(--ah-red)';
+    icon.style.borderColor = 'var(--ah-red)';
+    chk.style.display = 'block';
+    inp.value = '1';
+  } else {
+    box.style.borderColor = 'var(--ah-border)';
+    box.style.background = 'var(--ah-dark3)';
+    icon.style.background = 'var(--ah-dark2)';
+    icon.style.borderColor = 'var(--ah-border)';
+    chk.style.display = 'none';
+    inp.value = '0';
   }
 }
 </script>

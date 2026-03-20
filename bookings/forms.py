@@ -7,8 +7,30 @@ from services.models import ServiceItem, ServiceGarage
 from accounts.models import Car
 
 
-class MultiFileInput(forms.ClearableFileInput):
+class MultiFileInput(forms.FileInput):
+    """FileInput simplu care suportă multiple fișiere — fără logica ClearableFileInput."""
     allow_multiple_selected = True
+
+    def value_from_datadict(self, data, files, name):
+        return files.getlist(name)
+
+
+class MultipleFileField(forms.Field):
+    """Field care acceptă o listă de fișiere, fără validare internă Django care blochează."""
+    widget = MultiFileInput(attrs={
+        'class': 'form-control',
+        'accept': 'image/*,video/*',
+        'multiple': True,
+    })
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('required', False)
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+        return [f for f in data if f]
 
 
 class BookingForm(forms.ModelForm):
@@ -18,9 +40,7 @@ class BookingForm(forms.ModelForm):
         empty_label='— Alege o mașină salvată (opțional) —',
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_saved_car'})
     )
-    attachments = forms.FileField(
-        required=False,
-        widget=MultiFileInput(attrs={'class': 'form-control', 'accept': 'image/*,video/*', 'capture': 'environment', 'multiple': True}),
+    attachments = MultipleFileField(
         help_text='Poți încărca poze și video cu problema mașinii.'
     )
 
@@ -92,8 +112,11 @@ class BookingForm(forms.ModelForm):
         ):
             self.add_error('booking_time', 'Ora aleasă nu mai este disponibilă pentru garajul selectat.')
 
-        attachments = self.files.getlist('attachments')
+        # Validare atașamente — folosim cleaned_data, nu self.files
+        attachments = cleaned.get('attachments') or []
         for uploaded in attachments:
+            if not uploaded:
+                continue
             content_type = getattr(uploaded, 'content_type', '') or ''
             if not (content_type.startswith('image/') or content_type.startswith('video/')):
                 self.add_error('attachments', f'Fișierul {uploaded.name} nu este imagine sau video.')
@@ -121,7 +144,6 @@ class BookingForm(forms.ModelForm):
             raise forms.ValidationError('Introduceți numărul de înmatriculare.')
         return plate
 
-
     def clean_car_vin(self):
         vin = (self.cleaned_data.get('car_vin') or '').upper().strip()
         vin = ''.join(ch for ch in vin if ch.isalnum())
@@ -132,4 +154,3 @@ class BookingForm(forms.ModelForm):
         if any(ch in {'I', 'O', 'Q'} for ch in vin):
             raise forms.ValidationError('VIN-ul nu poate conține literele I, O sau Q.')
         return vin
-

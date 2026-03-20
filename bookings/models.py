@@ -90,6 +90,7 @@ class Booking(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     reminder_sent_1d = models.BooleanField(default=False, verbose_name='Reminder SMS trimis cu o zi înainte')
+    wants_offer = models.BooleanField(default=False, verbose_name='Client dorește ofertă înainte de confirmare')
 
     class Meta:
         verbose_name = 'Programare'

@@ -328,8 +328,8 @@
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'list' %}active{% endif %}" href="{% url 'services:list' %}">
-            <i class="bi bi-search me-1"></i>Service-uri
+          <a class="nav-link {% if request.resolver_match.url_name == 'cars' %}active{% endif %}" href="{% url 'accounts:cars' %}">
+            <i class="bi bi-car-front me-1"></i>Mașinile mele
           </a>
         </li>
         {% if nav_categories %}
@@ -399,7 +399,7 @@
         {% if user.is_authenticated %}
           {% if not has_service_center %}
           <li class="nav-item">
-            <a class="nav-link" href="{% url 'bookings:my_bookings' %}">
+            <a class="nav-link {% if request.resolver_match.url_name == 'my_bookings' %}active{% endif %}" href="{% url 'bookings:my_bookings' %}">
               <i class="bi bi-calendar-check me-1"></i>Programările mele
             </a>
           </li>
@@ -411,12 +411,6 @@
             </a>
             <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
               <li><a class="dropdown-item" href="{% url 'accounts:profile' %}"><i class="bi bi-person me-2"></i>Profilul meu</a></li>
-              {% if not has_service_center %}
-              <li><a class="dropdown-item" href="{% url 'accounts:cars' %}"><i class="bi bi-car-front me-2"></i>Mașinile mele</a></li>
-              {% endif %}
-              {% if user.is_staff %}
-              <li><a class="dropdown-item" href="/admin/"><i class="bi bi-shield-check me-2"></i>Admin</a></li>
-              {% endif %}
               <li><hr class="dropdown-divider border-secondary"></li>
               <li><a class="dropdown-item text-danger" href="{% url 'accounts:logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Deconectare</a></li>
             </ul>
