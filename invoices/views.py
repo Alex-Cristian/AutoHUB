@@ -1,7 +1,10 @@
 from collections import OrderedDict
 
+from collections import OrderedDict
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Max
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -53,8 +56,14 @@ def clients_list(request):
         else:
             clients[key]['count'] += 1
 
+    clients_list_data = list(clients.values())
+    page_obj = Paginator(clients_list_data, 20).get_page(request.GET.get('page'))
+
     return render(request, 'invoices/clients_list.html', {
-        'clients': list(clients.values()),
+        'clients': page_obj.object_list,
+        'page_obj': page_obj,
+        'total_clients': len(clients_list_data),
+        'total_bookings': bookings.count(),
     })
 
 

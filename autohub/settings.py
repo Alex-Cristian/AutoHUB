@@ -7,11 +7,22 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
-SECRET_KEY = 'django-insecure-autohub-marketplace-change-in-production-2024-xyz'
+def env_bool(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in {'1', 'true', 'yes', 'on'}
 
-DEBUG = False
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
+def env_list(name, default=''):
+    return [item.strip() for item in os.getenv(name, default).split(',') if item.strip()]
+
+
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-autohub-marketplace-dev-only')
+
+DEBUG = env_bool('DEBUG', False)
+
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', '127.0.0.1,localhost')
+CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS', '')
+USE_X_FORWARDED_HOST = env_bool('USE_X_FORWARDED_HOST', True)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 LOGGING = {
     'version': 1,
@@ -21,10 +32,13 @@ LOGGING = {
             'class': 'logging.StreamHandler',
         },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': 'ERROR',
+    'loggers': {
+        'django': {'handlers': ['console'], 'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO')},
+        'core': {'handlers': ['console'], 'level': os.getenv('APP_LOG_LEVEL', 'INFO'), 'propagate': False},
+        'services': {'handlers': ['console'], 'level': os.getenv('APP_LOG_LEVEL', 'INFO'), 'propagate': False},
+        'bookings': {'handlers': ['console'], 'level': os.getenv('APP_LOG_LEVEL', 'INFO'), 'propagate': False},
     },
+    'root': {'handlers': ['console'], 'level': os.getenv('ROOT_LOG_LEVEL', 'WARNING')},
 }
 
 INSTALLED_APPS = [
@@ -53,7 +67,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    #'core.middleware.LegalAcceptanceRequiredMiddleware',
+    'core.middleware.LegalAcceptanceRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -84,6 +98,14 @@ DATABASES = {
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
         conn_max_age=600
     )
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'autohub-default-cache',
+        'TIMEOUT': int(os.getenv('CACHE_DEFAULT_TIMEOUT', '300')),
+    }
 }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -134,6 +156,9 @@ TWILIO_SMS_ENABLED = os.getenv('TWILIO_SMS_ENABLED', 'False').lower() == 'true'
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
+MAX_IMAGE_UPLOAD_MB = int(os.getenv('MAX_IMAGE_UPLOAD_MB', '8'))
+MAX_VIDEO_UPLOAD_MB = int(os.getenv('MAX_VIDEO_UPLOAD_MB', '50'))
+MAX_DOCUMENT_UPLOAD_MB = int(os.getenv('MAX_DOCUMENT_UPLOAD_MB', '12'))
 if USE_CLOUDINARY and all([
     os.getenv('CLOUDINARY_CLOUD_NAME'),
     os.getenv('CLOUDINARY_API_KEY'),
@@ -172,3 +197,20 @@ EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() == 'true'
 EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '20'))
 ACCOUNT_VERIFICATION_EXPIRY_HOURS = int(os.getenv('ACCOUNT_VERIFICATION_EXPIRY_HOURS', '24'))
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = os.getenv('X_FRAME_OPTIONS', 'DENY')
+SECURE_REFERRER_POLICY = os.getenv('SECURE_REFERRER_POLICY', 'strict-origin-when-cross-origin')
+SECURE_CROSS_ORIGIN_OPENER_POLICY = os.getenv('SECURE_CROSS_ORIGIN_OPENER_POLICY', 'same-origin')
+
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = env_bool('CSRF_COOKIE_HTTPONLY', False)
+SESSION_COOKIE_SECURE = env_bool('SESSION_COOKIE_SECURE', not DEBUG)
+CSRF_COOKIE_SECURE = env_bool('CSRF_COOKIE_SECURE', not DEBUG)
+SESSION_COOKIE_SAMESITE = os.getenv('SESSION_COOKIE_SAMESITE', 'Lax')
+CSRF_COOKIE_SAMESITE = os.getenv('CSRF_COOKIE_SAMESITE', 'Lax')
+
+SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', False)
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', False)
+SECURE_HSTS_PRELOAD = env_bool('SECURE_HSTS_PRELOAD', False)

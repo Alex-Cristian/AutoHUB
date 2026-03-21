@@ -76,6 +76,11 @@
   .dashboard-list-grid,
   .dashboard-bookings-grid,
   .dashboard-mobile-shortcuts { display:grid; gap:1rem; }
+  .dashboard-analytics-grid { display:grid; grid-template-columns: 1.2fr .8fr; gap:1rem; }
+  .dashboard-mini-list { display:grid; gap:.75rem; }
+  .dashboard-mini-item { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.85rem 1rem; border-radius:16px; background:var(--ah-dark3); }
+  .dashboard-progress { height: 10px; background: var(--ah-dark3); border-radius: 999px; overflow: hidden; }
+  .dashboard-progress > span { display:block; height:100%; background: linear-gradient(90deg, var(--ah-red), var(--ah-orange)); }
   .dashboard-actions-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .dashboard-action-card,
   .dashboard-center-card,
@@ -131,6 +136,7 @@
     .dashboard-grid-main,
     .dashboard-bookings-grid,
     .dashboard-stat-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .dashboard-analytics-grid { grid-template-columns: 1fr; }
     .dashboard-grid-main { grid-template-columns: 1fr; }
   }
 
@@ -222,6 +228,117 @@
       <a class="dashboard-chip" href="{% url 'services:car_history' %}"><i class="bi bi-clock-history"></i>Istoric mașini</a>
       <a class="dashboard-chip" href="#centre"><i class="bi bi-building"></i>Service-uri</a>
       <a class="dashboard-chip" href="#notificari"><i class="bi bi-bell"></i>Notificări</a>
+    </div>
+  </section>
+
+  <section class="mb-4" id="analytics">
+    <div class="dashboard-section-head">
+      <div>
+        <h2 class="dashboard-section-title">Analytics service</h2>
+        <div class="dashboard-section-note">Indicatori rapizi pentru conversie, venit estimat si performanta operationala.</div>
+      </div>
+    </div>
+    <div class="dashboard-analytics-grid">
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <div>
+            <h3 class="dashboard-panel-title"><i class="bi bi-graph-up-arrow text-orange me-2"></i>Conversie booking</h3>
+            <div class="dashboard-panel-subtitle">Flux pending → ofertat → acceptat → finalizat.</div>
+          </div>
+        </div>
+        <div class="dashboard-mini-list">
+          <div class="dashboard-mini-item">
+            <div>
+              <div class="small text-muted-custom">Oferta trimisa</div>
+              <div class="fw-semibold">{{ analytics.quoted_count }} din {{ analytics.total_bookings }}</div>
+            </div>
+            <div class="text-end">
+              <div class="fw-semibold">{{ analytics.quote_rate }}%</div>
+            </div>
+          </div>
+          <div class="dashboard-progress"><span style="width: {{ analytics.quote_rate }}%;"></span></div>
+          <div class="dashboard-mini-item">
+            <div>
+              <div class="small text-muted-custom">Oferta acceptata</div>
+              <div class="fw-semibold">{{ analytics.accepted_count }} booking-uri</div>
+            </div>
+            <div class="text-end">
+              <div class="fw-semibold">{{ analytics.acceptance_rate }}%</div>
+            </div>
+          </div>
+          <div class="dashboard-progress"><span style="width: {{ analytics.acceptance_rate }}%;"></span></div>
+          <div class="dashboard-mini-item">
+            <div>
+              <div class="small text-muted-custom">Lucrari finalizate</div>
+              <div class="fw-semibold">{{ analytics.completed_count }} booking-uri</div>
+            </div>
+            <div class="text-end">
+              <div class="fw-semibold">{{ analytics.completion_rate }}%</div>
+            </div>
+          </div>
+          <div class="dashboard-progress"><span style="width: {{ analytics.completion_rate }}%;"></span></div>
+        </div>
+      </div>
+
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <div>
+            <h3 class="dashboard-panel-title"><i class="bi bi-cash-coin text-orange me-2"></i>Rezumat business</h3>
+            <div class="dashboard-panel-subtitle">Valori estimate pe datele deja existente in proiect.</div>
+          </div>
+        </div>
+        <div class="dashboard-mini-list">
+          <div class="dashboard-mini-item"><span>Venit estimat din oferte</span><strong>{{ analytics.estimated_revenue|floatformat:2 }} RON</strong></div>
+          <div class="dashboard-mini-item"><span>Venit facturat</span><strong>{{ analytics.invoiced_revenue|floatformat:2 }} RON</strong></div>
+          <div class="dashboard-mini-item"><span>Lucrari in progres</span><strong>{{ analytics.in_progress_count }}</strong></div>
+          <div class="dashboard-mini-item"><span>Clienti recurenti</span><strong>{{ analytics.recurring_clients }}</strong></div>
+          <div class="dashboard-mini-item"><span>Rating mediu</span><strong>{{ analytics.avg_rating }} / 5</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid-main mt-3">
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <div>
+            <h3 class="dashboard-panel-title"><i class="bi bi-tools text-red me-2"></i>Servicii cele mai cerute</h3>
+            <div class="dashboard-panel-subtitle">Top servicii pe baza programarilor deja inregistrate.</div>
+          </div>
+        </div>
+        {% if analytics.top_services %}
+          <div class="dashboard-mini-list">
+            {% for item in analytics.top_services %}
+              <div class="dashboard-mini-item">
+                <span>{{ item.service_item__name }}</span>
+                <strong>{{ item.total }}</strong>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="dashboard-empty">Nu exista suficiente date pentru top servicii.</div>
+        {% endif %}
+      </div>
+
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <div>
+            <h3 class="dashboard-panel-title"><i class="bi bi-person-workspace text-red me-2"></i>Top mecanici</h3>
+            <div class="dashboard-panel-subtitle">Lucrari finalizate per mecanic.</div>
+          </div>
+        </div>
+        {% if analytics.top_mechanics %}
+          <div class="dashboard-mini-list">
+            {% for item in analytics.top_mechanics %}
+              <div class="dashboard-mini-item">
+                <span>{{ item.mechanic__name }}</span>
+                <strong>{{ item.total }}</strong>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="dashboard-empty">Topul mecanicilor va aparea dupa primele lucrari finalizate.</div>
+        {% endif %}
+      </div>
     </div>
   </section>
 
@@ -454,7 +571,7 @@
                 {% with visible_images=b.attachments.all %}
                   {% for item in visible_images %}
                     {% if item.is_image and forloop.counter <= 3 %}
-                      <img src="{{ item.file.url }}" alt="Poză programare {{ b.pk }}" class="booking-preview-thumb">
+                      <img src="{{ item.file.url }}" alt="Poză programare {{ b.pk }}" class="booking-preview-thumb" loading="lazy">
                     {% endif %}
                   {% endfor %}
                   {% if b.attachments.count > 3 %}<div class="booking-preview-more">+{{ b.attachments.count|add:'-3' }}</div>{% endif %}

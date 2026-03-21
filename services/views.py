@@ -1,10 +1,15 @@
-from django.http import HttpResponse
+from decimal import Decimal
+
+from django.core.cache import cache
+from django.core.paginator import Paginator
+from django.core.exceptions import ValidationError
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.contrib.auth import login
 from django.db import models
-from django.db.models import Avg, Count, Min, Max, Q, Prefetch
+from django.db.models import Avg, Count, Min, Max, Q, Prefetch, Sum
 from django.utils import timezone
 from django.urls import reverse
 
@@ -20,6 +25,7 @@ from .forms import (
     ServicePartForm,
 )
 from bookings.models import Booking, BookingNotification, BookingAttachment
+from invoices.models import Invoice
 from core.pdf_utils import build_work_order_pdf
 from accounts.views import _record_legal_acceptance
 from core.services.sms_service import (
@@ -32,6 +38,7 @@ from core.services.email_service import (
     send_booking_quote_email,
     send_booking_started_email,
 )
+from core.upload_validators import validate_booking_media_file, validate_image_file
 
 
 def _post_redirect(request, fallback):
@@ -39,6 +46,12 @@ def _post_redirect(request, fallback):
     if referer:
         return redirect(referer)
     return redirect(fallback)
+
+
+def _paginate_queryset(request, queryset, per_page=20, page_param='page'):
+    paginator = Paginator(queryset, per_page)
+    page_obj = paginator.get_page(request.GET.get(page_param))
+    return page_obj
 
 
 def category_list(request):
@@ -355,7 +368,9 @@ def service_dashboard(request):
         return redirect('services:register_service')
     centers = centers.prefetch_related('garages', 'garages__category', 'categories')
 
-    bookings_qs = Booking.objects.filter(center__in=centers).select_related('center', 'service_item', 'user', 'garage', 'mechanic').prefetch_related('attachments').order_by('-created_at')
+    bookings_qs = Booking.objects.filter(center__in=centers).select_related(
+        'center', 'service_item', 'user', 'garage', 'mechanic'
+    ).prefetch_related('attachments').order_by('-created_at')
     pending = bookings_qs.filter(status=Booking.STATUS_PENDING)
     active = bookings_qs.exclude(status=Booking.STATUS_CANCELLED)[:50]
     unread_count = BookingNotification.objects.filter(recipient=request.user, is_read=False).count()
@@ -365,6 +380,76 @@ def service_dashboard(request):
     mechanics_by_center = [(center, center.mechanics.order_by('name')) for center in centers]
 
     low_stock_count = ServicePart.objects.filter(center__in=centers, stock__lte=models.F('minimum_stock')).count()
+    booking_last_update = bookings_qs.aggregate(last=Max('updated_at'))['last']
+    invoice_last_update = Invoice.objects.filter(center__in=centers).aggregate(last=Max('updated_at'))['last']
+    analytics_cache_key = f"service_dashboard_analytics:{request.user.pk}:{booking_last_update}:{invoice_last_update}"
+    analytics = cache.get(analytics_cache_key)
+    if analytics is None:
+        booking_summary = bookings_qs.aggregate(
+            total_count=Count('id'),
+            pending_count=Count('id', filter=Q(status=Booking.STATUS_PENDING)),
+            quoted_count=Count('id', filter=Q(status=Booking.STATUS_QUOTED)),
+            confirmed_count=Count('id', filter=Q(status=Booking.STATUS_CONFIRMED)),
+            in_progress_count=Count('id', filter=Q(status=Booking.STATUS_IN_PROGRESS)),
+            done_count=Count('id', filter=Q(status=Booking.STATUS_DONE)),
+            cancelled_count=Count('id', filter=Q(status=Booking.STATUS_CANCELLED)),
+            estimated_revenue=Sum('estimated_price', filter=Q(status__in=[
+                Booking.STATUS_QUOTED,
+                Booking.STATUS_CONFIRMED,
+                Booking.STATUS_IN_PROGRESS,
+                Booking.STATUS_DONE,
+            ])),
+        )
+
+        invoices_total = Invoice.objects.filter(
+            center__in=centers,
+            status=Invoice.STATUS_FINAL,
+        ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+
+        top_services = list(
+            bookings_qs.exclude(service_item__isnull=True).values('service_item__name')
+            .annotate(total=Count('id'))
+            .order_by('-total', 'service_item__name')[:5]
+        )
+        top_mechanics = list(
+            bookings_qs.filter(status=Booking.STATUS_DONE, mechanic__isnull=False)
+            .values('mechanic__name')
+            .annotate(total=Count('id'))
+            .order_by('-total', 'mechanic__name')[:5]
+        )
+        recurring_clients = bookings_qs.exclude(client_email='').values('client_email').annotate(
+            total=Count('id')
+        ).filter(total__gte=2).count()
+        review_stats = ServiceCenter.objects.filter(pk__in=centers.values('pk')).aggregate(
+            avg_rating=Avg('review__rating', filter=Q(review__is_approved=True)),
+            total_reviews=Count('review', filter=Q(review__is_approved=True)),
+        )
+
+        total_bookings = booking_summary['total_count'] or 0
+        quoted_count = booking_summary['quoted_count'] or 0
+        accepted_count = (booking_summary['confirmed_count'] or 0) + (booking_summary['in_progress_count'] or 0) + (booking_summary['done_count'] or 0)
+        completed_count = booking_summary['done_count'] or 0
+
+        analytics = {
+            'total_bookings': total_bookings,
+            'pending_count': booking_summary['pending_count'] or 0,
+            'quoted_count': quoted_count,
+            'accepted_count': accepted_count,
+            'completed_count': completed_count,
+            'in_progress_count': booking_summary['in_progress_count'] or 0,
+            'cancelled_count': booking_summary['cancelled_count'] or 0,
+            'quote_rate': round((quoted_count / total_bookings) * 100, 1) if total_bookings else 0,
+            'acceptance_rate': round((accepted_count / quoted_count) * 100, 1) if quoted_count else 0,
+            'completion_rate': round((completed_count / accepted_count) * 100, 1) if accepted_count else 0,
+            'estimated_revenue': booking_summary['estimated_revenue'] or Decimal('0.00'),
+            'invoiced_revenue': invoices_total,
+            'top_services': top_services,
+            'top_mechanics': top_mechanics,
+            'recurring_clients': recurring_clients,
+            'avg_rating': round(review_stats['avg_rating'] or 0, 1),
+            'total_reviews': review_stats['total_reviews'] or 0,
+        }
+        cache.set(analytics_cache_key, analytics, 120)
 
     return render(request, 'services/service_dashboard.html', {
         'centers': centers,
@@ -376,6 +461,7 @@ def service_dashboard(request):
         'mechanic_form': mechanic_form,
         'mechanics_by_center': mechanics_by_center,
         'low_stock_count': low_stock_count,
+        'analytics': analytics,
     })
 
 
@@ -420,6 +506,11 @@ def mechanic_create(request, pk):
                 except ServiceGarage.DoesNotExist:
                     pass
             if request.FILES.get('photo'):
+                try:
+                    validate_image_file(request.FILES['photo'], label='Fotografia mecanicului')
+                except ValidationError as exc:
+                    messages.error(request, exc.message)
+                    return _post_redirect(request, 'services:dashboard')
                 mechanic.photo = request.FILES['photo']
             mechanic.save()
             cat_ids = request.POST.getlist('service_categories')
@@ -467,6 +558,11 @@ def mechanic_update(request, pk):
 
         # Fotografie
         if request.FILES.get('photo'):
+            try:
+                validate_image_file(request.FILES['photo'], label='Fotografia mecanicului')
+            except ValidationError as exc:
+                messages.error(request, exc.message)
+                return redirect('services:mechanic_profile', pk=pk)
             mechanic.photo = request.FILES['photo']
 
         mechanic.save()
@@ -554,9 +650,11 @@ def booking_detail(request, pk):
 
             added = 0
             for uploaded in files:
-                content_type = getattr(uploaded, 'content_type', '') or ''
-                if not (content_type.startswith('image/') or content_type.startswith('video/')):
+                try:
+                    validate_booking_media_file(uploaded)
+                except Exception:
                     continue
+                content_type = getattr(uploaded, 'content_type', '') or ''
                 media_kind = 'video' if content_type.startswith('video/') else 'image'
                 BookingAttachment.objects.create(booking=booking, file=uploaded, media_kind=media_kind)
                 added += 1
@@ -636,6 +734,7 @@ def owner_booking_create(request, pk):
             booking.save()
 
             for uploaded in request.FILES.getlist('attachments'):
+                validate_booking_media_file(uploaded)
                 content_type = getattr(uploaded, 'content_type', '') or ''
                 media_kind = 'video' if content_type.startswith('video/') else 'image'
                 BookingAttachment.objects.create(booking=booking, file=uploaded, media_kind=media_kind)
@@ -826,8 +925,35 @@ def service_notifications(request):
     centers = _require_service_owner(request)
     if centers is None:
         return redirect('services:register_service')
-    notifs = BookingNotification.objects.filter(recipient=request.user)
-    return render(request, 'services/service_notifications.html', {'notifications': notifs})
+    notifs = BookingNotification.objects.filter(recipient=request.user).select_related('booking')
+    page_obj = _paginate_queryset(request, notifs, per_page=20)
+    return render(request, 'services/service_notifications.html', {
+        'notifications': page_obj.object_list,
+        'page_obj': page_obj,
+        'total_notifications': notifs.count(),
+    })
+
+
+@login_required
+def notifications_feed(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return JsonResponse({'ok': False, 'detail': 'service_required'}, status=403)
+
+    unread_count = BookingNotification.objects.filter(recipient=request.user, is_read=False).count()
+    latest = list(
+        BookingNotification.objects.filter(recipient=request.user)
+        .select_related('booking')
+        .values('id', 'title', 'created_at', 'is_read')[:5]
+    )
+    for item in latest:
+        item['created_at'] = timezone.localtime(item['created_at']).strftime('%d.%m.%Y %H:%M')
+
+    return JsonResponse({
+        'ok': True,
+        'unread_count': unread_count,
+        'latest_notifications': latest,
+    })
 
 
 @login_required
@@ -987,6 +1113,11 @@ def mechanic_profile(request, pk):
             )
             photos = request.FILES.getlist('photos')
             for photo in photos:
+                try:
+                    validate_image_file(photo, label='Fotografia de lucru')
+                except ValidationError as exc:
+                    messages.error(request, exc.message)
+                    return redirect('services:mechanic_profile', pk=pk)
                 MechanicPhoto.objects.create(
                     work_log=work_log,
                     photo=photo,

@@ -10,6 +10,7 @@ from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage,
 from bookings.forms import BookingForm
 from bookings.models import Booking
 from accounts.models import Car
+from core.upload_validators import max_upload_size_bytes, validate_document_file, validate_image_file
 import re
 
 
@@ -137,6 +138,18 @@ class ServiceCenterRegisterForm(forms.ModelForm):
         if not categories:
             self.add_error('categories', 'Selectează cel puțin o categorie sau bifează „Toate categoriile".')
         return cleaned
+
+    def clean_card_image(self):
+        image = self.cleaned_data.get('card_image')
+        if image:
+            validate_image_file(image, label='Imaginea de prezentare')
+        return image
+
+    def clean_legal_document(self):
+        document = self.cleaned_data.get('legal_document')
+        if document:
+            validate_document_file(document, label='Documentul legal')
+        return document
 
     def save(self, commit=True):
         center = super().save(commit=False)
@@ -364,6 +377,12 @@ class ServiceMechanicForm(forms.ModelForm):
         self.fields['garage'].empty_label = '— Fără garaj fix —'
         self.fields['garage'].required = False
 
+    def clean_photo(self):
+        photo = self.cleaned_data.get('photo')
+        if photo:
+            validate_image_file(photo, label='Fotografia mecanicului')
+        return photo
+
 class ServiceGalleryImageForm(forms.ModelForm):
     class Meta:
         model = ServiceImage
@@ -372,6 +391,12 @@ class ServiceGalleryImageForm(forms.ModelForm):
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'caption': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Recepție / Intrare / Atelier'}),
         }
+
+    def clean_image(self):
+        image = self.cleaned_data.get('image')
+        if image:
+            validate_image_file(image, label='Imaginea din galerie')
+        return image
 
 class MultiImageInput(forms.ClearableFileInput):
     allow_multiple_selected = True
@@ -398,9 +423,11 @@ class ReviewForm(forms.ModelForm):
         if len(files) > 5:
             raise forms.ValidationError('Poți încărca maximum 5 poze la o recenzie.')
         for uploaded in files:
-            content_type = getattr(uploaded, 'content_type', '') or ''
-            if not content_type.startswith('image/'):
-                raise forms.ValidationError(f'{uploaded.name} nu este o imagine.')
+            validate_image_file(
+                uploaded,
+                max_size=max_upload_size_bytes(6),
+                label='Imaginea recenziei',
+            )
         return files
 
 

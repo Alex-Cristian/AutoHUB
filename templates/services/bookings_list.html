@@ -62,9 +62,9 @@
   .blist-filter-btn.active { background: rgba(230,57,70,0.18); border-color: rgba(230,57,70,0.6); color: var(--ah-text); }
   .blist-filter-btn.active.all    { background: var(--ah-dark4); border-color: var(--ah-border); }
   .blist-filter-btn.active.confirmed { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.5); color: #4ade80; }
-  .blist-filter-btn.active.completed { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.5); color: #a5b4fc; }
+  .blist-filter-btn.active.done { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.5); color: #a5b4fc; }
   .blist-filter-btn.active.pending   { background: rgba(234,179,8,0.15);  border-color: rgba(234,179,8,0.5);  color: #fde047; }
-  .blist-filter-btn.active.rejected  { background: rgba(239,68,68,0.15);  border-color: rgba(239,68,68,0.5);  color: #fca5a5; }
+  .blist-filter-btn.active.cancelled  { background: rgba(239,68,68,0.15);  border-color: rgba(239,68,68,0.5);  color: #fca5a5; }
   .blist-count-badge {
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 20px; height: 20px; border-radius: 999px;
@@ -147,8 +147,8 @@
   }
   .status-pill.pending   { background: rgba(234,179,8,0.15);  color: #fde047; border: 1px solid rgba(234,179,8,0.3); }
   .status-pill.confirmed { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
-  .status-pill.completed { background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
-  .status-pill.rejected  { background: rgba(239,68,68,0.15);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+  .status-pill.done { background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
+  .status-pill.cancelled  { background: rgba(239,68,68,0.15);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
   .status-pill.in_progress { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); }
 
   /* acțiuni */
@@ -243,13 +243,13 @@
         <i class="bi bi-check-circle"></i>Confirmate
         <span class="blist-count-badge" id="fc-confirmed">0</span>
       </button>
-      <button class="blist-filter-btn completed" data-filter="done">
+      <button class="blist-filter-btn done" data-filter="done">
         <i class="bi bi-check2-all"></i>Finalizate
         <span class="blist-count-badge" id="fc-done">0</span>
       </button>
-      <button class="blist-filter-btn rejected" data-filter="rejected">
+      <button class="blist-filter-btn cancelled" data-filter="cancelled">
         <i class="bi bi-x-circle"></i>Respinse
-        <span class="blist-count-badge" id="fc-rejected">0</span>
+        <span class="blist-count-badge" id="fc-cancelled">0</span>
       </button>
     </div>
   </div>
@@ -645,7 +645,7 @@ function renderPagination(total, totalPages) {
   const searchTermDisplay = document.getElementById('search-term-display');
 
   // Contoare status
-  const counts = { all: 0, pending:0, confirmed:0, done:0, rejected:0, in_progress:0 };
+  const counts = { all: 0, pending:0, confirmed:0, done:0, cancelled:0, in_progress:0 };
   rows.forEach(r => {
     const s = r.dataset.status;
     if (s !== 'done') counts.all++;
@@ -653,7 +653,7 @@ function renderPagination(total, totalPages) {
   });
   const el_all = document.getElementById('fc-all');
   if (el_all) el_all.textContent = counts.all;
-  ['pending','confirmed','done','rejected'].forEach(k => {
+  ['pending','confirmed','done','cancelled'].forEach(k => {
     const el = document.getElementById('fc-' + k);
     if (el) el.textContent = counts[k];
   });

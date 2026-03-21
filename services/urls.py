@@ -19,6 +19,7 @@ urlpatterns = [
     path('dashboard/mechanici/<int:pk>/sterge/', views.mechanic_delete, name='mechanic_delete'),
     path('dashboard/service/<int:pk>/programare-noua/', views.owner_booking_create, name='owner_booking_create'),
     path('dashboard/notificari/', views.service_notifications, name='notifications'),
+    path('dashboard/notificari/feed/', views.notifications_feed, name='notifications_feed'),
     path('dashboard/notificari/<int:pk>/citit/', views.notification_mark_read, name='notification_read'),
     path('dashboard/programari/<int:pk>/', views.booking_detail, name='booking_detail'),
     path('dashboard/programari/<int:pk>/print/', views.booking_print, name='booking_print'),

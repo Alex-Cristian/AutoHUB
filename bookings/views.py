@@ -13,6 +13,7 @@ from .ai import estimate_booking_duration, normalize_duration_minutes
 from .forms import BookingForm
 from .models import Booking, BookingAttachment, BookingNotification
 from core.services.email_service import send_quote_accepted_to_service_email
+from core.upload_validators import validate_booking_media_file
 
 
 def _extract_manual_duration(request):
@@ -113,6 +114,7 @@ def booking_create(request, slug):
             booking.save()
 
             for uploaded in request.FILES.getlist('attachments'):
+                validate_booking_media_file(uploaded)
                 content_type = getattr(uploaded, 'content_type', '') or ''
                 media_kind = 'video' if content_type.startswith('video/') else 'image'
                 BookingAttachment.objects.create(booking=booking, file=uploaded, media_kind=media_kind)
