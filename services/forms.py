@@ -534,13 +534,39 @@ class ServiceOwnerBookingForm(BookingForm):
 class ServicePartForm(forms.ModelForm):
     class Meta:
         model = ServicePart
-        fields = ['name', 'part_number', 'stock', 'minimum_stock', 'unit', 'shelf', 'notes']
+        fields = ['name', 'part_number', 'category', 'brand', 'supplier', 'price', 'stock', 'minimum_stock', 'unit', 'shelf', 'notes']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Filtru ulei'}),
             'part_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Cod piesă (opțional)'}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
+            'brand': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Bosch, Mann, Brembo'}),
+            'supplier': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Inter Cars'}),
+            'price': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01', 'placeholder': 'Ex: 89.90'}),
             'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'minimum_stock': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'unit': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'buc'}),
             'shelf': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Raft A3'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Detalii opționale'}),
         }
+
+    def clean_price(self):
+        price = self.cleaned_data.get('price')
+        if price is not None and price < 0:
+            raise forms.ValidationError('Pretul nu poate fi negativ.')
+        return price
+
+    def clean(self):
+        cleaned = super().clean()
+        stock = cleaned.get('stock')
+        minimum_stock = cleaned.get('minimum_stock')
+        if stock is not None and stock < 0:
+            self.add_error('stock', 'Stocul nu poate fi negativ.')
+        if minimum_stock is not None and minimum_stock < 0:
+            self.add_error('minimum_stock', 'Pragul minim nu poate fi negativ.')
+        if (
+            stock is not None and minimum_stock is not None
+            and stock == 0 and minimum_stock == 0
+            and not (cleaned.get('notes') or '').strip()
+        ):
+            self.add_error('notes', 'Adauga o observatie scurta daca piesa este complet fara stoc si fara prag minim.')
+        return cleaned

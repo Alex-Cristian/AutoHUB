@@ -1,4 +1,6 @@
+from datetime import datetime, timedelta
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from django.core.cache import cache
 from django.core.paginator import Paginator
@@ -10,6 +12,7 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.db import models
 from django.db.models import Avg, Count, Min, Max, Q, Prefetch, Sum
+from django.db.models.functions import ExtractHour, ExtractWeekDay, TruncMonth
 from django.utils import timezone
 from django.urls import reverse
 
@@ -24,7 +27,8 @@ from .forms import (
     ReviewForm,
     ServicePartForm,
 )
-from bookings.models import Booking, BookingNotification, BookingAttachment
+from bookings.activity import log_booking_activity
+from bookings.models import Booking, BookingNotification, BookingAttachment, BookingChecklistItem
 from invoices.models import Invoice
 from core.pdf_utils import build_work_order_pdf
 from accounts.views import _record_legal_acceptance
@@ -54,6 +58,245 @@ def _paginate_queryset(request, queryset, per_page=20, page_param='page'):
     return page_obj
 
 
+def _calendar_status_config():
+    return {
+        Booking.STATUS_PENDING: {'label': 'In asteptare', 'color': '#facc15'},
+        Booking.STATUS_QUOTED: {'label': 'Ofertat', 'color': '#94a3b8'},
+        Booking.STATUS_CONFIRMED: {'label': 'Confirmat', 'color': '#22c55e'},
+        Booking.STATUS_IN_PROGRESS: {'label': 'In progres', 'color': '#f97316'},
+        Booking.STATUS_DONE: {'label': 'Finalizat', 'color': '#6366f1'},
+        Booking.STATUS_CANCELLED: {'label': 'Anulat', 'color': '#ef4444'},
+    }
+
+
+def _booking_calendar_attention(booking):
+    reasons = []
+    if booking.needs_attention():
+        if booking.status in {Booking.STATUS_CONFIRMED, Booking.STATUS_IN_PROGRESS} and not booking.garage_id:
+            reasons.append('Lipseste garajul')
+        if booking.status == Booking.STATUS_IN_PROGRESS and not booking.mechanic_id:
+            reasons.append('Lipseste mecanicul')
+        if Booking.TAG_BLOCKED in (booking.operational_tags or []):
+            reasons.append('Marcat ca blocat')
+        if Booking.TAG_WAITING_PART in (booking.operational_tags or []):
+            reasons.append('Asteapta piesa')
+    return reasons
+
+
+def _capacity_label(booked_minutes, available_minutes):
+    if available_minutes <= 0:
+        return 'Suprarezervat'
+    load_ratio = booked_minutes / available_minutes
+    if load_ratio >= 1:
+        return 'Suprarezervat'
+    if load_ratio >= 0.75:
+        return 'Aproape plin'
+    return 'Liber'
+
+
+def _capacity_badge(load_label):
+    return {
+        'Liber': 'success',
+        'Aproape plin': 'warning text-dark',
+        'Suprarezervat': 'danger',
+    }.get(load_label, 'secondary')
+
+
+def _resource_capacity_snapshot(centers, day_bookings, target_date):
+    mechanics_capacity = []
+    for mechanic in ServiceMechanic.objects.filter(center__in=centers).select_related('center', 'garage').order_by('center__name', 'name'):
+        mechanic_bookings = [booking for booking in day_bookings if booking.mechanic_id == mechanic.pk]
+        booked_minutes = sum(booking.effective_duration_minutes() for booking in mechanic_bookings)
+        available_minutes = 8 * 60
+        load_label = _capacity_label(booked_minutes, available_minutes)
+        mechanics_capacity.append({
+            'mechanic': mechanic,
+            'todays_count': len(mechanic_bookings),
+            'booked_minutes': booked_minutes,
+            'available_minutes': available_minutes,
+            'load_percent': min(round((booked_minutes / available_minutes) * 100), 100) if available_minutes else 100,
+            'load_label': load_label,
+            'load_badge': _capacity_badge(load_label),
+        })
+
+    garages_capacity = []
+    for garage in ServiceGarage.objects.filter(center__in=centers).select_related('center').order_by('center__name', 'name'):
+        garage_bookings = [booking for booking in day_bookings if booking.garage_id == garage.pk]
+        available_minutes = max(
+            int((datetime.combine(target_date, garage.close_time) - datetime.combine(target_date, garage.open_time)).total_seconds() // 60),
+            0,
+        )
+        booked_minutes = sum(booking.effective_duration_minutes() for booking in garage_bookings)
+        load_label = _capacity_label(booked_minutes, available_minutes)
+        garages_capacity.append({
+            'garage': garage,
+            'todays_count': len(garage_bookings),
+            'booked_minutes': booked_minutes,
+            'available_minutes': available_minutes,
+            'load_percent': min(round((booked_minutes / available_minutes) * 100), 100) if available_minutes else 100,
+            'load_label': load_label,
+            'load_badge': _capacity_badge(load_label),
+        })
+
+    return mechanics_capacity, garages_capacity
+
+
+def _parts_dashboard_stats(centers):
+    parts_qs = ServicePart.objects.filter(center__in=centers)
+    return {
+        'total_parts': parts_qs.count(),
+        'low_stock_count': parts_qs.filter(stock__lte=models.F('minimum_stock')).count(),
+        'out_of_stock_count': parts_qs.filter(stock=0).count(),
+        'estimated_stock_value': parts_qs.aggregate(
+            total=Sum(
+                models.F('stock') * models.F('price'),
+                output_field=models.DecimalField(max_digits=14, decimal_places=2),
+            )
+        )['total'] or Decimal('0.00'),
+        'low_stock_parts': list(
+            parts_qs.filter(stock__lte=models.F('minimum_stock'))
+            .select_related('center')
+            .order_by('stock', 'name')[:6]
+        ),
+    }
+
+
+def _build_dashboard_analytics(bookings_qs, centers, user_id):
+    booking_last_update = bookings_qs.aggregate(last=Max('updated_at'))['last']
+    invoice_last_update = Invoice.objects.filter(center__in=centers).aggregate(last=Max('updated_at'))['last']
+    booking_version = int(booking_last_update.timestamp()) if booking_last_update else 0
+    invoice_version = int(invoice_last_update.timestamp()) if invoice_last_update else 0
+    analytics_cache_key = f"service_dashboard_analytics:{user_id}:{booking_version}:{invoice_version}"
+    analytics = cache.get(analytics_cache_key)
+    if analytics is not None:
+        return analytics
+
+    booking_summary = bookings_qs.aggregate(
+        total_count=Count('id'),
+        pending_count=Count('id', filter=Q(status=Booking.STATUS_PENDING)),
+        quoted_count=Count('id', filter=Q(status=Booking.STATUS_QUOTED)),
+        confirmed_count=Count('id', filter=Q(status=Booking.STATUS_CONFIRMED)),
+        in_progress_count=Count('id', filter=Q(status=Booking.STATUS_IN_PROGRESS)),
+        done_count=Count('id', filter=Q(status=Booking.STATUS_DONE)),
+        cancelled_count=Count('id', filter=Q(status=Booking.STATUS_CANCELLED)),
+        estimated_revenue=Sum('estimated_price', filter=Q(status__in=[
+            Booking.STATUS_QUOTED,
+            Booking.STATUS_CONFIRMED,
+            Booking.STATUS_IN_PROGRESS,
+            Booking.STATUS_DONE,
+        ])),
+    )
+
+    invoices_total = Invoice.objects.filter(
+        center__in=centers,
+        status=Invoice.STATUS_FINAL,
+    ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+
+    top_services = list(
+        bookings_qs.exclude(service_item__isnull=True).values('service_item__name')
+        .annotate(total=Count('id'))
+        .order_by('-total', 'service_item__name')[:5]
+    )
+    top_mechanics = list(
+        bookings_qs.filter(status=Booking.STATUS_DONE, mechanic__isnull=False)
+        .values('mechanic__name')
+        .annotate(total=Count('id'))
+        .order_by('-total', 'mechanic__name')[:5]
+    )
+    recurring_clients = bookings_qs.exclude(client_email='').values('client_email').annotate(
+        total=Count('id')
+    ).filter(total__gte=2).count()
+    review_stats = ServiceCenter.objects.filter(pk__in=centers.values('pk')).aggregate(
+        avg_rating=Avg('review__rating', filter=Q(review__is_approved=True)),
+        total_reviews=Count('review', filter=Q(review__is_approved=True)),
+    )
+
+    month_points = list(
+        bookings_qs.annotate(month=TruncMonth('booking_date'))
+        .values('month')
+        .annotate(
+            total=Count('id'),
+            confirmed=Count('id', filter=Q(status=Booking.STATUS_CONFIRMED)),
+            done=Count('id', filter=Q(status=Booking.STATUS_DONE)),
+            cancelled=Count('id', filter=Q(status=Booking.STATUS_CANCELLED)),
+            revenue=Sum('estimated_price', filter=Q(status__in=[
+                Booking.STATUS_QUOTED,
+                Booking.STATUS_CONFIRMED,
+                Booking.STATUS_IN_PROGRESS,
+                Booking.STATUS_DONE,
+            ])),
+        )
+        .order_by('-month')[:6]
+    )
+    month_points.reverse()
+    monthly_trend = [
+        {
+            'label': item['month'].strftime('%b %Y') if item['month'] else '',
+            'total': item['total'],
+            'confirmed': item['confirmed'],
+            'done': item['done'],
+            'cancelled': item['cancelled'],
+            'revenue': float(item['revenue'] or 0),
+        }
+        for item in month_points
+    ]
+
+    today = timezone.localdate()
+    today_count = bookings_qs.filter(booking_date=today).count()
+    busiest_hours = list(
+        bookings_qs.annotate(hour=ExtractHour('booking_time'))
+        .values('hour')
+        .annotate(total=Count('id'))
+        .order_by('-total', 'hour')[:5]
+    )
+    weekday_labels = {
+        1: 'Duminica', 2: 'Luni', 3: 'Marti', 4: 'Miercuri', 5: 'Joi', 6: 'Vineri', 7: 'Sambata'
+    }
+    busiest_days = list(
+        bookings_qs.annotate(weekday=ExtractWeekDay('booking_date'))
+        .values('weekday')
+        .annotate(total=Count('id'))
+        .order_by('-total', 'weekday')[:5]
+    )
+
+    total_bookings = booking_summary['total_count'] or 0
+    quoted_count = booking_summary['quoted_count'] or 0
+    accepted_count = (booking_summary['confirmed_count'] or 0) + (booking_summary['in_progress_count'] or 0) + (booking_summary['done_count'] or 0)
+    completed_count = booking_summary['done_count'] or 0
+
+    analytics = {
+        'total_bookings': total_bookings,
+        'pending_count': booking_summary['pending_count'] or 0,
+        'quoted_count': quoted_count,
+        'accepted_count': accepted_count,
+        'completed_count': completed_count,
+        'in_progress_count': booking_summary['in_progress_count'] or 0,
+        'cancelled_count': booking_summary['cancelled_count'] or 0,
+        'quote_rate': round((quoted_count / total_bookings) * 100, 1) if total_bookings else 0,
+        'acceptance_rate': round((accepted_count / quoted_count) * 100, 1) if quoted_count else 0,
+        'completion_rate': round((completed_count / accepted_count) * 100, 1) if accepted_count else 0,
+        'estimated_revenue': booking_summary['estimated_revenue'] or Decimal('0.00'),
+        'invoiced_revenue': invoices_total,
+        'top_services': top_services,
+        'top_mechanics': top_mechanics,
+        'recurring_clients': recurring_clients,
+        'avg_rating': round(review_stats['avg_rating'] or 0, 1),
+        'total_reviews': review_stats['total_reviews'] or 0,
+        'monthly_trend': monthly_trend,
+        'today_count': today_count,
+        'busiest_hours': [
+            {'label': f"{item['hour']:02d}:00" if item['hour'] is not None else 'Fara ora', 'total': item['total']}
+            for item in busiest_hours
+        ],
+        'busiest_days': [
+            {'label': weekday_labels.get(item['weekday'], str(item['weekday'])), 'total': item['total']}
+            for item in busiest_days
+        ],
+    }
+    cache.set(analytics_cache_key, analytics, 120)
+    return analytics
+
+
 def category_list(request):
     categories = ServiceCategory.objects.all().order_by('order')
     for cat in categories:
@@ -65,8 +308,9 @@ def category_list(request):
 
 
 def service_list(request):
-    from django.db.models import Subquery, OuterRef, FloatField, IntegerField
+    from django.db.models import Subquery, OuterRef, FloatField, IntegerField, Case, When, Value, F
     from django.db.models.functions import Coalesce
+    today = timezone.localdate()
 
     min_price_sq = Subquery(
         ServiceItem.objects.filter(center=OuterRef('pk'))
@@ -77,14 +321,51 @@ def service_list(request):
         avg_rating=Avg('review__rating', filter=Q(review__is_approved=True)),
         review_count=Count('review', filter=Q(review__is_approved=True), distinct=True),
         min_price=min_price_sq,
+        garage_count=Count('garages', distinct=True),
+        active_mechanics=Count('mechanics', filter=Q(mechanics__is_active=True), distinct=True),
+        future_bookings=Count(
+            'bookings',
+            filter=Q(
+                bookings__booking_date__gte=today,
+                bookings__status__in=[
+                    Booking.STATUS_QUOTED,
+                    Booking.STATUS_CONFIRMED,
+                    Booking.STATUS_IN_PROGRESS,
+                ],
+            ),
+            distinct=True,
+        ),
+        profile_completeness=(
+            Case(When(description__gt='', then=Value(1)), default=Value(0), output_field=IntegerField()) +
+            Case(When(email__gt='', then=Value(1)), default=Value(0), output_field=IntegerField()) +
+            Case(When(phone__gt='', then=Value(1)), default=Value(0), output_field=IntegerField()) +
+            Case(When(website__gt='', then=Value(1)), default=Value(0), output_field=IntegerField()) +
+            Case(When(card_image__isnull=False, then=Value(1)), default=Value(0), output_field=IntegerField())
+        ),
     ).prefetch_related('categories')
+    qs = qs.annotate(
+        ranking_score=(
+            Coalesce(F('avg_rating'), Value(0.0), output_field=FloatField()) * Value(2.5) +
+            Coalesce(F('review_count'), Value(0), output_field=FloatField()) * Value(0.35) +
+            Coalesce(F('profile_completeness'), Value(0), output_field=FloatField()) * Value(0.7) +
+            Coalesce(F('garage_count'), Value(0), output_field=FloatField()) * Value(0.5) +
+            Coalesce(F('active_mechanics'), Value(0), output_field=FloatField()) * Value(0.45) +
+            Case(
+                When(future_bookings__lte=2, then=Value(1.1)),
+                When(future_bookings__lte=5, then=Value(0.5)),
+                default=Value(0.0),
+                output_field=FloatField(),
+            ) +
+            Case(When(is_featured=True, then=Value(1.2)), default=Value(0.0), output_field=FloatField())
+        )
+    )
 
     category_slug = request.GET.get('category', '').strip()
     city = request.GET.get('city', '').strip()
     min_rating = request.GET.get('min_rating', '').strip()
     price_min = request.GET.get('price_min', '').strip()
     price_max = request.GET.get('price_max', '').strip()
-    sort_by = request.GET.get('sort', 'rating')
+    sort_by = request.GET.get('sort', 'recommended')
     search_q = request.GET.get('q', '').strip()
 
     if search_q:
@@ -135,17 +416,17 @@ def service_list(request):
         except ValueError:
             pass
 
-    from django.db.models import F
     sort_options = {
+        'recommended': F('ranking_score').desc(nulls_last=True),
         'rating': F('avg_rating').desc(nulls_last=True),
         'price_asc': F('min_price').asc(nulls_last=True),
         'price_desc': F('min_price').desc(nulls_last=True),
         'reviews': F('review_count').desc(nulls_last=True),
         'name': F('name').asc(),
         # 'distance' e tratat client-side cu JS/GPS - server face fallback la rating
-        'distance': F('avg_rating').desc(nulls_last=True),
+        'distance': F('ranking_score').desc(nulls_last=True),
     }
-    qs = qs.order_by(sort_options.get(sort_by, F('avg_rating').desc(nulls_last=True)))
+    qs = qs.order_by(sort_options.get(sort_by, F('ranking_score').desc(nulls_last=True)))
 
     categories = ServiceCategory.objects.all()
     from .models import CITY_CHOICES
@@ -379,77 +660,28 @@ def service_dashboard(request):
     mechanic_form = ServiceMechanicForm()
     mechanics_by_center = [(center, center.mechanics.order_by('name')) for center in centers]
 
-    low_stock_count = ServicePart.objects.filter(center__in=centers, stock__lte=models.F('minimum_stock')).count()
-    booking_last_update = bookings_qs.aggregate(last=Max('updated_at'))['last']
-    invoice_last_update = Invoice.objects.filter(center__in=centers).aggregate(last=Max('updated_at'))['last']
-    analytics_cache_key = f"service_dashboard_analytics:{request.user.pk}:{booking_last_update}:{invoice_last_update}"
-    analytics = cache.get(analytics_cache_key)
-    if analytics is None:
-        booking_summary = bookings_qs.aggregate(
-            total_count=Count('id'),
-            pending_count=Count('id', filter=Q(status=Booking.STATUS_PENDING)),
-            quoted_count=Count('id', filter=Q(status=Booking.STATUS_QUOTED)),
-            confirmed_count=Count('id', filter=Q(status=Booking.STATUS_CONFIRMED)),
-            in_progress_count=Count('id', filter=Q(status=Booking.STATUS_IN_PROGRESS)),
-            done_count=Count('id', filter=Q(status=Booking.STATUS_DONE)),
-            cancelled_count=Count('id', filter=Q(status=Booking.STATUS_CANCELLED)),
-            estimated_revenue=Sum('estimated_price', filter=Q(status__in=[
-                Booking.STATUS_QUOTED,
-                Booking.STATUS_CONFIRMED,
-                Booking.STATUS_IN_PROGRESS,
-                Booking.STATUS_DONE,
-            ])),
-        )
-
-        invoices_total = Invoice.objects.filter(
-            center__in=centers,
-            status=Invoice.STATUS_FINAL,
-        ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
-
-        top_services = list(
-            bookings_qs.exclude(service_item__isnull=True).values('service_item__name')
-            .annotate(total=Count('id'))
-            .order_by('-total', 'service_item__name')[:5]
-        )
-        top_mechanics = list(
-            bookings_qs.filter(status=Booking.STATUS_DONE, mechanic__isnull=False)
-            .values('mechanic__name')
-            .annotate(total=Count('id'))
-            .order_by('-total', 'mechanic__name')[:5]
-        )
-        recurring_clients = bookings_qs.exclude(client_email='').values('client_email').annotate(
-            total=Count('id')
-        ).filter(total__gte=2).count()
-        review_stats = ServiceCenter.objects.filter(pk__in=centers.values('pk')).aggregate(
-            avg_rating=Avg('review__rating', filter=Q(review__is_approved=True)),
-            total_reviews=Count('review', filter=Q(review__is_approved=True)),
-        )
-
-        total_bookings = booking_summary['total_count'] or 0
-        quoted_count = booking_summary['quoted_count'] or 0
-        accepted_count = (booking_summary['confirmed_count'] or 0) + (booking_summary['in_progress_count'] or 0) + (booking_summary['done_count'] or 0)
-        completed_count = booking_summary['done_count'] or 0
-
-        analytics = {
-            'total_bookings': total_bookings,
-            'pending_count': booking_summary['pending_count'] or 0,
-            'quoted_count': quoted_count,
-            'accepted_count': accepted_count,
-            'completed_count': completed_count,
-            'in_progress_count': booking_summary['in_progress_count'] or 0,
-            'cancelled_count': booking_summary['cancelled_count'] or 0,
-            'quote_rate': round((quoted_count / total_bookings) * 100, 1) if total_bookings else 0,
-            'acceptance_rate': round((accepted_count / quoted_count) * 100, 1) if quoted_count else 0,
-            'completion_rate': round((completed_count / accepted_count) * 100, 1) if accepted_count else 0,
-            'estimated_revenue': booking_summary['estimated_revenue'] or Decimal('0.00'),
-            'invoiced_revenue': invoices_total,
-            'top_services': top_services,
-            'top_mechanics': top_mechanics,
-            'recurring_clients': recurring_clients,
-            'avg_rating': round(review_stats['avg_rating'] or 0, 1),
-            'total_reviews': review_stats['total_reviews'] or 0,
-        }
-        cache.set(analytics_cache_key, analytics, 120)
+    parts_stats = _parts_dashboard_stats(centers)
+    analytics = _build_dashboard_analytics(bookings_qs, centers, request.user.pk)
+    today = timezone.localdate()
+    todays_bookings_all = list(
+        bookings_qs.filter(booking_date=today).order_by('booking_time', 'created_at')
+    )
+    mechanics_capacity, garages_capacity = _resource_capacity_snapshot(centers, todays_bookings_all, today)
+    today_conflicts = [
+        booking for booking in todays_bookings_all
+        if Booking.TAG_BLOCKED in (booking.operational_tags or [])
+        or Booking.TAG_WAITING_PART in (booking.operational_tags or [])
+    ][:6]
+    today_board = {
+        'upcoming': [booking for booking in todays_bookings_all if booking.status in {Booking.STATUS_QUOTED, Booking.STATUS_CONFIRMED}][:6],
+        'in_progress': [booking for booking in todays_bookings_all if booking.status == Booking.STATUS_IN_PROGRESS][:6],
+        'overdue': [
+            booking for booking in todays_bookings_all
+            if booking.status in {Booking.STATUS_QUOTED, Booking.STATUS_CONFIRMED}
+            and booking.get_end_datetime()
+            and timezone.make_aware(booking.get_end_datetime()) < timezone.now()
+        ][:6],
+    }
 
     return render(request, 'services/service_dashboard.html', {
         'centers': centers,
@@ -460,8 +692,14 @@ def service_dashboard(request):
         'pending_verifications': pending_verifications,
         'mechanic_form': mechanic_form,
         'mechanics_by_center': mechanics_by_center,
-        'low_stock_count': low_stock_count,
+        'low_stock_count': parts_stats['low_stock_count'],
         'analytics': analytics,
+        'todays_bookings': todays_bookings_all[:8],
+        'mechanics_capacity': mechanics_capacity[:8],
+        'garages_capacity': garages_capacity[:8],
+        'today_conflicts': today_conflicts,
+        'today_board': today_board,
+        'parts_stats': parts_stats,
     })
 
 
@@ -482,6 +720,173 @@ def bookings_list(request):
     return render(request, 'services/bookings_list.html', {
         'bookings': bookings,
         'centers': centers,
+    })
+
+
+@login_required
+def service_calendar(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+
+    centers = centers.prefetch_related('garages', 'categories')
+    today = timezone.localdate()
+    today_bookings = Booking.objects.filter(center__in=centers, booking_date=today).count()
+    garages = ServiceGarage.objects.filter(center__in=centers).order_by('center__name', 'name')
+    mechanics = ServiceMechanic.objects.filter(center__in=centers).order_by('center__name', 'name')
+
+    return render(request, 'services/service_calendar.html', {
+        'centers': centers,
+        'today_bookings': today_bookings,
+        'calendar_statuses': _calendar_status_config(),
+        'calendar_garages': garages,
+        'calendar_mechanics': mechanics,
+    })
+
+
+@login_required
+def service_calendar_events(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return JsonResponse({'ok': False, 'detail': 'service_required'}, status=403)
+
+    start_raw = (request.GET.get('start') or '').strip()
+    end_raw = (request.GET.get('end') or '').strip()
+    status_filter = (request.GET.get('status') or '').strip()
+    garage_filter = (request.GET.get('garage') or '').strip()
+    mechanic_filter = (request.GET.get('mechanic') or '').strip()
+
+    bookings = Booking.objects.filter(center__in=centers).select_related(
+        'center', 'garage', 'mechanic', 'service_item'
+    )
+
+    if start_raw:
+        try:
+            start_date = datetime.fromisoformat(start_raw.replace('Z', '+00:00')).date()
+            bookings = bookings.filter(booking_date__gte=start_date)
+        except ValueError:
+            pass
+    if end_raw:
+        try:
+            end_date = datetime.fromisoformat(end_raw.replace('Z', '+00:00')).date()
+            bookings = bookings.filter(booking_date__lt=end_date)
+        except ValueError:
+            pass
+
+    if status_filter:
+        allowed_statuses = {choice[0] for choice in Booking.STATUS_CHOICES}
+        selected_statuses = [item for item in status_filter.split(',') if item in allowed_statuses]
+        if selected_statuses:
+            bookings = bookings.filter(status__in=selected_statuses)
+    if garage_filter.isdigit():
+        bookings = bookings.filter(garage_id=int(garage_filter))
+    if mechanic_filter.isdigit():
+        bookings = bookings.filter(mechanic_id=int(mechanic_filter))
+
+    status_config = _calendar_status_config()
+    events = []
+    for booking in bookings.order_by('booking_date', 'booking_time', 'pk'):
+        start_dt = booking.get_start_datetime()
+        end_dt = booking.get_end_datetime()
+        config = status_config.get(booking.status, {'label': booking.get_status_display(), 'color': '#94a3b8'})
+        attention_reasons = _booking_calendar_attention(booking)
+        events.append({
+            'id': booking.pk,
+            'title': f"#{booking.pk} {booking.client_name}",
+            'start': start_dt.isoformat() if start_dt else None,
+            'end': end_dt.isoformat() if end_dt else None,
+            'url': reverse('services:booking_detail', args=[booking.pk]),
+            'backgroundColor': config['color'],
+            'borderColor': config['color'],
+            'textColor': '#0f172a' if booking.status == Booking.STATUS_PENDING else '#ffffff',
+            'extendedProps': {
+                'status': booking.status,
+                'status_label': booking.get_status_display(),
+                'center': booking.center.name,
+                'garage': booking.garage.name if booking.garage_id else 'Fara garaj',
+                'mechanic': booking.mechanic.name if booking.mechanic_id else 'Nealocat',
+                'car': f"{booking.car_brand} {booking.car_model} ({booking.car_plate})",
+                'service': booking.service_item.name if booking.service_item_id else 'Fara serviciu selectat',
+                'problem_description': booking.problem_description,
+                'duration': booking.get_duration_display(),
+                'estimated_price': f"{booking.estimated_price:.2f} RON" if booking.estimated_price is not None else '',
+                'booking_date': booking.booking_date.strftime('%d.%m.%Y'),
+                'booking_time': booking.booking_time.strftime('%H:%M'),
+                'needs_attention': bool(attention_reasons),
+                'attention_reasons': attention_reasons,
+            },
+        })
+
+    return JsonResponse(events, safe=False)
+
+
+@login_required
+def service_calendar_update_booking(request, pk):
+    booking = get_object_or_404(
+        Booking.objects.select_related('center', 'garage', 'mechanic', 'service_item'),
+        pk=pk,
+    )
+    if not (request.user.is_staff or booking.center.owner_id == request.user.id):
+        return JsonResponse({'ok': False, 'detail': 'forbidden'}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'detail': 'method_not_allowed'}, status=405)
+    if booking.status in {Booking.STATUS_DONE, Booking.STATUS_CANCELLED}:
+        return JsonResponse({'ok': False, 'detail': 'locked', 'message': 'Programarile finalizate sau anulate nu mai pot fi mutate din calendar.'}, status=400)
+
+    payload = request.POST or request.GET
+    start_raw = (payload.get('start') or '').strip()
+    end_raw = (payload.get('end') or '').strip()
+    if not start_raw or not end_raw:
+        return JsonResponse({'ok': False, 'message': 'Lipsesc data de inceput sau data de final.'}, status=400)
+
+    try:
+        new_start = datetime.fromisoformat(start_raw.replace('Z', '+00:00'))
+        new_end = datetime.fromisoformat(end_raw.replace('Z', '+00:00'))
+    except ValueError:
+        return JsonResponse({'ok': False, 'message': 'Intervalul trimis nu este valid.'}, status=400)
+
+    if timezone.is_aware(new_start):
+        new_start = timezone.localtime(new_start).replace(tzinfo=None)
+    if timezone.is_aware(new_end):
+        new_end = timezone.localtime(new_end).replace(tzinfo=None)
+
+    duration_minutes = int((new_end - new_start).total_seconds() // 60)
+    if duration_minutes < 30:
+        return JsonResponse({'ok': False, 'message': 'Durata minima este de 30 minute.'}, status=400)
+
+    old_snapshot = {
+        'date': booking.booking_date.isoformat(),
+        'time': booking.booking_time.strftime('%H:%M'),
+        'duration': booking.effective_duration_minutes(),
+    }
+    booking.booking_date = new_start.date()
+    booking.booking_time = new_start.time().replace(second=0, microsecond=0)
+    booking.duration_minutes = duration_minutes
+
+    try:
+        booking.full_clean()
+        booking.save(update_fields=['booking_date', 'booking_time', 'duration_minutes', 'updated_at'])
+    except ValidationError as exc:
+        return JsonResponse({'ok': False, 'message': '; '.join(exc.messages)}, status=400)
+
+    log_booking_activity(
+        booking,
+        'schedule_changed',
+        f'Programarea a fost mutata in calendar pe {booking.booking_date:%d.%m.%Y} la {booking.booking_time:%H:%M}.',
+        actor=request.user,
+        metadata={
+            'old': old_snapshot,
+            'new': {
+                'date': booking.booking_date.isoformat(),
+                'time': booking.booking_time.strftime('%H:%M'),
+                'duration': booking.duration_minutes,
+            },
+        },
+    )
+    return JsonResponse({
+        'ok': True,
+        'message': 'Programarea a fost actualizata.',
+        'duration_display': booking.get_duration_display(),
     })
 
 
@@ -594,7 +999,9 @@ def mechanic_delete(request, pk):
 @login_required
 def booking_detail(request, pk):
     booking = get_object_or_404(
-        Booking.objects.select_related('center', 'service_item', 'user', 'garage', 'mechanic').prefetch_related('attachments'),
+        Booking.objects.select_related('center', 'service_item', 'user', 'garage', 'mechanic').prefetch_related(
+            'attachments', 'activity_logs__actor', 'checklist_items'
+        ),
         pk=pk,
     )
     if not (request.user.is_staff or booking.center.owner_id == request.user.id):
@@ -605,22 +1012,93 @@ def booking_detail(request, pk):
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'save_work_order_info':
+            previous_used_services = booking.used_services
+            previous_description = booking.additional_description
             booking.used_services = (request.POST.get('used_services') or '').strip()
             booking.additional_description = (request.POST.get('additional_description') or '').strip()
             booking.save(update_fields=['used_services', 'additional_description', 'updated_at'])
+            if booking.used_services != previous_used_services or booking.additional_description != previous_description:
+                log_booking_activity(booking, 'note_updated', 'Fisa de lucru a fost actualizata.', actor=request.user)
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 from django.http import JsonResponse
                 return JsonResponse({'ok': True, 'msg': 'Fișa a fost salvată.'})
             messages.success(request, 'Detaliile suplimentare pentru fișa de comandă au fost salvate.')
             return redirect('services:booking_detail', pk=booking.pk)
 
+        if action == 'save_internal_notes':
+            previous_notes = booking.notes
+            booking.notes = (request.POST.get('notes') or '').strip()
+            booking.save(update_fields=['notes', 'updated_at'])
+            if booking.notes != previous_notes:
+                log_booking_activity(booking, 'note_updated', 'Nota interna a fost actualizata.', actor=request.user)
+            messages.success(request, 'Nota interna a fost salvata.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'update_tags':
+            selected_tags = [tag for tag in request.POST.getlist('operational_tags') if tag in dict(Booking.TAG_CHOICES)]
+            previous_tags = list(booking.operational_tags or [])
+            booking.operational_tags = selected_tags
+            try:
+                booking.full_clean()
+                booking.save(update_fields=['operational_tags', 'updated_at'])
+            except ValidationError as exc:
+                messages.error(request, '; '.join(exc.messages))
+                return redirect('services:booking_detail', pk=booking.pk)
+            if booking.operational_tags != previous_tags:
+                log_booking_activity(
+                    booking,
+                    'tags_updated',
+                    'Tag-urile operationale au fost actualizate.',
+                    actor=request.user,
+                    metadata={'old': previous_tags, 'new': booking.operational_tags},
+                )
+            messages.success(request, 'Tag-urile operationale au fost actualizate.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'add_checklist_item':
+            label = (request.POST.get('label') or '').strip()
+            if not label:
+                messages.error(request, 'Introdu un pas valid pentru checklist.')
+                return redirect('services:booking_detail', pk=booking.pk)
+            item = BookingChecklistItem.objects.create(booking=booking, label=label, created_by=request.user)
+            log_booking_activity(booking, 'checklist_updated', f'A fost adaugat in checklist: {item.label}.', actor=request.user)
+            messages.success(request, 'Checklist-ul a fost actualizat.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'toggle_checklist_item':
+            item = get_object_or_404(BookingChecklistItem, pk=request.POST.get('item_id'), booking=booking)
+            item.is_done = not item.is_done
+            item.completed_at = timezone.now() if item.is_done else None
+            item.save(update_fields=['is_done', 'completed_at'])
+            log_booking_activity(
+                booking,
+                'checklist_updated',
+                f'Checklist: {item.label} a fost {"bifat" if item.is_done else "redeschis"}.',
+                actor=request.user,
+            )
+            messages.info(request, 'Checklist-ul a fost actualizat.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
         if action == 'assign_mechanic':
             mechanic_id = (request.POST.get('mechanic') or '').strip()
+            old_mechanic = booking.mechanic.name if booking.mechanic_id else ''
             mechanic = None
             if mechanic_id:
                 mechanic = get_object_or_404(ServiceMechanic, pk=mechanic_id, center=booking.center)
             booking.mechanic = mechanic
-            booking.save(update_fields=['mechanic', 'updated_at'])
+            try:
+                booking.full_clean()
+                booking.save(update_fields=['mechanic', 'updated_at'])
+            except ValidationError as exc:
+                messages.error(request, '; '.join(exc.messages))
+                return redirect('services:booking_detail', pk=booking.pk)
+            log_booking_activity(
+                booking,
+                'mechanic_changed',
+                f'Mecanicul a fost {"alocat" if mechanic else "eliminat"} pentru programare.',
+                actor=request.user,
+                metadata={'old': old_mechanic, 'new': mechanic.name if mechanic else ''},
+            )
             if mechanic and booking.user:
                 BookingNotification.objects.create(
                     recipient=booking.user,
@@ -657,6 +1135,13 @@ def booking_detail(request, pk):
                 content_type = getattr(uploaded, 'content_type', '') or ''
                 media_kind = 'video' if content_type.startswith('video/') else 'image'
                 BookingAttachment.objects.create(booking=booking, file=uploaded, media_kind=media_kind)
+                log_booking_activity(
+                    booking,
+                    'attachment_added',
+                    f'A fost adaugat un fisier: {uploaded.name}.',
+                    actor=request.user,
+                    metadata={'filename': uploaded.name, 'media_kind': media_kind},
+                )
                 added += 1
 
             if added:
@@ -674,8 +1159,16 @@ def booking_detail(request, pk):
                     return JsonResponse({'ok': False, 'msg': 'Status invalid.'})
                 messages.error(request, 'Statusul selectat nu este valid.')
                 return redirect('services:booking_detail', pk=booking.pk)
+            old_status = booking.status
             booking.status = new_status
             booking.save(update_fields=['status', 'updated_at'])
+            log_booking_activity(
+                booking,
+                'status_changed',
+                f'Status schimbat din {dict(Booking.STATUS_CHOICES).get(old_status)} in {booking.get_status_display()}.',
+                actor=request.user,
+                metadata={'old': old_status, 'new': new_status},
+            )
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 from django.http import JsonResponse
                 return JsonResponse({'ok': True, 'msg': f'Status actualizat: {booking.get_status_display()}', 'status_display': booking.get_status_display(), 'status_badge': booking.get_status_badge()})
@@ -698,6 +1191,9 @@ def booking_detail(request, pk):
         'mechanics': mechanics,
         'history_entries': history_entries,
         'work_log': work_log,
+        'activity_logs': booking.activity_logs.all()[:12],
+        'checklist_items': booking.checklist_items.all(),
+        'operational_tag_choices': Booking.TAG_CHOICES,
         'status_choices': [choice for choice in Booking.STATUS_CHOICES if choice[0] not in [Booking.STATUS_PENDING, Booking.STATUS_QUOTED, Booking.STATUS_CANCELLED]],
     })
 
@@ -732,12 +1228,25 @@ def owner_booking_create(request, pk):
                 booking.user = saved_car.owner
             booking.full_clean()
             booking.save()
+            log_booking_activity(
+                booking,
+                'schedule_changed',
+                'Programarea a fost creata direct din dashboardul service-ului.',
+                actor=request.user,
+            )
 
             for uploaded in request.FILES.getlist('attachments'):
                 validate_booking_media_file(uploaded)
                 content_type = getattr(uploaded, 'content_type', '') or ''
                 media_kind = 'video' if content_type.startswith('video/') else 'image'
                 BookingAttachment.objects.create(booking=booking, file=uploaded, media_kind=media_kind)
+                log_booking_activity(
+                    booking,
+                    'attachment_added',
+                    f'A fost adaugat un fisier la creare: {uploaded.name}.',
+                    actor=request.user,
+                    metadata={'filename': uploaded.name, 'media_kind': media_kind},
+                )
 
             if booking.user:
                 BookingNotification.objects.create(
@@ -875,7 +1384,19 @@ def booking_accept(request, pk):
         booking.status = Booking.STATUS_QUOTED
         booking.duration_minutes = duration_minutes
         booking.estimated_price = estimated_price
-        booking.save(update_fields=['status', 'duration_minutes', 'estimated_price', 'updated_at'])
+        try:
+            booking.full_clean()
+            booking.save(update_fields=['status', 'duration_minutes', 'estimated_price', 'updated_at'])
+        except ValidationError as exc:
+            messages.error(request, '; '.join(exc.messages))
+            return _post_redirect(request, 'services:dashboard')
+        log_booking_activity(
+            booking,
+            'offer_updated',
+            f'A fost trimisa o oferta de {estimated_price:.2f} RON cu durata {booking.get_duration_display()}.',
+            actor=request.user,
+            metadata={'estimated_price': estimated_price, 'duration_minutes': duration_minutes},
+        )
         if booking.user:
             BookingNotification.objects.create(
                 recipient=booking.user,
@@ -908,6 +1429,13 @@ def booking_reject(request, pk):
             return redirect('services:dashboard')
         booking.status = Booking.STATUS_CANCELLED
         booking.save(update_fields=['status', 'updated_at'])
+        log_booking_activity(
+            booking,
+            'status_changed',
+            'Programarea a fost anulata de service inainte de confirmare.',
+            actor=request.user,
+            metadata={'old': Booking.STATUS_PENDING, 'new': Booking.STATUS_CANCELLED},
+        )
         if booking.user:
             BookingNotification.objects.create(
                 recipient=booking.user,
@@ -989,6 +1517,22 @@ def parts_inventory(request):
         messages.info(request, 'Adaugă mai întâi un service pentru a gestiona piesele.')
         return redirect('services:register_service')
 
+    query = (request.GET.get('q') or '').strip()
+    selected_category = (request.GET.get('category') or '').strip()
+    selected_stock_status = (request.GET.get('stock_status') or '').strip()
+    selected_sort = (request.GET.get('sort') or 'name').strip() or 'name'
+
+    redirect_params = {'center': selected_center.pk}
+    if query:
+        redirect_params['q'] = query
+    if selected_category:
+        redirect_params['category'] = selected_category
+    if selected_stock_status:
+        redirect_params['stock_status'] = selected_stock_status
+    if selected_sort and selected_sort != 'name':
+        redirect_params['sort'] = selected_sort
+    redirect_url = f"{reverse('services:parts_inventory')}?{urlencode(redirect_params)}"
+
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'add_part':
@@ -998,7 +1542,7 @@ def parts_inventory(request):
                 part.center = selected_center
                 part.save()
                 messages.success(request, 'Piesa a fost adăugată în stoc.')
-                return redirect(f"{reverse('services:parts_inventory')}?center={selected_center.pk}")
+                return redirect(redirect_url)
         elif action == 'update_stock':
             part = get_object_or_404(ServicePart, pk=request.POST.get('part_id'), center__in=centers)
             try:
@@ -1011,23 +1555,79 @@ def parts_inventory(request):
                 part.minimum_stock = max(minimum_stock, 0)
                 part.save(update_fields=['stock', 'minimum_stock', 'updated_at'])
                 messages.success(request, 'Stocul piesei a fost actualizat.')
-                return redirect(f"{reverse('services:parts_inventory')}?center={part.center_id}")
+                return redirect(redirect_url)
+        elif action == 'adjust_stock':
+            part = get_object_or_404(ServicePart, pk=request.POST.get('part_id'), center__in=centers)
+            try:
+                delta = int(request.POST.get('delta', 0))
+            except (TypeError, ValueError):
+                messages.error(request, 'Actualizarea rapidă a stocului a eșuat.')
+            else:
+                part.stock = max(part.stock + delta, 0)
+                part.save(update_fields=['stock', 'updated_at'])
+                messages.success(request, f'Stocul pentru {part.name} a fost actualizat la {part.stock} {part.unit}.')
+                return redirect(redirect_url)
         elif action == 'delete_part':
             part = get_object_or_404(ServicePart, pk=request.POST.get('part_id'), center__in=centers)
-            center_pk = part.center_id
             part.delete()
             messages.info(request, 'Piesa a fost ștearsă din stoc.')
-            return redirect(f"{reverse('services:parts_inventory')}?center={center_pk}")
+            return redirect(redirect_url)
     else:
         form = ServicePartForm()
 
-    parts = ServicePart.objects.filter(center=selected_center).order_by('name')
+    parts = ServicePart.objects.filter(center=selected_center)
+    if query:
+        parts = parts.filter(
+            Q(name__icontains=query)
+            | Q(part_number__icontains=query)
+            | Q(brand__icontains=query)
+            | Q(supplier__icontains=query)
+            | Q(shelf__icontains=query)
+            | Q(notes__icontains=query)
+        )
+    if selected_category:
+        parts = parts.filter(category=selected_category)
+    if selected_stock_status == 'out':
+        parts = parts.filter(stock=0)
+    elif selected_stock_status == 'low':
+        parts = parts.filter(stock__lte=models.F('minimum_stock')).exclude(stock=0)
+    elif selected_stock_status == 'ok':
+        parts = parts.filter(stock__gt=models.F('minimum_stock'))
+
+    sort_options = {
+        'name': ['name', 'brand'],
+        'stock_asc': ['stock', 'name'],
+        'stock_desc': ['-stock', 'name'],
+        'updated': ['-updated_at', 'name'],
+        'price_desc': ['-price', 'name'],
+        'category': ['category', 'name'],
+    }
+    parts = parts.order_by(*sort_options.get(selected_sort, ['name']))
+    page_obj = _paginate_queryset(request, parts, per_page=18, page_param='stock_page')
+    parts_stats = {
+        'total_parts': parts.count(),
+        'low_stock_count': parts.filter(stock__lte=models.F('minimum_stock')).count(),
+        'out_of_stock_count': parts.filter(stock=0).count(),
+        'estimated_stock_value': parts.aggregate(
+            total=Sum(
+                models.F('stock') * models.F('price'),
+                output_field=models.DecimalField(max_digits=14, decimal_places=2),
+            )
+        )['total'] or Decimal('0.00'),
+    }
     return render(request, 'services/parts_inventory.html', {
         'centers': centers,
         'selected_center': selected_center,
-        'parts': parts,
+        'parts': page_obj.object_list,
+        'page_obj': page_obj,
         'form': form,
-        'low_stock_count': parts.filter(stock__lte=models.F('minimum_stock')).count(),
+        'low_stock_count': parts_stats['low_stock_count'],
+        'parts_stats': parts_stats,
+        'selected_query': query,
+        'selected_category': selected_category,
+        'selected_stock_status': selected_stock_status,
+        'selected_sort': selected_sort,
+        'category_filters': ServicePart.CATEGORY_FILTERS,
     })
 
 
@@ -1144,8 +1744,16 @@ def mechanic_profile(request, pk):
                 if booking.status == new_status:
                     messages.info(request, 'Programarea are deja acest status.')
                     return redirect('services:mechanic_profile', pk=pk)
+                old_status = booking.status
                 booking.status = new_status
                 booking.save(update_fields=['status', 'updated_at'])
+                log_booking_activity(
+                    booking,
+                    'status_changed',
+                    f'Status schimbat din {dict(Booking.STATUS_CHOICES).get(old_status)} in {booking.get_status_display()} din profilul mecanicului.',
+                    actor=request.user,
+                    metadata={'old': old_status, 'new': new_status},
+                )
                 sms_sent = False
                 email_sent = False
                 if new_status == 'in_progress':
