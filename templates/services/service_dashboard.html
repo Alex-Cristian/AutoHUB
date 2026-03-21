@@ -224,6 +224,7 @@
     <div class="dashboard-chip-nav">
       <a class="dashboard-chip" href="#actiunirapide"><i class="bi bi-lightning-charge"></i>Acțiuni rapide</a>
       <a class="dashboard-chip" href="#asteptare"><i class="bi bi-hourglass"></i>În așteptare</a>
+      <a class="dashboard-chip" href="{% url 'services:calendar' %}"><i class="bi bi-calendar3"></i>Calendar</a>
       <a class="dashboard-chip" href="{% url 'services:parts_inventory' %}"><i class="bi bi-box-seam"></i>Piese</a>
       <a class="dashboard-chip" href="{% url 'services:car_history' %}"><i class="bi bi-clock-history"></i>Istoric mașini</a>
       <a class="dashboard-chip" href="#centre"><i class="bi bi-building"></i>Service-uri</a>
@@ -297,6 +298,22 @@
       </div>
     </div>
 
+    <div class="dashboard-panel mt-3">
+      <div class="dashboard-panel-header">
+        <div>
+          <h3 class="dashboard-panel-title"><i class="bi bi-bar-chart-line text-orange me-2"></i>Trend ultimele luni</h3>
+          <div class="dashboard-panel-subtitle">Volum booking-uri, lucrări finalizate, anulate și venit estimat pe lună.</div>
+        </div>
+      </div>
+      {% if analytics.monthly_trend %}
+        <div style="height:320px;">
+          <canvas id="analyticsTrendChart"></canvas>
+        </div>
+      {% else %}
+        <div class="dashboard-empty">Nu există încă suficiente date pentru trenduri lunare.</div>
+      {% endif %}
+    </div>
+
     <div class="dashboard-grid-main mt-3">
       <div class="dashboard-panel">
         <div class="dashboard-panel-header">
@@ -340,6 +357,177 @@
         {% endif %}
       </div>
     </div>
+
+    <div class="dashboard-grid-main mt-3">
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <div>
+            <h3 class="dashboard-panel-title"><i class="bi bi-clock text-orange me-2"></i>Ore aglomerate</h3>
+            <div class="dashboard-panel-subtitle">Intervalele in care se aduna cele mai multe booking-uri.</div>
+          </div>
+        </div>
+        {% if analytics.busiest_hours %}
+          <div class="dashboard-mini-list">
+            {% for item in analytics.busiest_hours %}
+            <div class="dashboard-mini-item"><span>{{ item.label }}</span><strong>{{ item.total }}</strong></div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="dashboard-empty">Nu exista suficiente date pentru ore aglomerate.</div>
+        {% endif %}
+      </div>
+
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <div>
+            <h3 class="dashboard-panel-title"><i class="bi bi-calendar-week text-orange me-2"></i>Zile aglomerate</h3>
+            <div class="dashboard-panel-subtitle">Zilele in care cererea este cea mai mare.</div>
+          </div>
+        </div>
+        {% if analytics.busiest_days %}
+          <div class="dashboard-mini-list">
+            {% for item in analytics.busiest_days %}
+            <div class="dashboard-mini-item"><span>{{ item.label }}</span><strong>{{ item.total }}</strong></div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="dashboard-empty">Nu exista suficiente date pentru zile aglomerate.</div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-4" id="today-board">
+    <div class="dashboard-section-head">
+      <div>
+        <h2 class="dashboard-section-title">Today Board</h2>
+        <div class="dashboard-section-note">Ce urmează azi, unde se încarcă atelierul și ce necesită intervenție rapidă.</div>
+      </div>
+      <a class="btn btn-sm btn-outline-light" href="{% url 'services:calendar' %}"><i class="bi bi-calendar3 me-1"></i>Deschide calendarul</a>
+    </div>
+
+    <div class="dashboard-grid-main">
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <div>
+            <h3 class="dashboard-panel-title"><i class="bi bi-calendar-event text-orange me-2"></i>Programările de azi</h3>
+            <div class="dashboard-panel-subtitle">Lista scurtă pentru atelier, fără să intri în toate booking-urile.</div>
+          </div>
+        </div>
+        <div class="dashboard-mini-list">
+          <div class="dashboard-mini-item"><span>Începuturi / urmează</span><strong>{{ today_board.upcoming|length }}</strong></div>
+          <div class="dashboard-mini-item"><span>În progres</span><strong>{{ today_board.in_progress|length }}</strong></div>
+          <div class="dashboard-mini-item"><span>Întârziate</span><strong>{{ today_board.overdue|length }}</strong></div>
+          <div class="dashboard-mini-item"><span>Conflicte / atenție</span><strong>{{ today_conflicts|length }}</strong></div>
+        </div>
+
+        <div class="mt-3">
+          {% if todays_bookings %}
+            <div class="dashboard-mini-list">
+              {% for booking in todays_bookings %}
+              <div class="dashboard-mini-item">
+                <div>
+                  <div class="fw-semibold">#{{ booking.pk }} · {{ booking.client_name }}</div>
+                  <div class="small text-muted-custom">{{ booking.booking_time|time:"H:i" }} · {{ booking.car_brand }} {{ booking.car_model }}{% if booking.mechanic %} · {{ booking.mechanic.name }}{% endif %}</div>
+                </div>
+                <span class="badge bg-{{ booking.get_status_badge }}">{{ booking.get_status_display }}</span>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="dashboard-empty"><strong>Atelier liber azi</strong>Nu există programări pentru ziua curentă.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <div>
+            <h3 class="dashboard-panel-title"><i class="bi bi-box-seam text-red me-2"></i>Stoc și atenționări</h3>
+            <div class="dashboard-panel-subtitle">Piese cu risc operațional și valoarea estimată a stocului.</div>
+          </div>
+        </div>
+        <div class="dashboard-mini-list">
+          <div class="dashboard-mini-item"><span>Total piese</span><strong>{{ parts_stats.total_parts }}</strong></div>
+          <div class="dashboard-mini-item"><span>Low stock</span><strong>{{ parts_stats.low_stock_count }}</strong></div>
+          <div class="dashboard-mini-item"><span>Out of stock</span><strong>{{ parts_stats.out_of_stock_count }}</strong></div>
+          <div class="dashboard-mini-item"><span>Valoare estimată</span><strong>{{ parts_stats.estimated_stock_value|floatformat:2 }} RON</strong></div>
+        </div>
+        <div class="mt-3">
+          {% if parts_stats.low_stock_parts %}
+            <div class="dashboard-mini-list">
+              {% for part in parts_stats.low_stock_parts %}
+              <div class="dashboard-mini-item">
+                <div>
+                  <div class="fw-semibold">{{ part.name }}</div>
+                  <div class="small text-muted-custom">{{ part.center.name }}{% if part.part_number %} · {{ part.part_number }}{% endif %}</div>
+                </div>
+                <span class="badge bg-{{ part.stock_status_badge }}">{{ part.stock }} / {{ part.minimum_stock }}</span>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="dashboard-empty"><strong>Stocul arată bine</strong>Nu există piese sub pragul minim pentru service-urile tale.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid-main mt-3">
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <div>
+            <h3 class="dashboard-panel-title"><i class="bi bi-person-gear text-orange me-2"></i>Capacitate mecanici</h3>
+            <div class="dashboard-panel-subtitle">Încărcarea pe ziua curentă calculată din durata rezervată.</div>
+          </div>
+        </div>
+        {% if mechanics_capacity %}
+          <div class="dashboard-mini-list">
+            {% for item in mechanics_capacity %}
+            <div class="dashboard-mini-item">
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between gap-3">
+                  <span>{{ item.mechanic.name }}</span>
+                  <span class="small text-muted-custom">{{ item.booked_minutes }} / {{ item.available_minutes }} min</span>
+                </div>
+                <div class="dashboard-progress mt-2"><span style="width: {{ item.load_percent }}%;"></span></div>
+              </div>
+              <span class="badge bg-{{ item.load_badge }}">{{ item.load_label }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="dashboard-empty"><strong>Fără mecanici activați</strong>Adaugă mecanici pentru a vedea gradul de ocupare.</div>
+        {% endif %}
+      </div>
+
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <div>
+            <h3 class="dashboard-panel-title"><i class="bi bi-building-gear text-orange me-2"></i>Capacitate garaje</h3>
+            <div class="dashboard-panel-subtitle">Vezi rapid care posturi de lucru sunt aproape pline.</div>
+          </div>
+        </div>
+        {% if garages_capacity %}
+          <div class="dashboard-mini-list">
+            {% for item in garages_capacity %}
+            <div class="dashboard-mini-item">
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between gap-3">
+                  <span>{{ item.garage.name }}</span>
+                  <span class="small text-muted-custom">{{ item.booked_minutes }} / {{ item.available_minutes }} min</span>
+                </div>
+                <div class="dashboard-progress mt-2"><span style="width: {{ item.load_percent }}%;"></span></div>
+              </div>
+              <span class="badge bg-{{ item.load_badge }}">{{ item.load_label }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="dashboard-empty"><strong>Nu există garaje configurate</strong>Adaugă cel puțin un post de lucru pentru planificare clară.</div>
+        {% endif %}
+      </div>
+    </div>
   </section>
 
   <section class="dashboard-grid-main mb-4" id="actiunirapide">
@@ -356,6 +544,13 @@
           <div>
             <div class="fw-semibold" style="color:var(--ah-text)">Notificări</div>
             <div class="small text-muted-custom">Vezi rapid ce s-a schimbat în programări.</div>
+          </div>
+        </a>
+        <a class="dashboard-action-card" href="{% url 'services:calendar' %}">
+          <div class="dashboard-action-icon"><i class="bi bi-calendar3"></i></div>
+          <div>
+            <div class="fw-semibold" style="color:var(--ah-text)">Calendar</div>
+            <div class="small text-muted-custom">Planificare pe zi, săptămână și lună pentru toate programările.</div>
           </div>
         </a>
         <a class="dashboard-action-card" href="{% url 'invoices:clients' %}">
@@ -652,4 +847,76 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 </script>
+{% if analytics.monthly_trend %}
+{{ analytics.monthly_trend|json_script:"analytics-trend-data" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const canvas = document.getElementById('analyticsTrendChart');
+    const source = document.getElementById('analytics-trend-data');
+    if (!canvas || !source || !window.Chart) return;
+    const data = JSON.parse(source.textContent);
+    new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: data.map(item => item.label),
+        datasets: [
+          {
+            label: 'Booking-uri',
+            data: data.map(item => item.total),
+            backgroundColor: 'rgba(230,57,70,0.55)',
+            borderRadius: 8
+          },
+          {
+            label: 'Finalizate',
+            data: data.map(item => item.done),
+            backgroundColor: 'rgba(99,102,241,0.55)',
+            borderRadius: 8
+          },
+          {
+            label: 'Anulate',
+            data: data.map(item => item.cancelled),
+            backgroundColor: 'rgba(239,68,68,0.55)',
+            borderRadius: 8
+          },
+          {
+            label: 'Venit estimat',
+            data: data.map(item => item.revenue),
+            borderColor: '#f4a261',
+            backgroundColor: 'rgba(244,162,97,0.15)',
+            tension: 0.35,
+            type: 'line',
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#cfcfcf' } }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#9ca3af' },
+            grid: { color: 'rgba(255,255,255,0.05)' }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#9ca3af', precision: 0 },
+            grid: { color: 'rgba(255,255,255,0.05)' }
+          },
+          y1: {
+            beginAtZero: true,
+            position: 'right',
+            ticks: { color: '#f4a261' },
+            grid: { drawOnChartArea: false }
+          }
+        }
+      }
+    });
+  });
+</script>
+{% endif %}
 {% endblock %}

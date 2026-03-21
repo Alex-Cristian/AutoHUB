@@ -76,6 +76,23 @@
         </div>
         {% endif %}
 
+        <div class="mt-3 p-3 rounded-3" style="background:rgba(230,57,70,0.08);border:1px solid rgba(230,57,70,0.18);">
+          <div class="small text-muted-custom mb-1">Urmatorul pas</div>
+          {% if b.status == 'pending' %}
+          <div class="fw-semibold text-white">Service-ul analizeaza cererea si poate trimite o oferta sau confirmarea rezervarii.</div>
+          {% elif b.status == 'quoted' %}
+          <div class="fw-semibold text-white">Ai oferta disponibila. Poti accepta sau refuza direct de aici.</div>
+          {% elif b.status == 'confirmed' %}
+          <div class="fw-semibold text-white">Programarea este confirmata. Pregateste masina si documentele pentru intervalul rezervat.</div>
+          {% elif b.status == 'in_progress' %}
+          <div class="fw-semibold text-white">Masina este in lucru. Vei vedea aici update-urile importante si pozele incarcate de service.</div>
+          {% elif b.status == 'done' %}
+          <div class="fw-semibold text-white">Lucrarea este finalizata. Poti reveni rapid pentru aceeasi interventie daca ai nevoie.</div>
+          {% else %}
+          <div class="fw-semibold text-white">Programarea este inchisa. Poti relua rapid cererea catre acelasi service.</div>
+          {% endif %}
+        </div>
+
         {% if b.status == "quoted" %}
         <div class="mt-3 p-3 rounded-3" style="background:rgba(244,162,97,0.08);border:1px solid rgba(244,162,97,0.25);">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
@@ -90,6 +107,15 @@
           </div>
         </div>
         {% endif %}
+
+        <div class="d-flex justify-content-end gap-2 flex-wrap mt-3">
+          <a href="{{ b.center.get_absolute_url }}" class="btn btn-sm btn-outline-light">
+            <i class="bi bi-shop me-1"></i>Vezi service
+          </a>
+          <a href="{% url 'bookings:create' b.center.slug %}{% if b.service_item_id %}?service_item={{ b.service_item_id }}{% endif %}" class="btn btn-sm btn-outline-warning">
+            <i class="bi bi-arrow-repeat me-1"></i>Re-book
+          </a>
+        </div>
 
         <!-- ══════════════════════════════════════════
              POZE LUCRARE — adăugate de mecanic

@@ -34,6 +34,34 @@
         </div>
       </div>
 
+      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:rgba(230,57,70,0.28) !important;">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <div class="text-muted-custom small mb-1">Urmatorul pas recomandat</div>
+            {% if booking.status == 'pending' %}
+              <div class="fw-semibold">Trimite oferta si durata estimata catre client.</div>
+              <div class="small text-muted-custom mt-1">Programarea ramane rezervabila doar dupa acceptarea ofertei de catre client.</div>
+            {% elif booking.status == 'quoted' %}
+              <div class="fw-semibold">Asteapta raspunsul clientului la oferta trimisa.</div>
+              <div class="small text-muted-custom mt-1">Daca intervalul nu mai este disponibil, poti actualiza oferta din nou.</div>
+            {% elif booking.status == 'confirmed' %}
+              <div class="fw-semibold">Aloca un mecanic si pregateste preluarea in service.</div>
+              <div class="small text-muted-custom mt-1">Poti incepe lucrarea cand masina ajunge si poti adauga media sau fisa de lucru.</div>
+            {% elif booking.status == 'in_progress' %}
+              <div class="fw-semibold">Lucrarea este in curs.</div>
+              <div class="small text-muted-custom mt-1">Actualizeaza fisa, pozele si marcheaza finalizarea cand masina este gata.</div>
+            {% elif booking.status == 'done' %}
+              <div class="fw-semibold">Lucrarea este finalizata.</div>
+              <div class="small text-muted-custom mt-1">Poti emite factura si verifica istoricul complet pentru masina.</div>
+            {% else %}
+              <div class="fw-semibold">Programarea este inchisa.</div>
+              <div class="small text-muted-custom mt-1">Pastreaza detaliile pentru istoric sau comunica urmatorii pasi direct cu clientul.</div>
+            {% endif %}
+          </div>
+          <div class="ah-badge-soft"><i class="bi bi-flag"></i>{{ booking.get_status_display }}</div>
+        </div>
+      </div>
+
       {% if booking.wants_offer %}
       <div style="background:linear-gradient(135deg,rgba(234,179,8,0.15),rgba(234,179,8,0.05));border:2px solid rgba(234,179,8,0.5);border-radius:16px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:1rem;">
         <div style="width:40px;height:40px;border-radius:12px;background:rgba(234,179,8,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -161,6 +189,94 @@
           </div>
           <div id="status-msg" class="small mt-2" style="display:none;"></div>
         </form>
+      </div>
+
+      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
+        <h5 class="mb-3"><i class="bi bi-tags me-2 text-red"></i>Tag-uri operaționale</h5>
+        <form method="post" class="d-grid gap-3">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_tags">
+          <div class="row g-2">
+            {% for value, label in operational_tag_choices %}
+            <div class="col-6">
+              <label class="w-100 border rounded-xl p-2 small" style="border-color:var(--ah-border) !important;background:var(--ah-dark3);cursor:pointer;">
+                <input type="checkbox" name="operational_tags" value="{{ value }}" class="form-check-input me-2" {% if value in booking.operational_tags %}checked{% endif %}>
+                {{ label }}
+              </label>
+            </div>
+            {% endfor %}
+          </div>
+          <button class="btn btn-outline-light" type="submit">Salvează tag-urile</button>
+        </form>
+        {% if booking.operational_tag_labels %}
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          {% for label in booking.operational_tag_labels %}
+          <span class="ah-badge-soft"><i class="bi bi-bookmark-check"></i>{{ label }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
+        <h5 class="mb-3"><i class="bi bi-card-checklist me-2 text-orange"></i>Checklist lucrare</h5>
+        <form method="post" class="d-flex gap-2 mb-3">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add_checklist_item">
+          <input type="text" name="label" class="form-control" placeholder="Ex: verificare frane, test final, poze iesire">
+          <button class="btn btn-outline-warning" type="submit">Adaugă</button>
+        </form>
+        {% if checklist_items %}
+          <div class="d-grid gap-2">
+            {% for item in checklist_items %}
+            <form method="post" class="d-flex justify-content-between align-items-center gap-3 border rounded-xl p-2" style="border-color:var(--ah-border) !important;background:var(--ah-dark3);">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="toggle_checklist_item">
+              <input type="hidden" name="item_id" value="{{ item.pk }}">
+              <div class="{% if item.is_done %}text-decoration-line-through text-muted-custom{% else %}text-white{% endif %}">{{ item.label }}</div>
+              <button class="btn btn-sm {% if item.is_done %}btn-outline-light{% else %}btn-success{% endif %}" type="submit">
+                {% if item.is_done %}Redeschide{% else %}Bifează{% endif %}
+              </button>
+            </form>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="ah-empty-state">
+            <strong>Niciun pas încă</strong>
+            Adaugă pași practici pentru echipă direct pe booking.
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
+        <h5 class="mb-3"><i class="bi bi-journal-text me-2 text-red"></i>Note interne private</h5>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="save_internal_notes">
+          <textarea name="notes" rows="4" class="form-control mb-3" placeholder="Detalii interne pentru echipă, client fidel, aşteaptă piesă, follow-up etc.">{{ booking.notes }}</textarea>
+          <button class="btn btn-outline-light w-100" type="submit">Salvează nota internă</button>
+        </form>
+      </div>
+
+      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
+        <h5 class="mb-3"><i class="bi bi-clock-history me-2 text-orange"></i>Activity log</h5>
+        {% if activity_logs %}
+          <div class="d-grid gap-2">
+            {% for item in activity_logs %}
+            <div class="border rounded-xl p-3" style="border-color:var(--ah-border) !important;background:var(--ah-dark3);">
+              <div class="fw-semibold">{{ item.message }}</div>
+              <div class="small text-muted-custom mt-1">
+                {{ item.created_at|date:"d.m.Y H:i" }}
+                {% if item.actor %} · {{ item.actor.username }}{% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="ah-empty-state">
+            <strong>Istoricul apare aici</strong>
+            Modificările importante ale booking-ului vor fi urmărite automat.
+          </div>
+        {% endif %}
       </div>
 
       {% if work_log %}
