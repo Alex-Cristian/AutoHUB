@@ -10,7 +10,7 @@
         <h1 class="section-title mb-1">Notificari</h1>
         <p class="ah-page-subtitle">Programari noi, confirmari si actualizari de status, ordonate clar pentru urmatorul tau pas.</p>
       </div>
-      <span class="ah-badge-soft"><i class="bi bi-clock-history"></i>{{ notifications|length }} actualizari</span>
+      <span class="ah-badge-soft"><i class="bi bi-clock-history"></i>{{ total_notifications }} actualizari</span>
     </div>
   </section>
 
@@ -57,5 +57,21 @@
       </div>
     {% endif %}
   </div>
+
+  {% if page_obj and page_obj.paginator.num_pages > 1 %}
+  <nav class="mt-4" aria-label="Paginare notificari">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div class="small text-muted-custom">Pagina {{ page_obj.number }} din {{ page_obj.paginator.num_pages }}</div>
+      <div class="d-flex gap-2">
+        {% if page_obj.has_previous %}
+          <a class="btn btn-sm btn-outline-light" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="btn btn-sm btn-outline-light" href="?page={{ page_obj.next_page_number }}">Urmator</a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+  {% endif %}
 </div>
 {% endblock %}

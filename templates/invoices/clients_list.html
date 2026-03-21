@@ -96,7 +96,7 @@
   {# ── Stats ── #}
   <div class="cl-stat-row">
     <div class="cl-stat">
-      <div class="cl-stat-val">{{ clients|length }}</div>
+      <div class="cl-stat-val">{{ total_clients }}</div>
       <div class="cl-stat-label">Clienți unici</div>
     </div>
     <div class="cl-stat">
@@ -104,12 +104,7 @@
       <div class="cl-stat-label">Afișați acum</div>
     </div>
     <div class="cl-stat">
-      <div class="cl-stat-val" style="color:#4ade80;">
-        {% with total=0 %}
-          {% for c in clients %}{% endfor %}
-          {{ clients|length }}
-        {% endwith %}
-      </div>
+      <div class="cl-stat-val" style="color:#4ade80;">{{ total_bookings }}</div>
       <div class="cl-stat-label">Total programări</div>
     </div>
   </div>
@@ -128,7 +123,7 @@
     </div>
     <div class="d-flex align-items-center gap-2 flex-shrink-0">
       <span class="small text-muted-custom">
-        <span id="visible-count">{{ clients|length }}</span> clienți
+        <span id="visible-count">{{ clients|length }}</span> din {{ total_clients }} clienți
       </span>
       <button class="btn btn-sm btn-outline-light" id="clear-search" style="display:none;" onclick="clearSearch()">
         <i class="bi bi-x me-1"></i>Șterge
@@ -259,6 +254,20 @@
       <div class="cl-empty-icon"><i class="bi bi-people"></i></div>
       <div class="fw-semibold text-white mb-1">Nu există clienți încă</div>
       <div class="small">Clienții apar automat din programările tale.</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if page_obj and page_obj.paginator.num_pages > 1 %}
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mt-4">
+    <div class="small text-muted-custom">Pagina {{ page_obj.number }} din {{ page_obj.paginator.num_pages }}</div>
+    <div class="d-flex gap-2">
+      {% if page_obj.has_previous %}
+      <a class="btn btn-sm btn-outline-light" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+      <a class="btn btn-sm btn-outline-light" href="?page={{ page_obj.next_page_number }}">Urmator</a>
+      {% endif %}
     </div>
   </div>
   {% endif %}

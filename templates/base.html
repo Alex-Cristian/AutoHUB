@@ -378,7 +378,7 @@
         <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" href="{% url 'services:notifications' %}">
             <i class="bi bi-bell me-1"></i>Notificări
-            {% if service_unread_notifications %}<span class="badge bg-danger ms-1">{{ service_unread_notifications }}</span>{% endif %}
+            <span class="badge bg-danger ms-1 {% if not service_unread_notifications %}d-none{% endif %}" id="serviceUnreadBadge">{{ service_unread_notifications }}</span>
           </a>
         </li>
         <li class="nav-item">
@@ -490,6 +490,69 @@
         applyTheme(current === 'dark' ? 'light' : 'dark');
       });
     }
+
+    {% if user.is_authenticated and has_service_center %}
+    const unreadBadge = document.getElementById('serviceUnreadBadge');
+    let lastUnreadCount = Number(unreadBadge?.textContent || 0);
+
+    function syncNotificationBadge(count) {
+      if (!unreadBadge) return;
+      unreadBadge.textContent = count;
+      unreadBadge.classList.toggle('d-none', !count);
+    }
+
+    async function refreshNotificationFeed() {
+      try {
+        const response = await fetch("{% url 'services:notifications_feed' %}", {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin'
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!payload.ok) return;
+        syncNotificationBadge(payload.unread_count || 0);
+        if ((payload.unread_count || 0) > lastUnreadCount) {
+          const delta = (payload.unread_count || 0) - lastUnreadCount;
+          showLiveToast(delta === 1 ? 'Ai o notificare noua.' : `Ai ${delta} notificari noi.`, 'info');
+        }
+        lastUnreadCount = payload.unread_count || 0;
+      } catch (error) {
+        console.debug('Notification polling unavailable', error);
+      }
+    }
+
+    function showLiveToast(message, level) {
+      if (!window.bootstrap || !message) return;
+      const host = document.querySelector('.toast-container-custom') || (() => {
+        const el = document.createElement('div');
+        el.className = 'toast-container-custom';
+        document.body.appendChild(el);
+        return el;
+      })();
+      const toast = document.createElement('div');
+      toast.className = `toast toast-autohub ${level || 'info'} mb-3`;
+      toast.setAttribute('role', 'alert');
+      toast.setAttribute('aria-live', 'assertive');
+      toast.setAttribute('aria-atomic', 'true');
+      toast.setAttribute('data-bs-delay', '3200');
+      toast.innerHTML = `
+        <div class="toast-header">
+          <i class="bi bi-bell-fill text-red me-2"></i>
+          <strong class="me-auto">AutoEMG</strong>
+          <small class="text-muted">acum</small>
+          <button type="button" class="btn-close btn-close-white ms-2" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">${message}</div>
+      `;
+      host.appendChild(toast);
+      const instance = new bootstrap.Toast(toast);
+      toast.addEventListener('hidden.bs.toast', () => toast.remove());
+      instance.show();
+    }
+
+    refreshNotificationFeed();
+    window.setInterval(refreshNotificationFeed, 45000);
+    {% endif %}
   });
 </script>
 </body>

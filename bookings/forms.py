@@ -5,6 +5,7 @@ from .ai import normalize_duration_minutes
 from .models import Booking
 from services.models import ServiceItem, ServiceGarage
 from accounts.models import Car
+from core.upload_validators import validate_booking_media_file
 
 
 class MultiFileInput(forms.FileInput):
@@ -117,11 +118,10 @@ class BookingForm(forms.ModelForm):
         for uploaded in attachments:
             if not uploaded:
                 continue
-            content_type = getattr(uploaded, 'content_type', '') or ''
-            if not (content_type.startswith('image/') or content_type.startswith('video/')):
-                self.add_error('attachments', f'Fișierul {uploaded.name} nu este imagine sau video.')
-            if uploaded.size > 50 * 1024 * 1024:
-                self.add_error('attachments', f'Fișierul {uploaded.name} depășește limita de 50MB.')
+            try:
+                validate_booking_media_file(uploaded)
+            except forms.ValidationError as exc:
+                self.add_error('attachments', exc)
 
         return cleaned
 
