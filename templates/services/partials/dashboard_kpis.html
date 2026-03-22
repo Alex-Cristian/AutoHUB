@@ -1,0 +1,26 @@
+<section class="dc-kpis">
+  <a class="dc-card" href="{% url 'services:bookings_list' %}">
+    <div class="d-flex justify-content-between gap-3"><div><div class="dc-label">Programări astăzi</div><div class="dc-value">{{ dashboard.kpis.appointments_today }}</div></div><div class="dc-icon"><i class="bi bi-calendar-day"></i></div></div>
+    <div class="dc-note mt-3">Programările planificate pentru ziua curentă.</div>
+  </a>
+  <a class="dc-card" href="{% url 'services:bookings_list' %}">
+    <div class="d-flex justify-content-between gap-3"><div><div class="dc-label">Programări în așteptare</div><div class="dc-value">{{ dashboard.kpis.appointments_pending }}</div></div><div class="dc-icon"><i class="bi bi-hourglass-split"></i></div></div>
+    <div class="dc-note mt-3">Cererile care așteaptă confirmare.</div>
+  </a>
+  <a class="dc-card" href="{% url 'services:bookings_list' %}?status=in_progress">
+    <div class="d-flex justify-content-between gap-3"><div><div class="dc-label">Mașini în lucru</div><div class="dc-value">{{ dashboard.kpis.cars_in_work }}</div></div><div class="dc-icon"><i class="bi bi-tools"></i></div></div>
+    <div class="dc-note mt-3">Intervenții active în service.</div>
+  </a>
+  <a class="dc-card" href="{% url 'services:bookings_list' %}">
+    <div class="d-flex justify-content-between gap-3"><div><div class="dc-label">Lucrări finalizate luna aceasta</div><div class="dc-value">{{ dashboard.kpis.completed_this_month }}</div></div><div class="dc-icon"><i class="bi bi-flag"></i></div></div>
+    <div class="dc-note mt-3">Lucrări închise în perioada curentă.</div>
+  </a>
+  <a class="dc-card" href="{% url 'services:reports' %}?report_type=revenue&preset_period=this_month">
+    <div class="d-flex justify-content-between gap-3"><div><div class="dc-label">Venit luna curentă</div><div class="dc-value">{{ dashboard.kpis.revenue_this_month|floatformat:0 }}</div></div><div class="dc-icon"><i class="bi bi-cash-stack"></i></div></div>
+    <div class="dc-note mt-3">Total facturat pe luna curentă.</div>
+  </a>
+  <a class="dc-card" href="{% url 'services:parts_inventory' %}">
+    <div class="d-flex justify-content-between gap-3"><div><div class="dc-label">Piese cu stoc scăzut</div><div class="dc-value">{{ dashboard.kpis.low_stock_count }}</div></div><div class="dc-icon"><i class="bi bi-box-seam"></i></div></div>
+    <div class="dc-note mt-3">Produse care necesită reaprovizionare.</div>
+  </a>
+</section>

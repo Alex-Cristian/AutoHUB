@@ -1,0 +1,46 @@
+<section class="dc-table-wrap">
+  <div class="dc-panel-head mb-3">
+    <div>
+      <h2 class="h4 mb-1">Programări de azi</h2>
+      <p class="text-muted-custom mb-0">Listă compactă, ușor de scanat și pregătită pentru acțiuni rapide.</p>
+    </div>
+    <a href="{% url 'services:bookings_list' %}" class="btn btn-outline-light btn-sm">Vezi toate</a>
+  </div>
+  {% if dashboard.today_bookings %}
+    <div class="table-responsive dc-table-responsive">
+      <table class="table dc-table align-middle">
+        <thead>
+          <tr><th>Ora</th><th>Client</th><th>Mașină</th><th>Serviciu</th><th>Status</th><th class="text-end">Acțiuni</th></tr>
+        </thead>
+        <tbody>
+          {% for booking in dashboard.today_bookings %}
+          <tr>
+            <td>{{ booking.booking_time|time:"H:i" }}</td>
+            <td>{{ booking.client_name }}</td>
+            <td>{{ booking.car_brand }} {{ booking.car_model }}</td>
+            <td>{% if booking.service_item %}{{ booking.service_item.name }}{% else %}Lucrare generală{% endif %}</td>
+            <td><span class="badge bg-{{ booking.get_status_badge }}">{{ booking.get_status_display }}</span></td>
+            <td class="text-end">
+              <div class="d-inline-flex gap-2">
+                <a href="{% url 'services:booking_detail' booking.pk %}" class="btn btn-sm btn-outline-light">Detalii</a>
+                {% if booking.status == 'pending' %}<a href="{% url 'services:booking_accept' booking.pk %}" class="btn btn-sm btn-primary">Confirmă</a>{% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="dc-mobile-cards">
+      {% for booking in dashboard.today_bookings %}
+      <div class="dc-mobile-row">
+        <div class="d-flex justify-content-between gap-2"><strong>{{ booking.booking_time|time:"H:i" }} · {{ booking.client_name }}</strong><span class="badge bg-{{ booking.get_status_badge }}">{{ booking.get_status_display }}</span></div>
+        <div class="text-muted-custom small mt-2">{{ booking.car_brand }} {{ booking.car_model }} · {% if booking.service_item %}{{ booking.service_item.name }}{% else %}Lucrare generală{% endif %}</div>
+        <div class="mt-3"><a href="{% url 'services:booking_detail' booking.pk %}" class="btn btn-sm btn-outline-light">Vezi detalii</a></div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="dc-empty"><strong>Nicio programare pentru azi.</strong> Ziua de azi este liberă în acest moment.</div>
+  {% endif %}
+</section>

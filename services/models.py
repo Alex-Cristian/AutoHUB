@@ -269,6 +269,26 @@ class ServiceMechanic(models.Model):
     def completed_bookings_count(self):
         return self.bookings.filter(status='done').count()
 
+    def is_time_available(self, booking_date, booking_time, duration_minutes=None, exclude_booking_id=None):
+        requested_duration = max(duration_minutes or 60, 30)
+        requested_start = datetime.combine(booking_date, booking_time)
+        requested_end = requested_start + timedelta(minutes=requested_duration)
+
+        qs = self.bookings.filter(
+            booking_date=booking_date,
+            status__in=['confirmed', 'in_progress'],
+        )
+        if exclude_booking_id:
+            qs = qs.exclude(pk=exclude_booking_id)
+
+        for booking in qs.select_related('service_item'):
+            existing_start = datetime.combine(booking.booking_date, booking.booking_time)
+            existing_duration = booking.duration_minutes or getattr(booking.service_item, 'duration_minutes', None) or 60
+            existing_end = existing_start + timedelta(minutes=max(existing_duration, 30))
+            if requested_start < existing_end and requested_end > existing_start:
+                return False
+        return True
+
 
 class MechanicWorkLog(models.Model):
     booking = models.OneToOneField(
@@ -377,14 +397,28 @@ class ServiceItem(models.Model):
 
 
 class ServicePart(models.Model):
+    CATEGORY_FILTERS = [
+        ('motor', 'Motor'),
+        ('consumabile', 'Consumabile'),
+        ('franare', 'Franare'),
+        ('electric', 'Electric'),
+        ('caroserie', 'Caroserie'),
+        ('suspensie', 'Suspensie'),
+        ('anvelope', 'Anvelope'),
+        ('altele', 'Altele'),
+    ]
     center = models.ForeignKey(
         ServiceCenter, on_delete=models.CASCADE,
         related_name='parts', verbose_name='Service'
     )
     name = models.CharField(max_length=160, verbose_name='Denumire piesă')
     part_number = models.CharField(max_length=80, blank=True, verbose_name='Cod piesă')
+    category = models.CharField(max_length=30, choices=CATEGORY_FILTERS, default='altele', verbose_name='Categorie')
+    brand = models.CharField(max_length=80, blank=True, verbose_name='Brand / producator')
+    supplier = models.CharField(max_length=120, blank=True, verbose_name='Furnizor')
     stock = models.PositiveIntegerField(default=0, verbose_name='Stoc curent')
     minimum_stock = models.PositiveIntegerField(default=0, verbose_name='Stoc minim')
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Pret unitar estimat')
     unit = models.CharField(max_length=20, default='buc', verbose_name='Unitate')
     shelf = models.CharField(max_length=80, blank=True, verbose_name='Raft / locație')
     notes = models.TextField(blank=True, verbose_name='Observații')
@@ -404,6 +438,40 @@ class ServicePart(models.Model):
     @property
     def is_low_stock(self):
         return self.stock <= self.minimum_stock
+
+    @property
+    def is_out_of_stock(self):
+        return self.stock == 0
+
+    @property
+    def stock_status(self):
+        if self.stock == 0:
+            return 'out'
+        if self.is_low_stock:
+            return 'low'
+        return 'ok'
+
+    @property
+    def stock_status_label(self):
+        return {
+            'out': 'Lipsa din stoc',
+            'low': 'Stoc redus',
+            'ok': 'Disponibil',
+        }.get(self.stock_status, 'Disponibil')
+
+    @property
+    def stock_status_badge(self):
+        return {
+            'out': 'danger',
+            'low': 'warning text-dark',
+            'ok': 'success',
+        }.get(self.stock_status, 'secondary')
+
+    @property
+    def estimated_stock_value(self):
+        if self.price is None:
+            return None
+        return self.price * self.stock
 
 
 class Review(models.Model):

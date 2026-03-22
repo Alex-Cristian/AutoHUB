@@ -1,0 +1,15 @@
+<form method="get" class="rp-filter h-100">
+  <h2 class="h4 mb-3">Generează raport</h2>
+  <div class="mb-3">{{ form.report_type.label_tag }}{{ form.report_type }}</div>
+  <div class="mb-3">{{ form.preset_period.label_tag }}{{ form.preset_period }}</div>
+  <div class="row g-3">
+    <div class="col-12">{{ form.specific_day.label_tag }}{{ form.specific_day }}</div>
+    <div class="col-md-6">{{ form.month.label_tag }}{{ form.month }}</div>
+    <div class="col-md-6">{{ form.year.label_tag }}{{ form.year }}</div>
+    <div class="col-md-6">{{ form.start_date.label_tag }}{{ form.start_date }}</div>
+    <div class="col-md-6">{{ form.end_date.label_tag }}{{ form.end_date }}</div>
+  </div>
+  {% if form.non_field_errors %}<div class="alert alert-danger mt-3 mb-0">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="d-grid mt-4"><button class="btn btn-primary" type="submit">Generează raport</button></div>
+  <p class="text-muted-custom small mt-3 mb-0">Poți combina presetări rapide cu lună, an sau interval personalizat. Exportul CSV respectă exact filtrele curente.</p>
+</form>

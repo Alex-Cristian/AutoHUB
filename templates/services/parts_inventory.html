@@ -1,100 +1,270 @@
 {% extends "base.html" %}
 {% block title %}Piese service — AutoEMG{% endblock %}
+
+{% block extra_css %}
+<style>
+  .parts-shell { display:grid; grid-template-columns: 360px minmax(0, 1fr); gap:1.25rem; }
+  .parts-panel,
+  .parts-stat-card,
+  .parts-row-card {
+    background: var(--ah-dark2);
+    border: 1px solid var(--ah-border);
+    border-radius: 22px;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.18);
+  }
+  .parts-panel { padding: 1.2rem; }
+  .parts-stats { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:1rem; }
+  .parts-stat-card { padding:1rem; }
+  .parts-stat-label { color:var(--ah-muted); font-size:.82rem; }
+  .parts-stat-value { font-size:1.8rem; font-family:'Barlow Condensed', sans-serif; font-weight:800; line-height:1; }
+  .parts-toolbar { display:flex; justify-content:space-between; align-items:flex-end; gap:1rem; flex-wrap:wrap; }
+  .parts-filter-grid { display:grid; grid-template-columns: 1.2fr repeat(4, minmax(0,1fr)); gap:.75rem; }
+  .parts-table-wrap { overflow:auto; }
+  .parts-table { min-width: 980px; }
+  .parts-inline-form { display:flex; flex-wrap:wrap; gap:.45rem; }
+  .parts-inline-form .form-control { min-width:88px; }
+  .parts-stock-controls { display:flex; flex-wrap:wrap; gap:.35rem; }
+  .parts-mobile-list { display:none; gap:1rem; }
+  .parts-row-card { padding:1rem; }
+  .parts-meta { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:.75rem; margin-top:.85rem; }
+  .parts-meta-box { background: var(--ah-dark3); border-radius:16px; padding:.75rem; }
+  .parts-meta-label { color:var(--ah-muted); font-size:.75rem; }
+  .parts-meta-value { color:var(--ah-text); font-weight:700; }
+  .parts-actions { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1rem; }
+  .parts-filter-note { color: var(--ah-muted); font-size:.86rem; }
+  @media (max-width: 1199.98px) {
+    .parts-shell { grid-template-columns: 1fr; }
+    .parts-stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+  @media (max-width: 767.98px) {
+    .parts-filter-grid,
+    .parts-stats,
+    .parts-meta { grid-template-columns: 1fr; }
+    .parts-table-wrap { display:none; }
+    .parts-mobile-list { display:grid; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-5">
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-    <div>
-      <h1 class="mb-1">Piese & stoc</h1>
-      <p class="text-muted-custom mb-0">Adaugă piese, urmărește stocul și vezi rapid ce trebuie reaprovizionat.</p>
+<div class="container py-4 py-lg-5">
+  <section class="ah-page-header">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+      <div>
+        <div class="ah-page-eyebrow"><i class="bi bi-box-seam"></i>Operare service</div>
+        <h1 class="section-title mb-1">Piese și stoc</h1>
+        <p class="ah-page-subtitle">Gestionează rapid piesele, vezi ce trebuie reaprovizionat și actualizează cantitățile fără pași inutili.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <span class="ah-badge-soft"><i class="bi bi-exclamation-triangle"></i>{{ parts_stats.low_stock_count }} low stock</span>
+        <span class="ah-badge-soft"><i class="bi bi-x-octagon"></i>{{ parts_stats.out_of_stock_count }} fără stoc</span>
+      </div>
     </div>
-    <span class="badge bg-{% if low_stock_count %}warning text-dark{% else %}success{% endif %} fs-6">{{ low_stock_count }} piese la limită</span>
+  </section>
+
+  <div class="parts-stats mb-4">
+    <div class="parts-stat-card">
+      <div class="parts-stat-label">Piese în listă</div>
+      <div class="parts-stat-value">{{ parts_stats.total_parts }}</div>
+      <div class="small text-muted-custom mt-2">Rezultatele vizibile pentru filtrul curent</div>
+    </div>
+    <div class="parts-stat-card">
+      <div class="parts-stat-label">Stoc redus</div>
+      <div class="parts-stat-value">{{ parts_stats.low_stock_count }}</div>
+      <div class="small text-muted-custom mt-2">Piese care au atins pragul minim</div>
+    </div>
+    <div class="parts-stat-card">
+      <div class="parts-stat-label">Lipsă din stoc</div>
+      <div class="parts-stat-value">{{ parts_stats.out_of_stock_count }}</div>
+      <div class="small text-muted-custom mt-2">Necesită reaprovizionare urgentă</div>
+    </div>
+    <div class="parts-stat-card">
+      <div class="parts-stat-label">Valoare estimată</div>
+      <div class="parts-stat-value">{{ parts_stats.estimated_stock_value|floatformat:2 }}</div>
+      <div class="small text-muted-custom mt-2">RON pe baza prețului unitar estimat</div>
+    </div>
   </div>
 
-  <div class="row g-4">
-    <div class="col-lg-4">
-      <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
-        <h4 class="mb-3">Adaugă piesă</h4>
-        <form method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="add_part">
-          <input type="hidden" name="center_id" value="{{ selected_center.pk }}">
-          <div class="mb-3">
-            <label class="form-label">Service</label>
-            <select class="form-select" onchange="window.location='?center=' + this.value">
-              {% for center in centers %}
-                <option value="{{ center.pk }}" {% if selected_center.pk == center.pk %}selected{% endif %}>{{ center.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% for field in form %}
-            <div class="mb-3">
-              <label class="form-label">{{ field.label }}</label>
-              {{ field }}
-              {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors|join:', ' }}</div>{% endif %}
-            </div>
-          {% endfor %}
-          <button class="btn btn-nav-cta w-100" type="submit"><i class="bi bi-plus-circle me-1"></i>Adaugă în stoc</button>
-        </form>
-      </div>
-    </div>
-
-    <div class="col-lg-8">
-      <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
-        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
-          <h4 class="mb-0">Stoc {{ selected_center.name }}</h4>
-          <form method="get" class="d-flex gap-2">
-            <select name="center" class="form-select" onchange="this.form.submit()">
-              {% for center in centers %}
-                <option value="{{ center.pk }}" {% if selected_center.pk == center.pk %}selected{% endif %}>{{ center.name }}</option>
-              {% endfor %}
-            </select>
-          </form>
+  <div class="parts-shell">
+    <aside class="parts-panel">
+      <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+        <div>
+          <h2 class="h4 mb-1">Adaugă piesă</h2>
+          <p class="parts-filter-note mb-0">Completează datele utile pentru operare: cod, brand, furnizor, locație și prag minim.</p>
         </div>
-        {% if parts %}
-          <div class="table-responsive">
-            <table class="table table-dark table-hover align-middle">
-              <thead>
-                <tr>
-                  <th>Piesă</th><th>Cod</th><th>Stoc</th><th>Minim</th><th>Locație</th><th style="width:260px">Acțiuni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for part in parts %}
-                <tr>
-                  <td>
-                    <div class="fw-semibold">{{ part.name }}</div>
-                    {% if part.notes %}<div class="small text-muted-custom">{{ part.notes }}</div>{% endif %}
-                  </td>
-                  <td>{{ part.part_number|default:'—' }}</td>
-                  <td><span class="badge bg-{% if part.is_low_stock %}warning text-dark{% else %}success{% endif %}">{{ part.stock }} {{ part.unit }}</span></td>
-                  <td>{{ part.minimum_stock }} {{ part.unit }}</td>
-                  <td>{{ part.shelf|default:'—' }}</td>
-                  <td>
-                    <form method="post" class="row g-2">
-                      {% csrf_token %}
-                      <input type="hidden" name="action" value="update_stock">
-                      <input type="hidden" name="part_id" value="{{ part.pk }}">
-                      <div class="col-4"><input type="number" min="0" name="stock" value="{{ part.stock }}" class="form-control"></div>
-                      <div class="col-4"><input type="number" min="0" name="minimum_stock" value="{{ part.minimum_stock }}" class="form-control"></div>
-                      <div class="col-4 d-grid"><button class="btn btn-outline-light btn-sm">Salvează</button></div>
-                    </form>
-                    <form method="post" class="mt-2 text-end">
-                      {% csrf_token %}
-                      <input type="hidden" name="action" value="delete_part">
-                      <input type="hidden" name="part_id" value="{{ part.pk }}">
-                      <button class="btn btn-sm btn-outline-danger">Șterge</button>
-                    </form>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        {% else %}
-          <div class="text-muted-custom">Nu există piese adăugate încă pentru acest service.</div>
-        {% endif %}
+        <i class="bi bi-plus-circle text-red fs-4"></i>
       </div>
-    </div>
+      <form method="post" class="d-grid gap-3">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_part">
+        <input type="hidden" name="center_id" value="{{ selected_center.pk }}">
+        <div>
+          <label class="form-label">Service</label>
+          <select class="form-select" onchange="window.location='?center=' + this.value">
+            {% for center in centers %}
+              <option value="{{ center.pk }}" {% if selected_center.pk == center.pk %}selected{% endif %}>{{ center.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% for field in form %}
+          <div>
+            <label class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+            {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors|join:', ' }}</div>{% endif %}
+          </div>
+        {% endfor %}
+        <button class="btn btn-nav-cta w-100" type="submit"><i class="bi bi-plus-circle me-1"></i>Salvează piesa</button>
+      </form>
+    </aside>
+
+    <section class="parts-panel">
+      <div class="parts-toolbar mb-3">
+        <div>
+          <h2 class="h4 mb-1">Stoc {{ selected_center.name }}</h2>
+          <p class="parts-filter-note mb-0">Listă scanabilă, filtre rapide și ajustări de cantitate direct din pagină.</p>
+        </div>
+      </div>
+
+      <form method="get" class="parts-filter-grid mb-3">
+        <input type="hidden" name="center" value="{{ selected_center.pk }}">
+        <input type="search" name="q" value="{{ selected_query }}" class="form-control" placeholder="Caută după nume, cod, brand, furnizor sau locație">
+        <select name="category" class="form-select">
+          <option value="">Toate categoriile</option>
+          {% for value, label in category_filters %}
+          <option value="{{ value }}" {% if selected_category == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select name="stock_status" class="form-select">
+          <option value="">Toate statusurile</option>
+          <option value="ok" {% if selected_stock_status == 'ok' %}selected{% endif %}>Disponibil</option>
+          <option value="low" {% if selected_stock_status == 'low' %}selected{% endif %}>Stoc redus</option>
+          <option value="out" {% if selected_stock_status == 'out' %}selected{% endif %}>Fără stoc</option>
+        </select>
+        <select name="sort" class="form-select">
+          <option value="name" {% if selected_sort == 'name' %}selected{% endif %}>Sortare: nume</option>
+          <option value="stock_asc" {% if selected_sort == 'stock_asc' %}selected{% endif %}>Stoc crescător</option>
+          <option value="stock_desc" {% if selected_sort == 'stock_desc' %}selected{% endif %}>Stoc descrescător</option>
+          <option value="updated" {% if selected_sort == 'updated' %}selected{% endif %}>Actualizate recent</option>
+          <option value="price_desc" {% if selected_sort == 'price_desc' %}selected{% endif %}>Valoare mare</option>
+          <option value="category" {% if selected_sort == 'category' %}selected{% endif %}>Categorie</option>
+        </select>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-light flex-grow-1" type="submit"><i class="bi bi-funnel me-1"></i>Aplică</button>
+          <a class="btn btn-outline-secondary" href="{% url 'services:parts_inventory' %}?center={{ selected_center.pk }}">Reset</a>
+        </div>
+      </form>
+
+      {% if parts %}
+        <div class="parts-table-wrap">
+          <table class="table table-dark align-middle parts-table">
+            <thead>
+              <tr>
+                <th>Piesă</th>
+                <th>Status</th>
+                <th>Brand / categorie</th>
+                <th>Stoc</th>
+                <th>Prag</th>
+                <th>Valoare</th>
+                <th>Ultima actualizare</th>
+                <th style="width:280px;">Acțiuni rapide</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for part in parts %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ part.name }}</div>
+                  <div class="small text-muted-custom">
+                    {{ part.part_number|default:'Fără cod' }}
+                    {% if part.shelf %} · raft {{ part.shelf }}{% endif %}
+                    {% if part.supplier %} · {{ part.supplier }}{% endif %}
+                  </div>
+                  {% if part.notes %}<div class="small text-muted-custom mt-1">{{ part.notes|truncatechars:90 }}</div>{% endif %}
+                </td>
+                <td><span class="badge bg-{{ part.stock_status_badge }}">{{ part.stock_status_label }}</span></td>
+                <td>
+                  <div>{{ part.brand|default:'—' }}</div>
+                  <div class="small text-muted-custom">{{ part.get_category_display }}</div>
+                </td>
+                <td><strong>{{ part.stock }} {{ part.unit }}</strong></td>
+                <td>{{ part.minimum_stock }} {{ part.unit }}</td>
+                <td>{% if part.estimated_stock_value is not None %}{{ part.estimated_stock_value|floatformat:2 }} RON{% else %}<span class="text-muted-custom">—</span>{% endif %}</td>
+                <td>{{ part.updated_at|date:"d.m.Y H:i" }}</td>
+                <td>
+                  <div class="parts-stock-controls mb-2">
+                    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="adjust_stock"><input type="hidden" name="part_id" value="{{ part.pk }}"><input type="hidden" name="delta" value="-1"><button class="btn btn-sm btn-outline-secondary">-1</button></form>
+                    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="adjust_stock"><input type="hidden" name="part_id" value="{{ part.pk }}"><input type="hidden" name="delta" value="1"><button class="btn btn-sm btn-outline-light">+1</button></form>
+                    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="adjust_stock"><input type="hidden" name="part_id" value="{{ part.pk }}"><input type="hidden" name="delta" value="-5"><button class="btn btn-sm btn-outline-secondary">-5</button></form>
+                    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="adjust_stock"><input type="hidden" name="part_id" value="{{ part.pk }}"><input type="hidden" name="delta" value="5"><button class="btn btn-sm btn-outline-light">+5</button></form>
+                  </div>
+                  <form method="post" class="parts-inline-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_stock">
+                    <input type="hidden" name="part_id" value="{{ part.pk }}">
+                    <input type="number" min="0" name="stock" value="{{ part.stock }}" class="form-control form-control-sm" placeholder="Stoc">
+                    <input type="number" min="0" name="minimum_stock" value="{{ part.minimum_stock }}" class="form-control form-control-sm" placeholder="Minim">
+                    <button class="btn btn-sm btn-outline-warning">Salvează</button>
+                  </form>
+                  <form method="post" class="mt-2 text-end">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_part">
+                    <input type="hidden" name="part_id" value="{{ part.pk }}">
+                    <button class="btn btn-sm btn-outline-danger">Șterge</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="parts-mobile-list">
+          {% for part in parts %}
+          <article class="parts-row-card">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+              <div>
+                <div class="fw-semibold">{{ part.name }}</div>
+                <div class="small text-muted-custom">{{ part.part_number|default:'Fără cod' }}{% if part.brand %} · {{ part.brand }}{% endif %}</div>
+              </div>
+              <span class="badge bg-{{ part.stock_status_badge }}">{{ part.stock_status_label }}</span>
+            </div>
+            <div class="parts-meta">
+              <div class="parts-meta-box"><div class="parts-meta-label">Categorie</div><div class="parts-meta-value">{{ part.get_category_display }}</div></div>
+              <div class="parts-meta-box"><div class="parts-meta-label">Stoc</div><div class="parts-meta-value">{{ part.stock }} {{ part.unit }}</div></div>
+              <div class="parts-meta-box"><div class="parts-meta-label">Prag minim</div><div class="parts-meta-value">{{ part.minimum_stock }} {{ part.unit }}</div></div>
+              <div class="parts-meta-box"><div class="parts-meta-label">Raft</div><div class="parts-meta-value">{{ part.shelf|default:'—' }}</div></div>
+            </div>
+            {% if part.notes %}<div class="small text-muted-custom mt-3">{{ part.notes|truncatechars:120 }}</div>{% endif %}
+            <div class="parts-actions">
+              <form method="post">{% csrf_token %}<input type="hidden" name="action" value="adjust_stock"><input type="hidden" name="part_id" value="{{ part.pk }}"><input type="hidden" name="delta" value="-1"><button class="btn btn-sm btn-outline-secondary">-1</button></form>
+              <form method="post">{% csrf_token %}<input type="hidden" name="action" value="adjust_stock"><input type="hidden" name="part_id" value="{{ part.pk }}"><input type="hidden" name="delta" value="1"><button class="btn btn-sm btn-outline-light">+1</button></form>
+              <form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete_part"><input type="hidden" name="part_id" value="{{ part.pk }}"><button class="btn btn-sm btn-outline-danger">Șterge</button></form>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+        <div class="d-flex justify-content-between align-items-center gap-3 mt-3 flex-wrap">
+          <div class="small text-muted-custom">Pagina {{ page_obj.number }} din {{ page_obj.paginator.num_pages }}</div>
+          <div class="d-flex gap-2">
+            {% if page_obj.has_previous %}
+            <a class="btn btn-sm btn-outline-light" href="?center={{ selected_center.pk }}{% if selected_query %}&q={{ selected_query|urlencode }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_stock_status %}&stock_status={{ selected_stock_status }}{% endif %}{% if selected_sort %}&sort={{ selected_sort }}{% endif %}&stock_page={{ page_obj.previous_page_number }}">Anterior</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a class="btn btn-sm btn-outline-light" href="?center={{ selected_center.pk }}{% if selected_query %}&q={{ selected_query|urlencode }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_stock_status %}&stock_status={{ selected_stock_status }}{% endif %}{% if selected_sort %}&sort={{ selected_sort }}{% endif %}&stock_page={{ page_obj.next_page_number }}">Următor</a>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      {% else %}
+        <div class="ah-empty-state">
+          <strong>Nu există piese pentru filtrul curent</strong>
+          Adaugă prima piesă sau schimbă filtrele pentru a vedea toate articolele din stoc.
+        </div>
+      {% endif %}
+    </section>
   </div>
 </div>
 {% endblock %}

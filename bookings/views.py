@@ -12,6 +12,7 @@ from services.models import ServiceCenter, ServiceGarage, ServiceItem, ServiceCa
 from .ai import estimate_booking_duration, normalize_duration_minutes
 from .forms import BookingForm
 from .models import Booking, BookingAttachment, BookingNotification
+from .activity import log_booking_activity
 from core.services.email_service import send_quote_accepted_to_service_email
 from core.upload_validators import validate_booking_media_file
 
@@ -112,12 +113,20 @@ def booking_create(request, slug):
                 booking.user = request.user
             booking.full_clean()
             booking.save()
+            log_booking_activity(booking, 'schedule_changed', 'Programarea a fost creata de client.', actor=request.user if request.user.is_authenticated else None)
 
             for uploaded in request.FILES.getlist('attachments'):
                 validate_booking_media_file(uploaded)
                 content_type = getattr(uploaded, 'content_type', '') or ''
                 media_kind = 'video' if content_type.startswith('video/') else 'image'
                 BookingAttachment.objects.create(booking=booking, file=uploaded, media_kind=media_kind)
+                log_booking_activity(
+                    booking,
+                    'attachment_added',
+                    f'Clientul a adaugat un fisier: {uploaded.name}.',
+                    actor=request.user if request.user.is_authenticated else None,
+                    metadata={'filename': uploaded.name, 'media_kind': media_kind},
+                )
 
             if request.user.is_authenticated and request.POST.get('save_car') == '1':
                 saved_car_id = request.POST.get('saved_car', '').strip()
@@ -325,6 +334,13 @@ def booking_accept_quote(request, pk):
 
     booking.status = Booking.STATUS_CONFIRMED
     booking.save(update_fields=['status', 'updated_at'])
+    log_booking_activity(
+        booking,
+        'status_changed',
+        'Clientul a acceptat oferta service-ului.',
+        actor=request.user,
+        metadata={'old': Booking.STATUS_QUOTED, 'new': Booking.STATUS_CONFIRMED},
+    )
     if booking.center.owner_id:
         BookingNotification.objects.create(
             recipient=booking.center.owner,
@@ -351,6 +367,13 @@ def booking_reject_quote(request, pk):
 
     booking.status = Booking.STATUS_CANCELLED
     booking.save(update_fields=['status', 'updated_at'])
+    log_booking_activity(
+        booking,
+        'status_changed',
+        'Clientul a refuzat oferta service-ului.',
+        actor=request.user,
+        metadata={'old': Booking.STATUS_QUOTED, 'new': Booking.STATUS_CANCELLED},
+    )
     if booking.center.owner_id:
         BookingNotification.objects.create(
             recipient=booking.center.owner,

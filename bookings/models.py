@@ -14,6 +14,12 @@ class Booking(models.Model):
     STATUS_IN_PROGRESS = 'in_progress'
     STATUS_DONE = 'done'
     STATUS_CANCELLED = 'cancelled'
+    TAG_URGENT = 'urgent'
+    TAG_WAITING_PART = 'waiting_part'
+    TAG_LOYAL_CLIENT = 'loyal_client'
+    TAG_WARRANTY = 'warranty'
+    TAG_PRIORITY = 'priority'
+    TAG_BLOCKED = 'blocked'
 
     STATUS_CHOICES = [
         (STATUS_PENDING, 'În așteptare'),
@@ -22,6 +28,14 @@ class Booking(models.Model):
         (STATUS_IN_PROGRESS, 'În lucru'),
         (STATUS_DONE, 'Finalizată'),
         (STATUS_CANCELLED, 'Anulată'),
+    ]
+    TAG_CHOICES = [
+        (TAG_URGENT, 'Urgent'),
+        (TAG_WAITING_PART, 'Asteapta piesa'),
+        (TAG_LOYAL_CLIENT, 'Client fidel'),
+        (TAG_WARRANTY, 'Garantie'),
+        (TAG_PRIORITY, 'Prioritar'),
+        (TAG_BLOCKED, 'Blocat'),
     ]
 
     FUEL_CHOICES = [
@@ -91,6 +105,7 @@ class Booking(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     reminder_sent_1d = models.BooleanField(default=False, verbose_name='Reminder SMS trimis cu o zi înainte')
     wants_offer = models.BooleanField(default=False, verbose_name='Client dorește ofertă înainte de confirmare')
+    operational_tags = models.JSONField(default=list, blank=True, verbose_name='Tag-uri operationale')
 
     class Meta:
         verbose_name = 'Programare'
@@ -143,17 +158,41 @@ class Booking(models.Model):
             raise ValidationError({'car_vin': 'VIN-ul trebuie să aibă exact 17 caractere.'})
         if any(ch in {'I', 'O', 'Q'} for ch in vin):
             raise ValidationError({'car_vin': 'VIN-ul nu poate conține literele I, O sau Q.'})
+        duration = self.effective_duration_minutes()
+        if duration < 30 or duration > 12 * 60:
+            raise ValidationError({'duration_minutes': 'Durata trebuie sa fie intre 30 minute si 12 ore.'})
         if self.garage_id and self.center_id and self.garage.center_id != self.center_id:
             raise ValidationError({'garage': 'Garajul selectat nu aparține service-ului ales.'})
+        if self.mechanic_id and self.center_id and self.mechanic.center_id != self.center_id:
+            raise ValidationError({'mechanic': 'Mecanicul selectat nu apartine service-ului ales.'})
         if self.garage_id and self.booking_date and self.booking_time:
+            start_dt = datetime.combine(self.booking_date, self.booking_time)
+            end_dt = start_dt + timedelta(minutes=duration)
+            garage_open = datetime.combine(self.booking_date, self.garage.open_time)
+            garage_close = datetime.combine(self.booking_date, self.garage.close_time)
+            if start_dt < garage_open or end_dt > garage_close:
+                raise ValidationError({'booking_time': 'Programarea trebuie sa fie in intervalul de lucru al garajului.'})
             if not self.garage.is_time_available(
                 self.booking_date,
                 self.booking_time,
-                duration_minutes=self.effective_duration_minutes(),
+                duration_minutes=duration,
                 exclude_booking_id=self.pk,
                 booking_status=self.status,
             ):
                 raise ValidationError({'booking_time': 'Intervalul ales nu mai este disponibil pentru garajul selectat.'})
+        if self.mechanic_id and self.booking_date and self.booking_time:
+            if not self.mechanic.is_time_available(
+                self.booking_date,
+                self.booking_time,
+                duration_minutes=duration,
+                exclude_booking_id=self.pk,
+            ):
+                raise ValidationError({'mechanic': 'Mecanicul selectat este deja alocat in acest interval.'})
+        allowed_tags = {choice[0] for choice in self.TAG_CHOICES}
+        selected_tags = self.operational_tags or []
+        invalid_tags = [tag for tag in selected_tags if tag not in allowed_tags]
+        if invalid_tags:
+            raise ValidationError({'operational_tags': 'Unul sau mai multe tag-uri operationale nu sunt valide.'})
 
     def get_duration_display(self):
         minutes = self.effective_duration_minutes()
@@ -185,6 +224,20 @@ class Booking(models.Model):
             'cancelled': '❌',
         }
         return icons.get(self.status, '❓')
+
+    def operational_tag_labels(self):
+        labels = dict(self.TAG_CHOICES)
+        return [labels[tag] for tag in (self.operational_tags or []) if tag in labels]
+
+    def needs_attention(self):
+        active_statuses = {self.STATUS_PENDING, self.STATUS_QUOTED, self.STATUS_CONFIRMED, self.STATUS_IN_PROGRESS}
+        if self.status not in active_statuses:
+            return False
+        if self.status in {self.STATUS_CONFIRMED, self.STATUS_IN_PROGRESS} and not self.garage_id:
+            return True
+        if self.status == self.STATUS_IN_PROGRESS and not self.mechanic_id:
+            return True
+        return self.TAG_BLOCKED in (self.operational_tags or []) or self.TAG_WAITING_PART in (self.operational_tags or [])
 
 
 class BookingAttachment(models.Model):
@@ -238,3 +291,57 @@ class BookingNotification(models.Model):
 
     def __str__(self):
         return f"{self.recipient.username}: {self.title}"
+
+
+class BookingActivityLog(models.Model):
+    EVENT_STATUS_CHANGED = 'status_changed'
+    EVENT_OFFER_UPDATED = 'offer_updated'
+    EVENT_MECHANIC_CHANGED = 'mechanic_changed'
+    EVENT_SCHEDULE_CHANGED = 'schedule_changed'
+    EVENT_ATTACHMENT_ADDED = 'attachment_added'
+    EVENT_NOTE_UPDATED = 'note_updated'
+    EVENT_TAGS_UPDATED = 'tags_updated'
+    EVENT_CHECKLIST_UPDATED = 'checklist_updated'
+
+    EVENT_CHOICES = [
+        (EVENT_STATUS_CHANGED, 'Status schimbat'),
+        (EVENT_OFFER_UPDATED, 'Oferta actualizata'),
+        (EVENT_MECHANIC_CHANGED, 'Mecanic schimbat'),
+        (EVENT_SCHEDULE_CHANGED, 'Programare mutata'),
+        (EVENT_ATTACHMENT_ADDED, 'Fisier adaugat'),
+        (EVENT_NOTE_UPDATED, 'Nota interna actualizata'),
+        (EVENT_TAGS_UPDATED, 'Tag-uri actualizate'),
+        (EVENT_CHECKLIST_UPDATED, 'Checklist actualizat'),
+    ]
+
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='activity_logs')
+    actor = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='booking_activity_logs')
+    event_type = models.CharField(max_length=40, choices=EVENT_CHOICES)
+    message = models.CharField(max_length=255)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Activity log booking'
+        verbose_name_plural = 'Activity logs booking'
+
+    def __str__(self):
+        return f"#{self.booking_id} {self.event_type}"
+
+
+class BookingChecklistItem(models.Model):
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='checklist_items')
+    label = models.CharField(max_length=160)
+    is_done = models.BooleanField(default=False)
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='created_booking_checklist_items')
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+        verbose_name = 'Checklist booking'
+        verbose_name_plural = 'Checklist booking'
+
+    def __str__(self):
+        return f"#{self.booking_id} {self.label}"

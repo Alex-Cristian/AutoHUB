@@ -1,0 +1,17 @@
+<section class="dc-table-wrap">
+  <div class="dc-panel-head mb-3"><div><h2 class="h4 mb-1">Categorii principale</h2><p class="text-muted-custom mb-0">Dashboard-ul rămâne curat, iar managementul detaliat pleacă în pagini dedicate.</p></div></div>
+  <div class="dc-category-grid">
+    {% for category in dashboard.categories %}
+      <a class="dc-category" href="{{ category.url }}">
+        <div class="d-flex justify-content-between gap-3 align-items-start">
+          <div class="dc-icon"><i class="bi {{ category.icon }}"></i></div>
+          {% if category.count is not None %}<span class="badge text-bg-dark">{{ category.count }}</span>{% endif %}
+        </div>
+        <div>
+          <strong>{{ category.title }}</strong>
+          <small class="d-block mt-2">{{ category.description }}</small>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+</section>

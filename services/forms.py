@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from decimal import Decimal, ROUND_HALF_UP
 
 from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage, ServiceMechanic, Review, ServicePart
+from .reporting import REPORT_CHOICES, PRESET_CHOICES, MONTH_CHOICES
 from bookings.forms import BookingForm
 from bookings.models import Booking
 from accounts.models import Car
@@ -534,13 +535,57 @@ class ServiceOwnerBookingForm(BookingForm):
 class ServicePartForm(forms.ModelForm):
     class Meta:
         model = ServicePart
-        fields = ['name', 'part_number', 'stock', 'minimum_stock', 'unit', 'shelf', 'notes']
+        fields = ['name', 'part_number', 'category', 'brand', 'supplier', 'price', 'stock', 'minimum_stock', 'unit', 'shelf', 'notes']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Filtru ulei'}),
             'part_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Cod piesă (opțional)'}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
+            'brand': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Bosch, Mann, Brembo'}),
+            'supplier': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Inter Cars'}),
+            'price': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01', 'placeholder': 'Ex: 89.90'}),
             'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'minimum_stock': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'unit': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'buc'}),
             'shelf': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Raft A3'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Detalii opționale'}),
         }
+
+    def clean_price(self):
+        price = self.cleaned_data.get('price')
+        if price is not None and price < 0:
+            raise forms.ValidationError('Pretul nu poate fi negativ.')
+        return price
+
+    def clean(self):
+        cleaned = super().clean()
+        stock = cleaned.get('stock')
+        minimum_stock = cleaned.get('minimum_stock')
+        if stock is not None and stock < 0:
+            self.add_error('stock', 'Stocul nu poate fi negativ.')
+        if minimum_stock is not None and minimum_stock < 0:
+            self.add_error('minimum_stock', 'Pragul minim nu poate fi negativ.')
+        if (
+            stock is not None and minimum_stock is not None
+            and stock == 0 and minimum_stock == 0
+            and not (cleaned.get('notes') or '').strip()
+        ):
+            self.add_error('notes', 'Adauga o observatie scurta daca piesa este complet fara stoc si fara prag minim.')
+        return cleaned
+
+
+class ReportFilterForm(forms.Form):
+    report_type = forms.ChoiceField(label='Tip raport', choices=REPORT_CHOICES, initial='performance', widget=forms.Select(attrs={'class': 'form-select'}))
+    preset_period = forms.ChoiceField(label='Perioadă presetată', choices=PRESET_CHOICES, initial='this_month', widget=forms.Select(attrs={'class': 'form-select'}))
+    specific_day = forms.DateField(label='Zi', required=False, widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}))
+    month = forms.IntegerField(label='Lună', required=False, min_value=1, max_value=12, widget=forms.Select(choices=[('', '—')] + MONTH_CHOICES, attrs={'class': 'form-select'}))
+    year = forms.IntegerField(label='An', required=False, min_value=2020, max_value=2100, widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 2026'}))
+    start_date = forms.DateField(label='De la', required=False, widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}))
+    end_date = forms.DateField(label='Până la', required=False, widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}))
+
+    def clean(self):
+        cleaned = super().clean()
+        start = cleaned.get('start_date')
+        end = cleaned.get('end_date')
+        if start and end and start > end:
+            raise forms.ValidationError('Intervalul personalizat este invalid. Data de început trebuie să fie înaintea datei de final.')
+        return cleaned

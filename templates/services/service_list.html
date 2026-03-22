@@ -126,7 +126,7 @@
       <!-- hidden inputs — populate la submit -->
       <input type="hidden" name="category" id="hiddenCategory" value="{{ selected_category }}">
       <input type="hidden" name="min_rating" id="hiddenRating" value="{{ selected_min_rating }}">
-      <input type="hidden" name="sort" id="hiddenSort" value="{{ selected_sort|default:'rating' }}">
+      <input type="hidden" name="sort" id="hiddenSort" value="{{ selected_sort|default:'recommended' }}">
 
       <!-- APROAPE DE MINE - sus -->
       <div class="filter-group-drawer">
@@ -148,8 +148,11 @@
       <div class="filter-group-drawer">
         <p class="filter-title-drawer">Sortare</p>
         <div class="d-flex flex-column gap-1" id="sortButtons">
+          <button type="button" onclick="pickSort('recommended', this)" data-sort="recommended"
+                  class="btn btn-sm text-start {% if selected_sort == 'recommended' or not selected_sort %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  style="border-radius:8px;">🔥 Recomandate</button>
           <button type="button" onclick="pickSort('rating', this)" data-sort="rating"
-                  class="btn btn-sm text-start {% if selected_sort == 'rating' or not selected_sort %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                  class="btn btn-sm text-start {% if selected_sort == 'rating' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
                   style="border-radius:8px;">⭐ Rating + Recenzii</button>
           <button type="button" onclick="pickSort('reviews', this)" data-sort="reviews"
                   class="btn btn-sm text-start {% if selected_sort == 'reviews' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
@@ -279,7 +282,8 @@
         <!-- Sortare rapida -->
         <select class="form-select form-select-sm" style="width:auto"
                 onchange="sortRapid(this.value)">
-          <option value="rating" {% if selected_sort == "rating" or not selected_sort %}selected{% endif %}>⭐ Rating</option>
+          <option value="recommended" {% if selected_sort == "recommended" or not selected_sort %}selected{% endif %}>🔥 Recomandate</option>
+          <option value="rating" {% if selected_sort == "rating" %}selected{% endif %}>⭐ Rating</option>
           <option value="reviews" {% if selected_sort == "reviews" %}selected{% endif %}>💬 Recenzii</option>
           <option value="price_asc" {% if selected_sort == "price_asc" %}selected{% endif %}>💰 Preț ↑</option>
           <option value="price_desc" {% if selected_sort == "price_desc" %}selected{% endif %}>💰 Preț ↓</option>
@@ -313,6 +317,20 @@
                           {{ center.name }}
                           {% if center.is_featured %}<span class="badge-featured ms-2">⭐ Top</span>{% endif %}
                         </h6>
+                        <div class="d-flex gap-1 flex-wrap mb-1">
+                          {% if center.avg_rating and center.avg_rating >= 4.5 and center.review_count >= 3 %}
+                          <span class="badge" style="background:rgba(244,162,97,0.15);color:#f4a261;border:1px solid rgba(244,162,97,0.35);">Bine cotat</span>
+                          {% endif %}
+                          {% if center.profile_completeness >= 4 %}
+                          <span class="badge" style="background:rgba(34,197,94,0.12);color:#4ade80;border:1px solid rgba(34,197,94,0.28);">Profil complet</span>
+                          {% endif %}
+                          {% if center.future_bookings <= 2 and center.active_mechanics > 0 %}
+                          <span class="badge" style="background:rgba(56,189,248,0.14);color:#7dd3fc;border:1px solid rgba(56,189,248,0.28);">Disponibil curând</span>
+                          {% endif %}
+                          {% if center.active_mechanics > 1 %}
+                          <span class="badge" style="background:rgba(148,163,184,0.16);color:#cbd5e1;border:1px solid rgba(148,163,184,0.24);">Echipă activă</span>
+                          {% endif %}
+                        </div>
                         <p class="text-muted-custom small mb-0">
                           <i class="bi bi-geo-alt me-1 text-red"></i>{{ center.get_city_display }}
                           <span class="mx-2">·</span>
@@ -467,7 +485,7 @@
   // ===== STARE FILTRE (fara submit automat) =====
   let pendingCategory = "{{ selected_category }}";
   let pendingRating = "{{ selected_min_rating }}";
-  let pendingSort = "{{ selected_sort|default:'rating' }}";
+  let pendingSort = "{{ selected_sort|default:'recommended' }}";
 
   function pickCategory(slug) {
     // toggle: daca dai click pe aceeasi categorie, o deselectezi
@@ -503,9 +521,9 @@
   }
 
   function pickSort(val, btn) {
-    // Toggle: daca dai click pe cel deja selectat, revii la rating (default)
-    if (pendingSort === val && val !== 'rating') {
-      pendingSort = 'rating';
+    // Toggle: daca dai click pe cel deja selectat, revii la recommended (default)
+    if (pendingSort === val && val !== 'recommended') {
+      pendingSort = 'recommended';
     } else {
       pendingSort = val;
     }
@@ -898,7 +916,7 @@
     }
 
     const urlParams = new URLSearchParams(window.location.search);
-    const serverSort = urlParams.get('sort') || 'rating';
+    const serverSort = urlParams.get('sort') || 'recommended';
 
     // Daca URL contine sort=distance SAU localStorage are sort_dist_activ, reactiveaza
     if (serverSort === 'distance' || localStorage.getItem('sort_dist_activ') === 'true') {

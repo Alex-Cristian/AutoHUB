@@ -1,0 +1,20 @@
+<section class="rp-table">
+  <div class="d-flex justify-content-between gap-3 align-items-center mb-3">
+    <h2 class="h4 mb-0">Date detaliate</h2>
+    <a href="{% url 'services:export_report_csv' %}?{{ request.GET.urlencode }}" class="btn btn-outline-light btn-sm">Export CSV</a>
+  </div>
+  {% if report.table_rows %}
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr>{% for head in report.table_headers %}<th>{{ head }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for row in report.table_rows %}
+            <tr><td>{{ row.col1 }}</td><td>{{ row.col2 }}</td><td>{{ row.col3 }}</td><td>{{ row.col4 }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="ah-empty-state"><strong>Nicio înregistrare disponibilă pentru perioada aleasă.</strong> Încearcă o perioadă diferită sau alt tip de raport.</div>
+  {% endif %}
+</section>
