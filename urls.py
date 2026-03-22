@@ -30,8 +30,8 @@ urlpatterns = [
     path('bookings/', include('bookings.urls', namespace='bookings')),
     path('facturi/', include('invoices.urls', namespace='invoices')),
     path('api/', include('services.api_urls')),
+    path('api/auth/', include('accounts.api_urls')),
 ]
 
 if settings.DEBUG or not getattr(settings, 'USE_CLOUDINARY', False):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
