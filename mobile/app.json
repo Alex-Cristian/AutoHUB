@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "AutoEMG",
+    "slug": "autoemg",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "autoemg",
+    "userInterfaceStyle": "dark",
+    "ios": { "supportsTablet": false, "bundleIdentifier": "ro.autoemg.app" },
+    "android": { "package": "ro.autoemg.app" },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": { "typedRoutes": true }
+  }
+}

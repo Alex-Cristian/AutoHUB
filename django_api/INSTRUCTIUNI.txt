@@ -1,0 +1,72 @@
+═══════════════════════════════════════════════════════════
+INSTRUCTIUNI SETUP BACKEND DJANGO PENTRU API MOBIL
+═══════════════════════════════════════════════════════════
+
+PASUL 1 — Adauga in requirements.txt:
+───────────────────────────────────────
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.4.0
+
+
+PASUL 2 — Adauga in autohub/settings.py la INSTALLED_APPS:
+────────────────────────────────────────────────────────────
+'rest_framework',
+'rest_framework_simplejwt',
+'corsheaders',
+
+
+PASUL 3 — Adauga in MIDDLEWARE (PRIMUL in lista):
+──────────────────────────────────────────────────
+'corsheaders.middleware.CorsMiddleware',
+
+
+PASUL 4 — Adauga la sfarsitul settings.py:
+────────────────────────────────────────────
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ),
+}
+
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+}
+
+CORS_ALLOW_ALL_ORIGINS = True
+
+
+PASUL 5 — Adauga in autohub/urls.py:
+───────────────────────────────────────
+from django.urls import path, include
+
+# In urlpatterns adauga:
+path('api/', include('autohub.api_urls')),
+
+
+PASUL 6 — Copiaza fisierele:
+──────────────────────────────
+accounts_api_views.py  →  AutoHUB-main/accounts/api_views.py
+services_api_views_extended.py  →  AutoHUB-main/services/api_views_extended.py
+api_urls.py  →  AutoHUB-main/autohub/api_urls.py
+
+
+PASUL 7 — Push pe GitHub:
+───────────────────────────
+git add .
+git commit -m "feat: add REST API for mobile app"
+git push origin master
+
+Render va face redeploy automat in ~2 minute.
+
+
+PASUL 8 — Testeaza API-ul:
+────────────────────────────
+https://autohub-vouo.onrender.com/api/services/
+https://autohub-vouo.onrender.com/api/categories/
+═══════════════════════════════════════════════════════════
