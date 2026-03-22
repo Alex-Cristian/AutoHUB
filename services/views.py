@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urlencode
@@ -26,11 +27,13 @@ from .forms import (
     ServiceOwnerBookingForm,
     ReviewForm,
     ServicePartForm,
+    ReportFilterForm,
 )
 from bookings.activity import log_booking_activity
 from bookings.models import Booking, BookingNotification, BookingAttachment, BookingChecklistItem
 from invoices.models import Invoice
 from core.pdf_utils import build_work_order_pdf
+from .reporting import build_dashboard_metrics, build_report, export_report_csv
 from accounts.views import _record_legal_acceptance
 from core.services.sms_service import (
     send_booking_completed_sms,
@@ -647,60 +650,56 @@ def service_dashboard(request):
     centers = _require_service_owner(request)
     if centers is None:
         return redirect('services:register_service')
+
     centers = centers.prefetch_related('garages', 'garages__category', 'categories')
-
-    bookings_qs = Booking.objects.filter(center__in=centers).select_related(
-        'center', 'service_item', 'user', 'garage', 'mechanic'
-    ).prefetch_related('attachments').order_by('-created_at')
-    pending = bookings_qs.filter(status=Booking.STATUS_PENDING)
-    active = bookings_qs.exclude(status=Booking.STATUS_CANCELLED)[:50]
-    unread_count = BookingNotification.objects.filter(recipient=request.user, is_read=False).count()
-    latest_notifications = BookingNotification.objects.filter(recipient=request.user)[:6]
-    pending_verifications = ServiceCenter.objects.filter(verification_status='pending').count() if request.user.is_staff else 0
-    mechanic_form = ServiceMechanicForm()
-    mechanics_by_center = [(center, center.mechanics.order_by('name')) for center in centers]
-
-    parts_stats = _parts_dashboard_stats(centers)
-    analytics = _build_dashboard_analytics(bookings_qs, centers, request.user.pk)
-    today = timezone.localdate()
-    todays_bookings_all = list(
-        bookings_qs.filter(booking_date=today).order_by('booking_time', 'created_at')
-    )
-    mechanics_capacity, garages_capacity = _resource_capacity_snapshot(centers, todays_bookings_all, today)
-    today_conflicts = [
-        booking for booking in todays_bookings_all
-        if Booking.TAG_BLOCKED in (booking.operational_tags or [])
-        or Booking.TAG_WAITING_PART in (booking.operational_tags or [])
-    ][:6]
-    today_board = {
-        'upcoming': [booking for booking in todays_bookings_all if booking.status in {Booking.STATUS_QUOTED, Booking.STATUS_CONFIRMED}][:6],
-        'in_progress': [booking for booking in todays_bookings_all if booking.status == Booking.STATUS_IN_PROGRESS][:6],
-        'overdue': [
-            booking for booking in todays_bookings_all
-            if booking.status in {Booking.STATUS_QUOTED, Booking.STATUS_CONFIRMED}
-            and booking.get_end_datetime()
-            and timezone.make_aware(booking.get_end_datetime()) < timezone.now()
-        ][:6],
-    }
+    dashboard = build_dashboard_metrics(centers)
+    service_name = centers.first().name if centers.count() == 1 else 'Service-urile tale'
 
     return render(request, 'services/service_dashboard.html', {
         'centers': centers,
-        'pending_bookings': pending,
-        'bookings': active,
-        'unread_count': unread_count,
-        'latest_notifications': latest_notifications,
-        'pending_verifications': pending_verifications,
-        'mechanic_form': mechanic_form,
-        'mechanics_by_center': mechanics_by_center,
-        'low_stock_count': parts_stats['low_stock_count'],
-        'analytics': analytics,
-        'todays_bookings': todays_bookings_all[:8],
-        'mechanics_capacity': mechanics_capacity[:8],
-        'garages_capacity': garages_capacity[:8],
-        'today_conflicts': today_conflicts,
-        'today_board': today_board,
-        'parts_stats': parts_stats,
+        'service_name': service_name,
+        'dashboard': dashboard,
+        'current_date': timezone.localdate(),
     })
+
+
+@login_required
+def service_reports(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+
+    form = ReportFilterForm(request.GET or None)
+    if form.is_valid():
+        cleaned = form.cleaned_data
+    else:
+        cleaned = {'report_type': 'performance', 'preset_period': 'this_month'}
+        form = ReportFilterForm(initial=cleaned)
+
+    report_payload = build_report(centers, cleaned)
+    return render(request, 'services/service_reports.html', {
+        'form': form,
+        'report': report_payload,
+        'report_chart_json': json.dumps(report_payload.get('chart', {})),
+    })
+
+
+@login_required
+def export_report_csv_view(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+
+    form = ReportFilterForm(request.GET or None)
+    cleaned = form.cleaned_data if form.is_valid() else {'report_type': 'performance', 'preset_period': 'this_month'}
+    report_payload = build_report(centers, cleaned)
+    period = report_payload['period']
+    filename_period = f"{period.start.isoformat()}_{period.end.isoformat()}" if period.start != period.end else period.start.isoformat()
+    filename = f"raport_{report_payload['report_type']}_{filename_period}.csv"
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response.write('﻿')
+    return export_report_csv(response, report_payload)
 
 
 @login_required

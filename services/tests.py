@@ -307,3 +307,25 @@ class ServicePartsInventoryTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Adauga o observatie scurta')
+
+
+class ServiceReportsTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username='owner-reports', password='pass12345')
+        grant_legal_acceptance(self.owner)
+        self.center = create_center(self.owner, 'Reports Service')
+        self.booking = create_booking(self.center, status=Booking.STATUS_DONE, suffix='9')
+
+    def test_reports_page_renders(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse('services:reports'), {'report_type': 'performance', 'preset_period': 'this_month'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Rapoarte service')
+        self.assertContains(response, 'Generează raport')
+
+    def test_reports_csv_export(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse('services:export_report_csv'), {'report_type': 'appointments', 'preset_period': 'this_month'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'].split(';')[0], 'text/csv')
+        self.assertIn('raport_appointments', response['Content-Disposition'])
