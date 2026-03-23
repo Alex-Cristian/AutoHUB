@@ -1090,3 +1090,16 @@ def verify_email_view(request, token):
         user.save(update_fields=['is_active'])
     messages.success(request, 'Email confirmat cu succes. Acum te poți autentifica.')
     return redirect('accounts:login')
+
+
+@login_required
+def car_service_history(request, pk):
+    from services.business import build_vehicle_dossier
+
+    car = get_object_or_404(Car, pk=pk, owner=request.user)
+    dossier = build_vehicle_dossier(vin=car.vin, plate=car.plate_number)
+    return render(request, 'accounts/car_history.html', {
+        'car': car,
+        'dossier': dossier,
+        'history': dossier['history'],
+    })

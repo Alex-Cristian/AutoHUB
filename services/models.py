@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils.text import slugify
@@ -6,6 +7,13 @@ from django.db.models import Avg
 from datetime import datetime, timedelta
 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+
+
+def _aware_datetime(value):
+    if timezone.is_naive(value):
+        return timezone.make_aware(value, timezone.get_current_timezone())
+    return value
 
 
 CITY_CHOICES = [
@@ -185,6 +193,15 @@ class ServiceGarage(models.Model):
     def __str__(self):
         return f"{self.name} - {self.center.name}"
 
+    def _blocks_overlap(self, requested_start, requested_end, exclude_block_id=None):
+        qs = self.availability_blocks.filter(
+            starts_at__lt=requested_end,
+            ends_at__gt=requested_start,
+        )
+        if exclude_block_id:
+            qs = qs.exclude(pk=exclude_block_id)
+        return qs.exists()
+
     def clean(self):
 
         if not self.center_id:
@@ -220,8 +237,13 @@ class ServiceGarage(models.Model):
         requested_duration = max(duration_minutes or 60, 30)
         requested_start = datetime.combine(booking_date, booking_time)
         requested_end = requested_start + timedelta(minutes=requested_duration)
+        db_requested_start = _aware_datetime(requested_start)
+        db_requested_end = _aware_datetime(requested_end)
 
-        blocked_statuses = ['confirmed', 'in_progress']
+        if self._blocks_overlap(db_requested_start, db_requested_end):
+            return False
+
+        blocked_statuses = ['confirmed', 'in_progress', 'waiting_parts']
         qs = self.bookings.filter(booking_date=booking_date, status__in=blocked_statuses)
         if exclude_booking_id:
             qs = qs.exclude(pk=exclude_booking_id)
@@ -264,7 +286,7 @@ class ServiceMechanic(models.Model):
         return f"{self.name} - {self.center.name}"
 
     def active_bookings_count(self):
-        return self.bookings.filter(status__in=['confirmed', 'in_progress']).count()
+        return self.bookings.filter(status__in=['confirmed', 'in_progress', 'waiting_parts']).count()
 
     def completed_bookings_count(self):
         return self.bookings.filter(status='done').count()
@@ -273,10 +295,18 @@ class ServiceMechanic(models.Model):
         requested_duration = max(duration_minutes or 60, 30)
         requested_start = datetime.combine(booking_date, booking_time)
         requested_end = requested_start + timedelta(minutes=requested_duration)
+        db_requested_start = _aware_datetime(requested_start)
+        db_requested_end = _aware_datetime(requested_end)
+
+        if self.availability_blocks.filter(
+            starts_at__lt=db_requested_end,
+            ends_at__gt=db_requested_start,
+        ).exists():
+            return False
 
         qs = self.bookings.filter(
             booking_date=booking_date,
-            status__in=['confirmed', 'in_progress'],
+            status__in=['confirmed', 'in_progress', 'waiting_parts'],
         )
         if exclude_booking_id:
             qs = qs.exclude(pk=exclude_booking_id)
@@ -344,6 +374,345 @@ class MechanicPhoto(models.Model):
 
     def __str__(self):
         return f"{self.get_photo_type_display()} - {self.work_log}"
+
+
+class ServiceAvailabilityBlock(models.Model):
+    BLOCK_CLOSED = 'closed'
+    BLOCK_BREAK = 'break'
+    BLOCK_VACATION = 'vacation'
+    BLOCK_MAINTENANCE = 'maintenance'
+
+    BLOCK_TYPE_CHOICES = [
+        (BLOCK_CLOSED, 'Service inchis'),
+        (BLOCK_BREAK, 'Pauza'),
+        (BLOCK_VACATION, 'Concediu'),
+        (BLOCK_MAINTENANCE, 'Blocaj operational'),
+    ]
+
+    center = models.ForeignKey(
+        ServiceCenter, on_delete=models.CASCADE,
+        related_name='availability_blocks', verbose_name='Service'
+    )
+    garage = models.ForeignKey(
+        'ServiceGarage', null=True, blank=True, on_delete=models.CASCADE,
+        related_name='availability_blocks', verbose_name='Garaj'
+    )
+    mechanic = models.ForeignKey(
+        'ServiceMechanic', null=True, blank=True, on_delete=models.CASCADE,
+        related_name='availability_blocks', verbose_name='Mecanic'
+    )
+    block_type = models.CharField(
+        max_length=20, choices=BLOCK_TYPE_CHOICES,
+        default=BLOCK_CLOSED, verbose_name='Tip blocare'
+    )
+    title = models.CharField(max_length=160, verbose_name='Titlu')
+    notes = models.TextField(blank=True, verbose_name='Observatii')
+    starts_at = models.DateTimeField(verbose_name='De la')
+    ends_at = models.DateTimeField(verbose_name='Pana la')
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='created_availability_blocks', verbose_name='Creat de'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Bloc disponibilitate'
+        verbose_name_plural = 'Blocari disponibilitate'
+        ordering = ['starts_at', 'pk']
+
+    def __str__(self):
+        return f"{self.title} ({self.starts_at:%d.%m %H:%M} - {self.ends_at:%d.%m %H:%M})"
+
+    def clean(self):
+        if self.ends_at <= self.starts_at:
+            raise ValidationError({'ends_at': 'Intervalul de blocare trebuie sa se termine dupa inceput.'})
+        if self.garage_id and self.garage.center_id != self.center_id:
+            raise ValidationError({'garage': 'Garajul ales nu apartine service-ului selectat.'})
+        if self.mechanic_id and self.mechanic.center_id != self.center_id:
+            raise ValidationError({'mechanic': 'Mecanicul ales nu apartine service-ului selectat.'})
+        if not self.garage_id and not self.mechanic_id:
+            raise ValidationError('Selecteaza cel putin un garaj sau un mecanic pentru blocare.')
+
+
+class JobCard(models.Model):
+    STATUS_CREATED = 'created'
+    STATUS_APPROVED = 'approved'
+    STATUS_IN_PROGRESS = 'in_progress'
+    STATUS_WAITING_PARTS = 'waiting_parts'
+    STATUS_WAITING_CUSTOMER = 'waiting_customer'
+    STATUS_COMPLETED = 'completed'
+    STATUS_INVOICED = 'invoiced'
+    STATUS_CLOSED = 'closed'
+
+    STATUS_CHOICES = [
+        (STATUS_CREATED, 'Creata'),
+        (STATUS_APPROVED, 'Aprobata'),
+        (STATUS_IN_PROGRESS, 'In lucru'),
+        (STATUS_WAITING_PARTS, 'Asteapta piese'),
+        (STATUS_WAITING_CUSTOMER, 'Asteapta confirmare client'),
+        (STATUS_COMPLETED, 'Finalizata'),
+        (STATUS_INVOICED, 'Facturata'),
+        (STATUS_CLOSED, 'Inchisa'),
+    ]
+
+    booking = models.OneToOneField(
+        'bookings.Booking', on_delete=models.CASCADE,
+        related_name='job_card', verbose_name='Programare'
+    )
+    center = models.ForeignKey(
+        ServiceCenter, on_delete=models.CASCADE,
+        related_name='job_cards', verbose_name='Service'
+    )
+    mechanic = models.ForeignKey(
+        'ServiceMechanic', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='job_cards', verbose_name='Mecanic alocat'
+    )
+    status = models.CharField(
+        max_length=24, choices=STATUS_CHOICES,
+        default=STATUS_CREATED, verbose_name='Status lucrare'
+    )
+    diagnostic_summary = models.TextField(blank=True, verbose_name='Diagnostic si observatii tehnice')
+    work_performed = models.TextField(blank=True, verbose_name='Operatiuni efectuate')
+    internal_notes = models.TextField(blank=True, verbose_name='Note interne')
+    customer_notes = models.TextField(blank=True, verbose_name='Note vizibile clientului')
+    mileage = models.PositiveIntegerField(null=True, blank=True, verbose_name='Kilometraj')
+    estimated_hours = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True,
+        verbose_name='Timp estimat (ore)'
+    )
+    actual_hours = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True,
+        verbose_name='Timp real (ore)'
+    )
+    estimated_cost = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name='Cost estimat (RON)'
+    )
+    final_cost = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name='Cost final (RON)'
+    )
+    next_service_date = models.DateField(null=True, blank=True, verbose_name='Data recomandata pentru urmatoarea revizie')
+    next_service_km = models.PositiveIntegerField(null=True, blank=True, verbose_name='Kilometraj recomandat pentru urmatoarea revizie')
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='created_job_cards', verbose_name='Creata de'
+    )
+    updated_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='updated_job_cards', verbose_name='Actualizata de'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Fisa lucrare'
+        verbose_name_plural = 'Fise lucrari'
+        ordering = ['-updated_at', '-created_at']
+
+    def __str__(self):
+        return f"Fisa lucrare #{self.booking_id}"
+
+    def clean(self):
+        if self.center_id and self.booking_id and self.booking.center_id != self.center_id:
+            raise ValidationError({'center': 'Service-ul fisei trebuie sa fie acelasi cu service-ul programarii.'})
+        if self.mechanic_id and self.center_id and self.mechanic.center_id != self.center_id:
+            raise ValidationError({'mechanic': 'Mecanicul ales nu apartine service-ului acestei lucrari.'})
+        if self.final_cost is not None and self.final_cost < 0:
+            raise ValidationError({'final_cost': 'Costul final nu poate fi negativ.'})
+        if self.estimated_cost is not None and self.estimated_cost < 0:
+            raise ValidationError({'estimated_cost': 'Costul estimat nu poate fi negativ.'})
+
+    @property
+    def operations_estimated_total(self):
+        return self.operations.aggregate(
+            total=models.Sum('estimated_cost')
+        )['total'] or Decimal('0.00')
+
+    @property
+    def operations_final_total(self):
+        return self.operations.aggregate(
+            total=models.Sum('final_cost')
+        )['total'] or Decimal('0.00')
+
+    @property
+    def parts_total(self):
+        return self.part_usages.exclude(status=JobPartUsage.STATUS_RETURNED).aggregate(
+            total=models.Sum(
+                models.F('quantity') * models.F('unit_price'),
+                output_field=models.DecimalField(max_digits=12, decimal_places=2),
+            )
+        )['total'] or Decimal('0.00')
+
+    @property
+    def unresolved_recommendations_count(self):
+        return self.recommendations.filter(is_resolved=False).count()
+
+
+class JobOperation(models.Model):
+    job_card = models.ForeignKey(
+        JobCard, on_delete=models.CASCADE,
+        related_name='operations', verbose_name='Fisa lucrare'
+    )
+    title = models.CharField(max_length=160, verbose_name='Operatiune')
+    description = models.TextField(blank=True, verbose_name='Detalii')
+    estimated_cost = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name='Cost estimat'
+    )
+    final_cost = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name='Cost final'
+    )
+    is_visible_to_customer = models.BooleanField(default=True, verbose_name='Vizibila clientului')
+    position = models.PositiveIntegerField(default=0, verbose_name='Ordine')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Operatiune lucrare'
+        verbose_name_plural = 'Operatiuni lucrare'
+        ordering = ['position', 'created_at', 'pk']
+
+    def __str__(self):
+        return f"{self.title} (#{self.job_card_id})"
+
+
+class JobRecommendation(models.Model):
+    PRIORITY_LOW = 'low'
+    PRIORITY_MEDIUM = 'medium'
+    PRIORITY_HIGH = 'high'
+
+    PRIORITY_CHOICES = [
+        (PRIORITY_LOW, 'Scazuta'),
+        (PRIORITY_MEDIUM, 'Medie'),
+        (PRIORITY_HIGH, 'Ridicata'),
+    ]
+
+    job_card = models.ForeignKey(
+        JobCard, on_delete=models.CASCADE,
+        related_name='recommendations', verbose_name='Fisa lucrare'
+    )
+    title = models.CharField(max_length=180, verbose_name='Recomandare')
+    details = models.TextField(blank=True, verbose_name='Detalii')
+    priority = models.CharField(
+        max_length=10, choices=PRIORITY_CHOICES,
+        default=PRIORITY_MEDIUM, verbose_name='Prioritate'
+    )
+    is_visible_to_customer = models.BooleanField(default=True, verbose_name='Vizibila clientului')
+    is_resolved = models.BooleanField(default=False, verbose_name='Rezolvata')
+    resolved_at = models.DateTimeField(null=True, blank=True, verbose_name='Rezolvata la')
+    due_date = models.DateField(null=True, blank=True, verbose_name='Recomandata pana la')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Recomandare tehnica'
+        verbose_name_plural = 'Recomandari tehnice'
+        ordering = ['is_resolved', '-created_at', 'pk']
+
+    def __str__(self):
+        return self.title
+
+
+class JobPartUsage(models.Model):
+    STATUS_RESERVED = 'reserved'
+    STATUS_CONSUMED = 'consumed'
+    STATUS_RETURNED = 'returned'
+
+    STATUS_CHOICES = [
+        (STATUS_RESERVED, 'Rezervata'),
+        (STATUS_CONSUMED, 'Consumata'),
+        (STATUS_RETURNED, 'Returnata'),
+    ]
+
+    job_card = models.ForeignKey(
+        JobCard, on_delete=models.CASCADE,
+        related_name='part_usages', verbose_name='Fisa lucrare'
+    )
+    part = models.ForeignKey(
+        'ServicePart', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='job_usages', verbose_name='Piesa din stoc'
+    )
+    description = models.CharField(max_length=180, verbose_name='Descriere')
+    quantity = models.PositiveIntegerField(default=1, verbose_name='Cantitate')
+    unit_label = models.CharField(max_length=20, blank=True, verbose_name='Unitate')
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Cost achizitie')
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Pret vanzare')
+    status = models.CharField(
+        max_length=12, choices=STATUS_CHOICES,
+        default=STATUS_RESERVED, verbose_name='Status piesa'
+    )
+    notes = models.CharField(max_length=220, blank=True, verbose_name='Observatii')
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='created_job_part_usages', verbose_name='Adaugata de'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Piesa folosita in lucrare'
+        verbose_name_plural = 'Piese folosite in lucrare'
+        ordering = ['-created_at', 'pk']
+
+    def __str__(self):
+        return f"{self.description} x{self.quantity}"
+
+    @property
+    def line_total(self):
+        if self.unit_price is None:
+            return None
+        return self.unit_price * self.quantity
+
+
+class StockMovement(models.Model):
+    TYPE_IN = 'in'
+    TYPE_OUT = 'out'
+    TYPE_ADJUSTMENT = 'adjustment'
+    TYPE_RESERVE = 'reserve'
+    TYPE_RELEASE = 'release'
+
+    MOVEMENT_CHOICES = [
+        (TYPE_IN, 'Intrare in stoc'),
+        (TYPE_OUT, 'Iesire din stoc'),
+        (TYPE_ADJUSTMENT, 'Ajustare manuala'),
+        (TYPE_RESERVE, 'Rezervare pentru lucrare'),
+        (TYPE_RELEASE, 'Eliberare / retur'),
+    ]
+
+    part = models.ForeignKey(
+        'ServicePart', on_delete=models.CASCADE,
+        related_name='stock_movements', verbose_name='Piesa'
+    )
+    job_card = models.ForeignKey(
+        JobCard, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='stock_movements', verbose_name='Fisa lucrare'
+    )
+    booking = models.ForeignKey(
+        'bookings.Booking', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='stock_movements', verbose_name='Programare'
+    )
+    movement_type = models.CharField(
+        max_length=20, choices=MOVEMENT_CHOICES,
+        verbose_name='Tip miscare'
+    )
+    quantity_delta = models.IntegerField(verbose_name='Delta stoc')
+    previous_stock = models.PositiveIntegerField(verbose_name='Stoc anterior')
+    new_stock = models.PositiveIntegerField(verbose_name='Stoc nou')
+    note = models.CharField(max_length=220, blank=True, verbose_name='Observatii')
+    actor = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='stock_movements', verbose_name='Utilizator'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Miscare stoc'
+        verbose_name_plural = 'Miscari stoc'
+        ordering = ['-created_at', '-pk']
+
+    def __str__(self):
+        sign = '+' if self.quantity_delta >= 0 else ''
+        return f"{self.part.name}: {sign}{self.quantity_delta}"
 
 class ServiceImage(models.Model):
     center = models.ForeignKey(ServiceCenter, on_delete=models.CASCADE, related_name='gallery_images', verbose_name='Service')
@@ -419,9 +788,12 @@ class ServicePart(models.Model):
     stock = models.PositiveIntegerField(default=0, verbose_name='Stoc curent')
     minimum_stock = models.PositiveIntegerField(default=0, verbose_name='Stoc minim')
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Pret unitar estimat')
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Pret achizitie')
+    sale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Pret vanzare')
     unit = models.CharField(max_length=20, default='buc', verbose_name='Unitate')
     shelf = models.CharField(max_length=80, blank=True, verbose_name='Raft / locație')
     notes = models.TextField(blank=True, verbose_name='Observații')
+    is_active = models.BooleanField(default=True, verbose_name='Activa')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -468,10 +840,19 @@ class ServicePart(models.Model):
         }.get(self.stock_status, 'secondary')
 
     @property
+    def cost_price(self):
+        return self.purchase_price if self.purchase_price is not None else self.price
+
+    @property
+    def client_price(self):
+        return self.sale_price if self.sale_price is not None else self.price
+
+    @property
     def estimated_stock_value(self):
-        if self.price is None:
+        reference_price = self.purchase_price if self.purchase_price is not None else self.price
+        if reference_price is None:
             return None
-        return self.price * self.stock
+        return reference_price * self.stock
 
 
 class Review(models.Model):

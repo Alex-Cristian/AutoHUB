@@ -1,55 +1,152 @@
 {% extends 'base.html' %}
-{% block title %}Dashboard service | AutoEMG{% endblock %}
+{% block title %}Dashboard Service | AutoHub{% endblock %}
+
 {% block extra_css %}
 <style>
-.dashboard-shell{padding-top:1.2rem;padding-bottom:2rem}
-.dc-hero,.dc-card,.dc-table-wrap,.dc-action,.dc-category,.dc-attention{background:var(--ah-dark2);border:1px solid var(--ah-border);border-radius:24px;box-shadow:0 10px 28px rgba(0,0,0,.14)}
-.dc-hero{padding:1.5rem;background:linear-gradient(135deg, rgba(230,57,70,.10), var(--ah-dark2) 58%, rgba(244,162,97,.08))}
-.dc-date{color:var(--ah-muted);font-size:.95rem}
-.dc-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1rem}
-.dc-card{padding:1.1rem 1rem;text-decoration:none;color:inherit;display:block}
-.dc-card:hover,.dc-action:hover,.dc-category:hover{transform:translateY(-2px);border-color:rgba(230,57,70,.45);color:inherit}
-.dc-icon{width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:var(--ah-dark3);font-size:1.15rem}
-.dc-value{font:800 2rem 'Barlow Condensed',sans-serif;line-height:1}
-.dc-label{color:var(--ah-muted);font-size:.86rem}
-.dc-note{color:var(--ah-muted);font-size:.82rem}
-.dc-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:1rem}
-.dc-panel{display:flex;flex-direction:column;gap:1rem}
-.dc-panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
-.dc-table-wrap{padding:1.1rem;overflow:hidden}
-.table.dc-table{--bs-table-bg:transparent;--bs-table-color:var(--ah-text);margin-bottom:0}
-.table.dc-table th{color:var(--ah-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;border-color:var(--ah-border)}
-.table.dc-table td{border-color:rgba(255,255,255,.06);vertical-align:middle}
-.dc-status{display:inline-flex;align-items:center;padding:.35rem .65rem;border-radius:999px;font-size:.8rem;font-weight:700}
-.dc-action-grid,.dc-category-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem}
-.dc-action,.dc-category{padding:1rem;text-decoration:none;color:inherit;min-height:150px;display:flex;flex-direction:column;justify-content:space-between}
-.dc-category small,.dc-action small{color:var(--ah-muted)}
-.dc-attention{padding:1rem}
-.dc-attention-list{display:grid;gap:.9rem}
-.dc-attention-item{display:flex;gap:.9rem;align-items:flex-start;padding:.9rem;border-radius:18px;background:var(--ah-dark3);text-decoration:none;color:inherit}
-.dc-attention-item:hover{color:inherit;border-color:rgba(230,57,70,.35)}
-.dc-empty{padding:1rem 1.1rem;border:1px dashed var(--ah-border);border-radius:18px;background:var(--ah-dark3);color:var(--ah-muted)}
-.dc-mobile-cards{display:none;gap:.85rem}
-.dc-mobile-row{padding:.95rem;border-radius:18px;background:var(--ah-dark3);border:1px solid rgba(255,255,255,.06)}
-@media (max-width:1200px){.dc-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.dc-action-grid,.dc-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dc-grid{grid-template-columns:1fr}}
-@media (max-width:768px){.dc-kpis,.dc-action-grid,.dc-category-grid{grid-template-columns:1fr}.dc-table-responsive{display:none}.dc-mobile-cards{display:grid}.dc-hero{padding:1.15rem}}
+  .dashboard-shell { padding:2rem 0; }
+  .dash-hero { background:linear-gradient(135deg, rgba(230,57,70,.10), var(--ah-dark2) 60%, rgba(244,162,97,.08)); border:1px solid var(--ah-border); border-radius:24px; padding:1.8rem; margin-bottom:1.5rem; }
+  .dash-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+  .dash-kpi { background:var(--ah-dark2); border:1px solid var(--ah-border); border-radius:20px; padding:1rem; box-shadow:0 16px 42px rgba(0,0,0,.14); color:inherit; text-decoration:none; outline:none; }
+  .dash-kpi:hover { color:inherit; text-decoration:none; border-color:rgba(230,57,70,.35); }
+  .dash-kpi:focus, .dash-kpi:active, .dash-kpi:visited { color:inherit; text-decoration:none; border-color:var(--ah-border); outline:none; }
+  .dash-kpi:focus-visible { border-color:var(--ah-border); box-shadow:0 0 0 2px rgba(255,255,255,.08), 0 16px 42px rgba(0,0,0,.14); }
+  .dash-kpi-value { font:800 2.3rem 'Barlow Condensed', sans-serif; line-height:1; }
+  .dash-kpi-label { color:var(--ah-muted); font-size:.82rem; margin-top:.35rem; }
+  .dash-grid { display:grid; grid-template-columns:1.3fr 1fr; gap:1rem; }
+  .dash-card { background:var(--ah-dark2); border:1px solid var(--ah-border); border-radius:22px; padding:1.2rem; box-shadow:0 16px 42px rgba(0,0,0,.14); }
+  .dash-list { display:grid; gap:.8rem; }
+  .dash-item { border:1px solid var(--ah-border); border-radius:18px; padding:.95rem; background:var(--ah-dark3); color:inherit; text-decoration:none; outline:none; }
+  .dash-categories { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:1rem; margin-top:1.5rem; }
+  .dash-category { background:var(--ah-dark2); border:1px solid var(--ah-border); border-radius:20px; padding:1rem; text-decoration:none; color:inherit; outline:none; }
+  .dash-item:hover, .dash-category:hover { color:inherit; text-decoration:none; border-color:rgba(230,57,70,.35); }
+  .dash-item:focus, .dash-item:active, .dash-item:visited,
+  .dash-category:focus, .dash-category:active, .dash-category:visited { color:inherit; text-decoration:none; border-color:var(--ah-border); outline:none; }
+  .dash-item:focus-visible, .dash-category:focus-visible { border-color:var(--ah-border); box-shadow:0 0 0 2px rgba(255,255,255,.08); }
+  @media (max-width: 1000px) { .dash-grid { grid-template-columns:1fr; } }
 </style>
 {% endblock %}
+
 {% block content %}
 <div class="container dashboard-shell">
-  <div class="visually-hidden">Analytics service · Today Board · Stoc și atenționări</div>
-  {% include 'services/partials/dashboard_header.html' %}
-  {% include 'services/partials/dashboard_kpis.html' %}
+  <section class="dash-hero">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+      <div>
+        <div class="ah-page-eyebrow"><i class="bi bi-speedometer2"></i>Dashboard service</div>
+        <h1 class="section-title mb-1">{{ service_name }}</h1>
+        <div class="d-none">{{ service_name|lower|capfirst }}</div>
+        <p class="ah-page-subtitle">Panou operational pentru ziua curenta: programari, lucrari active, stoc critic, clienti activi si urmatoarele actiuni utile.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <span class="ah-badge-soft"><i class="bi bi-calendar-day"></i>{{ current_date|date:'d.m.Y' }}</span>
+        <a href="{% url 'services:calendar' %}" class="btn btn-outline-light">Calendar</a>
+        {% if centers %}
+        <a href="{% url 'services:owner_booking_create' centers.0.pk %}" class="btn btn-nav-cta">Programare noua</a>
+        {% endif %}
+      </div>
+    </div>
+  </section>
 
-  <div class="dc-grid mt-4">
-    <div class="dc-panel">
-      {% include 'services/partials/dashboard_appointments_table.html' %}
-      {% include 'services/partials/dashboard_quick_actions.html' %}
-      {% include 'services/partials/dashboard_categories_grid.html' %}
+  <section class="dash-kpis">
+    <a class="dash-kpi" href="{% url 'services:bookings_list' %}">
+      <div class="dash-kpi-value">{{ dashboard.kpis.appointments_today }}</div>
+      <div class="dash-kpi-label">Programari astazi</div>
+    </a>
+    <a class="dash-kpi" href="{% url 'services:bookings_list' %}?status=in_progress">
+      <div class="dash-kpi-value">{{ dashboard.kpis.cars_in_work }}</div>
+      <div class="dash-kpi-label">Lucrari in desfasurare</div>
+    </a>
+    <a class="dash-kpi" href="{% url 'services:bookings_list' %}?status=pending">
+      <div class="dash-kpi-value">{{ dashboard.kpis.appointments_pending }}</div>
+      <div class="dash-kpi-label">Asteapta confirmare</div>
+    </a>
+    <a class="dash-kpi" href="{% url 'services:bookings_list' %}?overdue=1">
+      <div class="dash-kpi-value">{{ dashboard.kpis.overdue_bookings }}</div>
+      <div class="dash-kpi-label">Intarziate / neactualizate</div>
+    </a>
+    <div class="dash-kpi">
+      <div class="dash-kpi-value">{{ dashboard.kpis.revenue_this_month|floatformat:0 }}</div>
+      <div class="dash-kpi-label">Venit realizat luna aceasta (RON)</div>
     </div>
-    <div class="dc-panel">
-      {% include 'services/partials/dashboard_attention.html' %}
+    <div class="dash-kpi">
+      <div class="dash-kpi-value">{{ dashboard.kpis.estimated_revenue|floatformat:0 }}</div>
+      <div class="dash-kpi-label">Venit estimat in flux (RON)</div>
     </div>
+    <a class="dash-kpi" href="/invoices/clienti/">
+      <div class="dash-kpi-value">{{ dashboard.kpis.active_clients }}</div>
+      <div class="dash-kpi-label">Clienti activi</div>
+    </a>
+    <a class="dash-kpi" href="{% url 'services:parts_inventory' %}">
+      <div class="dash-kpi-value">{{ dashboard.kpis.low_stock_count }}</div>
+      <div class="dash-kpi-label">Alerte stoc minim</div>
+    </a>
+  </section>
+
+  <div class="dash-grid">
+    <section class="dash-card">
+      <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+        <div>
+          <h2 class="h4 mb-1">Stoc și atenționări</h2>
+          <p class="text-muted-custom small mb-0">Programari blocate, stoc minim, lipsa factura sau alte puncte care cer interventie rapida.</p>
+        </div>
+        <span class="ah-badge-soft"><i class="bi bi-exclamation-triangle"></i>{{ dashboard.attention_items|length }} alerte</span>
+      </div>
+      <div class="dash-list">
+        {% for item in dashboard.attention_items %}
+        <a href="{{ item.url }}" class="dash-item">
+          <div class="d-flex justify-content-between gap-3">
+            <div>
+              <div class="fw-semibold">{{ item.title }}</div>
+              <div class="text-muted-custom small">{{ item.description }}</div>
+            </div>
+            <span class="badge bg-{{ item.badge }}">{{ item.meta }}</span>
+          </div>
+        </a>
+        {% empty %}
+        <div class="ah-empty-state"><strong>Nicio alerta critica</strong>Dashboard-ul este curat pentru moment.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="dash-card">
+      <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+        <div>
+          <h2 class="h4 mb-1">Today Board</h2>
+          <p class="text-muted-custom small mb-0">Cine vine azi, la ce ora si ce urmeaza pentru fiecare masina.</p>
+        </div>
+      </div>
+      <div class="dash-list">
+        {% for booking in dashboard.today_bookings %}
+        <a href="{% url 'services:booking_detail' booking.pk %}" class="dash-item">
+          <div class="d-flex justify-content-between gap-3 flex-wrap">
+            <div>
+              <div class="fw-semibold">#{{ booking.pk }} · {{ booking.client_name }}</div>
+              <div class="text-muted-custom small">{{ booking.booking_time|time:"H:i" }} · {{ booking.car_brand }} {{ booking.car_model }} · {{ booking.garage.name|default:"Fara post" }}</div>
+            </div>
+            <span class="badge bg-{{ booking.get_status_badge }}">{{ booking.get_status_display }}</span>
+          </div>
+        </a>
+        {% empty %}
+        <div class="ah-empty-state"><strong>Nicio programare astazi</strong>Zi libera in calendar pentru service.</div>
+        {% endfor %}
+      </div>
+    </section>
   </div>
+
+  <section class="dash-categories">
+    {% for category in dashboard.categories %}
+    <a href="{{ category.url }}" class="dash-category">
+      <div class="d-flex justify-content-between gap-3">
+        <div>
+          <div class="fw-semibold mb-1">{{ category.title }}</div>
+          <div class="text-muted-custom small">{{ category.description }}</div>
+        </div>
+        <i class="bi {{ category.icon }} text-red fs-4"></i>
+      </div>
+      {% if category.count is not None %}
+      <div class="small text-muted-custom mt-3">{{ category.count }} elemente</div>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </section>
 </div>
 {% endblock %}

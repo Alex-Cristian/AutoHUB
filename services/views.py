@@ -17,8 +17,39 @@ from django.db.models.functions import ExtractHour, ExtractWeekDay, TruncMonth
 from django.utils import timezone
 from django.urls import reverse
 
-from .models import ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite, ServiceGarage, ServiceImage, ServiceMechanic, ReviewImage, ServicePart
+from .business import (
+    apply_stock_movement,
+    build_vehicle_dossier,
+    bookings_with_tag,
+    create_job_part_usage,
+    ensure_job_card,
+    rollback_job_part_usage,
+    sync_booking_from_job_card,
+)
+from .models import (
+    JobCard,
+    JobOperation,
+    JobPartUsage,
+    JobRecommendation,
+    ServiceAvailabilityBlock,
+    ServiceCategory,
+    ServiceCenter,
+    ServiceGarage,
+    ServiceImage,
+    ServiceItem,
+    ServiceMechanic,
+    Review,
+    Favorite,
+    ReviewImage,
+    ServicePart,
+    StockMovement,
+)
 from .forms import (
+    AvailabilityBlockForm,
+    JobCardForm,
+    JobOperationForm,
+    JobPartUsageForm,
+    JobRecommendationForm,
     ServiceCenterRegisterForm,
     ServiceCenterPublicRegisterForm,
     ServiceGarageForm,
@@ -27,6 +58,7 @@ from .forms import (
     ServiceOwnerBookingForm,
     ReviewForm,
     ServicePartForm,
+    StockMovementForm,
     ReportFilterForm,
 )
 from bookings.activity import log_booking_activity
@@ -67,6 +99,7 @@ def _calendar_status_config():
         Booking.STATUS_QUOTED: {'label': 'Ofertat', 'color': '#94a3b8'},
         Booking.STATUS_CONFIRMED: {'label': 'Confirmat', 'color': '#22c55e'},
         Booking.STATUS_IN_PROGRESS: {'label': 'In progres', 'color': '#f97316'},
+        Booking.STATUS_WAITING_PARTS: {'label': 'Asteapta piese', 'color': '#ef4444'},
         Booking.STATUS_DONE: {'label': 'Finalizat', 'color': '#6366f1'},
         Booking.STATUS_CANCELLED: {'label': 'Anulat', 'color': '#ef4444'},
     }
@@ -75,13 +108,13 @@ def _calendar_status_config():
 def _booking_calendar_attention(booking):
     reasons = []
     if booking.needs_attention():
-        if booking.status in {Booking.STATUS_CONFIRMED, Booking.STATUS_IN_PROGRESS} and not booking.garage_id:
+        if booking.status in {Booking.STATUS_CONFIRMED, Booking.STATUS_IN_PROGRESS, Booking.STATUS_WAITING_PARTS} and not booking.garage_id:
             reasons.append('Lipseste garajul')
-        if booking.status == Booking.STATUS_IN_PROGRESS and not booking.mechanic_id:
+        if booking.status in {Booking.STATUS_IN_PROGRESS, Booking.STATUS_WAITING_PARTS} and not booking.mechanic_id:
             reasons.append('Lipseste mecanicul')
-        if Booking.TAG_BLOCKED in (booking.operational_tags or []):
+        if booking.has_operational_tag(Booking.TAG_BLOCKED):
             reasons.append('Marcat ca blocat')
-        if Booking.TAG_WAITING_PART in (booking.operational_tags or []):
+        if booking.status == Booking.STATUS_WAITING_PARTS or booking.has_operational_tag(Booking.TAG_WAITING_PART):
             reasons.append('Asteapta piesa')
     return reasons
 
@@ -729,17 +762,42 @@ def service_calendar(request):
         return redirect('services:register_service')
 
     centers = centers.prefetch_related('garages', 'categories')
+    selected_center = centers.first()
+    center_id = (request.POST.get('center_id') or request.GET.get('center') or '').strip()
+    if center_id.isdigit():
+        selected_center = centers.filter(pk=int(center_id)).first() or selected_center
+
+    if request.method == 'POST' and selected_center:
+        availability_form = AvailabilityBlockForm(request.POST, center=selected_center)
+        if availability_form.is_valid():
+            block = availability_form.save(commit=False)
+            block.center = selected_center
+            block.created_by = request.user
+            block.save()
+            messages.success(request, 'Intervalul indisponibil a fost salvat in calendar.')
+            return redirect(f"{reverse('services:calendar')}?center={selected_center.pk}")
+    else:
+        availability_form = AvailabilityBlockForm(center=selected_center)
+
     today = timezone.localdate()
     today_bookings = Booking.objects.filter(center__in=centers, booking_date=today).count()
     garages = ServiceGarage.objects.filter(center__in=centers).order_by('center__name', 'name')
     mechanics = ServiceMechanic.objects.filter(center__in=centers).order_by('center__name', 'name')
+    service_items = ServiceItem.objects.filter(center__in=centers).order_by('center__name', 'name')
+    recent_blocks = ServiceAvailabilityBlock.objects.filter(center__in=centers).select_related(
+        'center', 'garage', 'mechanic'
+    ).order_by('starts_at')[:8]
 
     return render(request, 'services/service_calendar.html', {
         'centers': centers,
+        'selected_center': selected_center,
         'today_bookings': today_bookings,
         'calendar_statuses': _calendar_status_config(),
         'calendar_garages': garages,
         'calendar_mechanics': mechanics,
+        'calendar_services': service_items,
+        'availability_form': availability_form,
+        'recent_blocks': recent_blocks,
     })
 
 
@@ -754,6 +812,7 @@ def service_calendar_events(request):
     status_filter = (request.GET.get('status') or '').strip()
     garage_filter = (request.GET.get('garage') or '').strip()
     mechanic_filter = (request.GET.get('mechanic') or '').strip()
+    service_filter = (request.GET.get('service_item') or '').strip()
 
     bookings = Booking.objects.filter(center__in=centers).select_related(
         'center', 'garage', 'mechanic', 'service_item'
@@ -781,6 +840,8 @@ def service_calendar_events(request):
         bookings = bookings.filter(garage_id=int(garage_filter))
     if mechanic_filter.isdigit():
         bookings = bookings.filter(mechanic_id=int(mechanic_filter))
+    if service_filter.isdigit():
+        bookings = bookings.filter(service_item_id=int(service_filter))
 
     status_config = _calendar_status_config()
     events = []
@@ -813,6 +874,55 @@ def service_calendar_events(request):
                 'booking_time': booking.booking_time.strftime('%H:%M'),
                 'needs_attention': bool(attention_reasons),
                 'attention_reasons': attention_reasons,
+            },
+        })
+
+    blocks = ServiceAvailabilityBlock.objects.filter(center__in=centers).select_related(
+        'center', 'garage', 'mechanic'
+    )
+    if start_raw:
+        try:
+            start_date = datetime.fromisoformat(start_raw.replace('Z', '+00:00'))
+            blocks = blocks.filter(ends_at__gte=start_date)
+        except ValueError:
+            pass
+    if end_raw:
+        try:
+            end_date = datetime.fromisoformat(end_raw.replace('Z', '+00:00'))
+            blocks = blocks.filter(starts_at__lte=end_date)
+        except ValueError:
+            pass
+    if garage_filter.isdigit():
+        blocks = blocks.filter(garage_id=int(garage_filter))
+    if mechanic_filter.isdigit():
+        blocks = blocks.filter(mechanic_id=int(mechanic_filter))
+
+    for block in blocks.order_by('starts_at', 'pk'):
+        title_target = block.garage.name if block.garage_id else block.mechanic.name
+        events.append({
+            'id': f'block-{block.pk}',
+            'title': f'{block.title} · {title_target}',
+            'start': timezone.localtime(block.starts_at).isoformat() if timezone.is_aware(block.starts_at) else block.starts_at.isoformat(),
+            'end': timezone.localtime(block.ends_at).isoformat() if timezone.is_aware(block.ends_at) else block.ends_at.isoformat(),
+            'display': 'background',
+            'backgroundColor': '#7f1d1d',
+            'borderColor': '#991b1b',
+            'textColor': '#ffffff',
+            'extendedProps': {
+                'status': 'availability_block',
+                'status_label': dict(ServiceAvailabilityBlock.BLOCK_TYPE_CHOICES).get(block.block_type, 'Indisponibil'),
+                'center': block.center.name,
+                'garage': block.garage.name if block.garage_id else 'Nespecificat',
+                'mechanic': block.mechanic.name if block.mechanic_id else 'Nespecificat',
+                'car': 'Interval indisponibil',
+                'service': block.title,
+                'problem_description': block.notes,
+                'duration': '',
+                'estimated_price': '',
+                'booking_date': timezone.localtime(block.starts_at).strftime('%d.%m.%Y') if timezone.is_aware(block.starts_at) else block.starts_at.strftime('%d.%m.%Y'),
+                'booking_time': timezone.localtime(block.starts_at).strftime('%H:%M') if timezone.is_aware(block.starts_at) else block.starts_at.strftime('%H:%M'),
+                'needs_attention': False,
+                'attention_reasons': [],
             },
         })
 
@@ -1007,6 +1117,7 @@ def booking_detail(request, pk):
         return redirect('core:home')
 
     mechanics = booking.center.mechanics.order_by('name')
+    job_card, _ = ensure_job_card(booking, actor=request.user)
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -1031,6 +1142,118 @@ def booking_detail(request, pk):
             if booking.notes != previous_notes:
                 log_booking_activity(booking, 'note_updated', 'Nota interna a fost actualizata.', actor=request.user)
             messages.success(request, 'Nota interna a fost salvata.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'save_job_card':
+            form = JobCardForm(request.POST, instance=job_card, center=booking.center)
+            if form.is_valid():
+                previous_status = job_card.status
+                previous_mechanic_id = job_card.mechanic_id
+                job_card = form.save(commit=False)
+                job_card.booking = booking
+                job_card.center = booking.center
+                job_card.updated_by = request.user
+                if not job_card.created_by_id:
+                    job_card.created_by = request.user
+                job_card.save()
+                if previous_status != job_card.status:
+                    log_booking_activity(
+                        booking,
+                        'status_changed',
+                        f'Fisa lucrarii a fost actualizata in statusul {job_card.get_status_display()}.',
+                        actor=request.user,
+                        metadata={'old': previous_status, 'new': job_card.status, 'scope': 'job_card'},
+                    )
+                if previous_mechanic_id != job_card.mechanic_id:
+                    booking.mechanic = job_card.mechanic
+                    booking.save(update_fields=['mechanic', 'updated_at'])
+                sync_booking_from_job_card(job_card, actor=request.user)
+                messages.success(request, 'Fisa lucrarii a fost actualizata.')
+            else:
+                messages.error(request, '; '.join(form.errors.get_json_data(escape_html=False).keys()) or 'Formularul fisei lucrarii contine erori.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'add_operation':
+            form = JobOperationForm(request.POST)
+            if form.is_valid():
+                operation = form.save(commit=False)
+                operation.job_card = job_card
+                operation.position = job_card.operations.count() + 1
+                operation.save()
+                log_booking_activity(booking, 'note_updated', f'A fost adaugata operatiunea: {operation.title}.', actor=request.user)
+                messages.success(request, 'Operatiunea a fost adaugata in fisa lucrarii.')
+            else:
+                messages.error(request, 'Operatiunea nu a putut fi salvata.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'delete_operation':
+            operation = get_object_or_404(JobOperation, pk=request.POST.get('operation_id'), job_card=job_card)
+            title = operation.title
+            operation.delete()
+            log_booking_activity(booking, 'note_updated', f'Operatiunea "{title}" a fost eliminata din fisa lucrarii.', actor=request.user)
+            messages.info(request, 'Operatiunea a fost stearsa.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'add_recommendation':
+            form = JobRecommendationForm(request.POST)
+            if form.is_valid():
+                recommendation = form.save(commit=False)
+                recommendation.job_card = job_card
+                recommendation.save()
+                log_booking_activity(booking, 'note_updated', f'A fost adaugata recomandarea: {recommendation.title}.', actor=request.user)
+                messages.success(request, 'Recomandarea a fost salvata.')
+            else:
+                messages.error(request, 'Recomandarea nu a putut fi salvata.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'toggle_recommendation':
+            recommendation = get_object_or_404(JobRecommendation, pk=request.POST.get('recommendation_id'), job_card=job_card)
+            recommendation.is_resolved = not recommendation.is_resolved
+            recommendation.resolved_at = timezone.now() if recommendation.is_resolved else None
+            recommendation.save(update_fields=['is_resolved', 'resolved_at'])
+            log_booking_activity(
+                booking,
+                'note_updated',
+                f'Recomandarea "{recommendation.title}" a fost {"marcata ca rezolvata" if recommendation.is_resolved else "redeschisa"}.',
+                actor=request.user,
+            )
+            messages.info(request, 'Starea recomandarii a fost actualizata.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'add_job_part':
+            form = JobPartUsageForm(request.POST, center=booking.center)
+            if form.is_valid():
+                try:
+                    usage = create_job_part_usage(
+                        job_card,
+                        part=form.cleaned_data['part'],
+                        quantity=form.cleaned_data['quantity'],
+                        status=form.cleaned_data['status'],
+                        actor=request.user,
+                        note=form.cleaned_data['note'],
+                    )
+                except ValidationError as exc:
+                    messages.error(request, '; '.join(exc.messages))
+                else:
+                    if usage.status == JobPartUsage.STATUS_RESERVED and job_card.status not in {JobCard.STATUS_WAITING_PARTS, JobCard.STATUS_IN_PROGRESS}:
+                        job_card.status = JobCard.STATUS_APPROVED
+                        job_card.save(update_fields=['status', 'updated_at'])
+                    log_booking_activity(
+                        booking,
+                        'note_updated',
+                        f'A fost adaugata piesa "{usage.description}" x{usage.quantity} in fisa lucrarii.',
+                        actor=request.user,
+                    )
+                    messages.success(request, 'Piesa a fost inregistrata si stocul a fost actualizat.')
+            else:
+                messages.error(request, 'Piesa nu a putut fi adaugata.')
+            return redirect('services:booking_detail', pk=booking.pk)
+
+        if action == 'delete_job_part':
+            usage = get_object_or_404(JobPartUsage, pk=request.POST.get('usage_id'), job_card=job_card)
+            rollback_job_part_usage(usage, actor=request.user)
+            log_booking_activity(booking, 'note_updated', 'O piesa a fost scoasa din fisa lucrarii si stocul a fost refacut.', actor=request.user)
+            messages.info(request, 'Piesa a fost eliminata din fisa lucrarii.')
             return redirect('services:booking_detail', pk=booking.pk)
 
         if action == 'update_tags':
@@ -1091,6 +1314,10 @@ def booking_detail(request, pk):
             except ValidationError as exc:
                 messages.error(request, '; '.join(exc.messages))
                 return redirect('services:booking_detail', pk=booking.pk)
+            if job_card.mechanic_id != booking.mechanic_id:
+                job_card.mechanic = booking.mechanic
+                job_card.updated_by = request.user
+                job_card.save(update_fields=['mechanic', 'updated_by', 'updated_at'])
             log_booking_activity(
                 booking,
                 'mechanic_changed',
@@ -1161,6 +1388,17 @@ def booking_detail(request, pk):
             old_status = booking.status
             booking.status = new_status
             booking.save(update_fields=['status', 'updated_at'])
+            booking_to_job_status = {
+                Booking.STATUS_CONFIRMED: JobCard.STATUS_APPROVED,
+                Booking.STATUS_IN_PROGRESS: JobCard.STATUS_IN_PROGRESS,
+                Booking.STATUS_WAITING_PARTS: JobCard.STATUS_WAITING_PARTS,
+                Booking.STATUS_DONE: JobCard.STATUS_COMPLETED,
+            }
+            mapped_job_status = booking_to_job_status.get(new_status)
+            if mapped_job_status and job_card.status != mapped_job_status:
+                job_card.status = mapped_job_status
+                job_card.updated_by = request.user
+                job_card.save(update_fields=['status', 'updated_by', 'updated_at'])
             log_booking_activity(
                 booking,
                 'status_changed',
@@ -1174,21 +1412,29 @@ def booking_detail(request, pk):
             messages.success(request, f'Statusul programarii a fost actualizat la {booking.get_status_display()}.')
             return redirect('services:booking_detail', pk=booking.pk)
 
-    history_entries = Booking.objects.filter(
-        center=booking.center,
-        car_vin=booking.car_vin,
-        status=Booking.STATUS_DONE,
-    ).select_related('center').exclude(pk=booking.pk).order_by('-booking_date', '-booking_time', '-created_at')
+    dossier = build_vehicle_dossier(vin=booking.car_vin, plate=booking.car_plate)
+    history_entries = [item for item in dossier['history'] if item.pk != booking.pk and item.status == Booking.STATUS_DONE]
 
     from .models import MechanicWorkLog
     work_log = None
     if booking.mechanic:
         work_log = MechanicWorkLog.objects.filter(booking=booking, mechanic=booking.mechanic).prefetch_related('photos').first()
 
+    job_card_form = JobCardForm(instance=job_card, center=booking.center)
+    operation_form = JobOperationForm()
+    recommendation_form = JobRecommendationForm()
+    part_usage_form = JobPartUsageForm(center=booking.center)
+
     return render(request, 'services/booking_detail.html', {
         'booking': booking,
         'mechanics': mechanics,
         'history_entries': history_entries,
+        'dossier': dossier,
+        'job_card': job_card,
+        'job_card_form': job_card_form,
+        'operation_form': operation_form,
+        'recommendation_form': recommendation_form,
+        'part_usage_form': part_usage_form,
         'work_log': work_log,
         'activity_logs': booking.activity_logs.all()[:12],
         'checklist_items': booking.checklist_items.all(),
@@ -1812,3 +2058,222 @@ def booking_rar_pdf(request, pk):
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="fisa-interventie-{booking.pk}.pdf"'
     return response
+
+
+@login_required
+def parts_inventory(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+    centers = centers.order_by('name')
+
+    center_id = (request.GET.get('center') or request.POST.get('center_id') or '').strip()
+    selected_center = centers.filter(pk=center_id).first() if center_id else centers.first()
+    if selected_center is None:
+        messages.info(request, 'Adauga mai intai un service pentru a gestiona piesele.')
+        return redirect('services:register_service')
+
+    query = (request.GET.get('q') or '').strip()
+    selected_category = (request.GET.get('category') or '').strip()
+    selected_stock_status = (request.GET.get('stock_status') or '').strip()
+    selected_sort = (request.GET.get('sort') or 'name').strip() or 'name'
+
+    redirect_params = {'center': selected_center.pk}
+    if query:
+        redirect_params['q'] = query
+    if selected_category:
+        redirect_params['category'] = selected_category
+    if selected_stock_status:
+        redirect_params['stock_status'] = selected_stock_status
+    if selected_sort and selected_sort != 'name':
+        redirect_params['sort'] = selected_sort
+    redirect_url = f"{reverse('services:parts_inventory')}?{urlencode(redirect_params)}"
+
+    form = ServicePartForm()
+    movement_form = StockMovementForm()
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add_part':
+            form = ServicePartForm(request.POST)
+            if form.is_valid():
+                part = form.save(commit=False)
+                part.center = selected_center
+                part.save()
+                messages.success(request, 'Piesa a fost adaugata in stoc.')
+                return redirect(redirect_url)
+        elif action == 'update_stock':
+            part = get_object_or_404(ServicePart, pk=request.POST.get('part_id'), center__in=centers)
+            try:
+                stock = int(request.POST.get('stock', part.stock))
+                minimum_stock = int(request.POST.get('minimum_stock', part.minimum_stock))
+            except (TypeError, ValueError):
+                messages.error(request, 'Valorile pentru stoc trebuie sa fie numere intregi.')
+            else:
+                target_stock = max(stock, 0)
+                delta = target_stock - part.stock
+                if delta:
+                    try:
+                        apply_stock_movement(
+                            part,
+                            delta,
+                            StockMovement.TYPE_ADJUSTMENT,
+                            actor=request.user,
+                            note='Actualizare manuala din inventar',
+                        )
+                    except ValidationError as exc:
+                        messages.error(request, '; '.join(exc.messages))
+                        return redirect(redirect_url)
+                part.minimum_stock = max(minimum_stock, 0)
+                part.save(update_fields=['stock', 'minimum_stock', 'updated_at'])
+                messages.success(request, 'Stocul piesei a fost actualizat.')
+                return redirect(redirect_url)
+        elif action == 'adjust_stock':
+            part = get_object_or_404(ServicePart, pk=request.POST.get('part_id'), center__in=centers)
+            try:
+                delta = int(request.POST.get('delta', 0))
+            except (TypeError, ValueError):
+                messages.error(request, 'Actualizarea rapida a stocului a esuat.')
+            else:
+                try:
+                    apply_stock_movement(
+                        part,
+                        delta,
+                        StockMovement.TYPE_ADJUSTMENT,
+                        actor=request.user,
+                        note='Actualizare rapida din inventar',
+                    )
+                except ValidationError as exc:
+                    messages.error(request, '; '.join(exc.messages))
+                    return redirect(redirect_url)
+                messages.success(request, f'Stocul pentru {part.name} a fost actualizat la {part.stock} {part.unit}.')
+                return redirect(redirect_url)
+        elif action == 'record_movement':
+            movement_form = StockMovementForm(request.POST)
+            if movement_form.is_valid():
+                part = get_object_or_404(ServicePart, pk=movement_form.cleaned_data['part_id'], center__in=centers)
+                movement_type = movement_form.cleaned_data['movement_type']
+                quantity = movement_form.cleaned_data['quantity']
+                quantity_delta = quantity if movement_type in {StockMovement.TYPE_IN, StockMovement.TYPE_RELEASE, StockMovement.TYPE_ADJUSTMENT} else -quantity
+                try:
+                    apply_stock_movement(
+                        part,
+                        quantity_delta,
+                        movement_type,
+                        actor=request.user,
+                        note=movement_form.cleaned_data['note'],
+                    )
+                except ValidationError as exc:
+                    messages.error(request, '; '.join(exc.messages))
+                else:
+                    messages.success(request, f'Miscarea pentru {part.name} a fost inregistrata.')
+                    return redirect(redirect_url)
+        elif action == 'delete_part':
+            part = get_object_or_404(ServicePart, pk=request.POST.get('part_id'), center__in=centers)
+            part.delete()
+            messages.info(request, 'Piesa a fost stearsa din stoc.')
+            return redirect(redirect_url)
+
+    parts = ServicePart.objects.filter(center=selected_center)
+    if query:
+        parts = parts.filter(
+            Q(name__icontains=query)
+            | Q(part_number__icontains=query)
+            | Q(brand__icontains=query)
+            | Q(supplier__icontains=query)
+            | Q(shelf__icontains=query)
+            | Q(notes__icontains=query)
+        )
+    if selected_category:
+        parts = parts.filter(category=selected_category)
+    if selected_stock_status == 'out':
+        parts = parts.filter(stock=0)
+    elif selected_stock_status == 'low':
+        parts = parts.filter(stock__lte=models.F('minimum_stock')).exclude(stock=0)
+    elif selected_stock_status == 'ok':
+        parts = parts.filter(stock__gt=models.F('minimum_stock'))
+
+    sort_options = {
+        'name': ['name', 'brand'],
+        'stock_asc': ['stock', 'name'],
+        'stock_desc': ['-stock', 'name'],
+        'updated': ['-updated_at', 'name'],
+        'price_desc': ['-sale_price', '-price', 'name'],
+        'category': ['category', 'name'],
+    }
+    parts = parts.order_by(*sort_options.get(selected_sort, ['name']))
+    page_obj = _paginate_queryset(request, parts, per_page=18, page_param='stock_page')
+
+    parts_stats = {
+        'total_parts': parts.count(),
+        'low_stock_count': parts.filter(stock__lte=models.F('minimum_stock')).count(),
+        'out_of_stock_count': parts.filter(stock=0).count(),
+        'estimated_stock_value': parts.aggregate(
+            total=Sum(
+                models.F('stock') * models.functions.Coalesce('purchase_price', 'price'),
+                output_field=models.DecimalField(max_digits=14, decimal_places=2),
+            )
+        )['total'] or Decimal('0.00'),
+    }
+    recent_movements = StockMovement.objects.filter(part__center=selected_center).select_related(
+        'part', 'job_card', 'booking', 'actor'
+    ).order_by('-created_at')[:12]
+
+    return render(request, 'services/parts_inventory.html', {
+        'centers': centers,
+        'selected_center': selected_center,
+        'parts': page_obj.object_list,
+        'page_obj': page_obj,
+        'form': form,
+        'movement_form': movement_form,
+        'recent_movements': recent_movements,
+        'low_stock_count': parts_stats['low_stock_count'],
+        'parts_stats': parts_stats,
+        'selected_query': query,
+        'selected_category': selected_category,
+        'selected_stock_status': selected_stock_status,
+        'selected_sort': selected_sort,
+        'category_filters': ServicePart.CATEGORY_FILTERS,
+    })
+
+
+@login_required
+def service_car_history(request):
+    centers = _require_service_owner(request)
+    if centers is None:
+        return redirect('services:register_service')
+
+    search = (request.GET.get('q') or '').strip()
+    bookings = Booking.objects.filter(center__in=centers).exclude(status=Booking.STATUS_CANCELLED).select_related(
+        'center', 'mechanic'
+    ).order_by('-booking_date', '-booking_time', '-created_at')
+    if search:
+        bookings = bookings.filter(
+            Q(car_plate__icontains=search)
+            | Q(car_vin__icontains=search)
+            | Q(car_brand__icontains=search)
+            | Q(car_model__icontains=search)
+            | Q(client_name__icontains=search)
+            | Q(client_phone__icontains=search)
+        )
+
+    vehicle_map = {}
+    for booking in bookings:
+        key = booking.car_vin or booking.car_plate
+        if not key:
+            continue
+        if key not in vehicle_map:
+            dossier = build_vehicle_dossier(vin=booking.car_vin, plate=booking.car_plate)
+            vehicle_map[key] = {
+                'booking': booking,
+                'dossier': dossier,
+                'summary': dossier['summary'],
+                'open_recommendations': dossier['open_recommendations'][:3],
+            }
+
+    vehicles = list(vehicle_map.values())
+    return render(request, 'services/car_history.html', {
+        'vehicles': vehicles,
+        'centers': centers,
+        'search': search,
+    })

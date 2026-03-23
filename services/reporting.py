@@ -12,7 +12,8 @@ from django.utils import timezone
 
 from bookings.models import Booking
 from invoices.models import Invoice, InvoiceLine
-from services.models import ServicePart
+from services.models import ServiceMechanic, ServicePart
+from services.business import bookings_with_tag
 
 REPORT_CHOICES = [
     ('revenue', 'Raport venituri'),
@@ -145,14 +146,41 @@ def build_dashboard_metrics(centers):
     invoices = Invoice.objects.filter(center__in=centers)
     parts = ServicePart.objects.filter(center__in=centers)
 
+    # Programări întârziate - confirmate sau în lucru dar cu dată trecută
+    overdue_bookings = bookings.filter(
+        booking_date__lt=today,
+        status__in=[Booking.STATUS_CONFIRMED, Booking.STATUS_IN_PROGRESS]
+    ).count()
+
+    # Venit estimat - sumă estimated_price din programări active
+    estimated_revenue = bookings.filter(
+        status__in=[
+            Booking.STATUS_CONFIRMED,
+            Booking.STATUS_IN_PROGRESS,
+            Booking.STATUS_WAITING_PARTS,
+            Booking.STATUS_QUOTED,
+        ]
+    ).aggregate(
+        total=Coalesce(Sum('estimated_price'), Value(Decimal('0.00')), output_field=DecimalField(max_digits=12, decimal_places=2))
+    )['total']
+
+    # Clienți activi - clienți unici cu programări în ultimele 6 luni
+    six_months_ago = today - timedelta(days=180)
+    active_clients = bookings.filter(
+        booking_date__gte=six_months_ago
+    ).values('client_email').exclude(client_email='').distinct().count()
+
     kpis = {
         'appointments_today': bookings.filter(booking_date=today).count(),
         'appointments_pending': bookings.filter(status=Booking.STATUS_PENDING).count(),
-        'cars_in_work': bookings.filter(status=Booking.STATUS_IN_PROGRESS).count(),
+        'cars_in_work': bookings.filter(status__in=[Booking.STATUS_IN_PROGRESS, Booking.STATUS_WAITING_PARTS]).count(),
+        'overdue_bookings': overdue_bookings,
         'completed_this_month': bookings.filter(status=Booking.STATUS_DONE, booking_date__range=(month_start, today)).count(),
         'revenue_this_month': invoices.filter(status=Invoice.STATUS_FINAL, issue_date__range=(month_start, today)).aggregate(
             total=Coalesce(Sum('total'), Value(Decimal('0.00')), output_field=DecimalField(max_digits=12, decimal_places=2))
         )['total'],
+        'estimated_revenue': estimated_revenue,
+        'active_clients': active_clients,
         'low_stock_count': parts.filter(stock__lte=F('minimum_stock')).count(),
     }
 
@@ -163,7 +191,8 @@ def build_dashboard_metrics(centers):
     )
 
     attention = []
-    for booking in bookings.filter(status=Booking.STATUS_PENDING).order_by('-created_at')[:3]:
+    # Programări noi neconfirmate
+    for booking in bookings.filter(status=Booking.STATUS_PENDING).order_by('-created_at')[:2]:
         attention.append({
             'title': 'Programare nouă neconfirmată',
             'description': f'{booking.client_name} · {booking.car_brand} {booking.car_model}',
@@ -172,34 +201,67 @@ def build_dashboard_metrics(centers):
             'icon': 'bi-hourglass-split',
             'url': f'/services/dashboard/programari/{booking.pk}/',
         })
+    
+    # Lucrări întârziate
     overdue_qs = bookings.filter(
         booking_date__lte=today,
         status__in=[Booking.STATUS_CONFIRMED, Booking.STATUS_IN_PROGRESS],
     ).order_by('booking_date', 'booking_time')
-    for booking in overdue_qs[:3]:
+    for booking in overdue_qs[:2]:
         attention.append({
-            'title': 'Lucrare întârziată sau nerezolvată',
+            'title': 'Lucrare întârziată',
             'description': f'{booking.client_name} · {booking.car_brand} {booking.car_model}',
-            'meta': booking.booking_date.strftime('%d.%m.%Y'),
+            'meta': f'Programat {booking.booking_date.strftime("%d.%m.%Y")}',
             'badge': 'danger',
             'icon': 'bi-exclamation-triangle',
             'url': f'/services/dashboard/programari/{booking.pk}/',
         })
-    for part in parts.filter(stock__lte=F('minimum_stock')).order_by('stock', 'name')[:3]:
+    
+    # Lucrări blocate
+    blocked_bookings = bookings.order_by('-updated_at')
+    blocked_bookings = bookings_with_tag(blocked_bookings, Booking.TAG_BLOCKED)[:2]
+    for booking in blocked_bookings:
         attention.append({
-            'title': 'Stoc critic piese',
-            'description': f'{part.name} · {part.stock} {part.unit} disponibile',
+            'title': 'Lucrare blocată',
+            'description': f'{booking.client_name} · {booking.car_brand} {booking.car_model}',
+            'meta': 'Marcată ca blocată',
+            'badge': 'danger',
+            'icon': 'bi-x-circle',
+            'url': f'/services/dashboard/programari/{booking.pk}/',
+        })
+    
+    # Așteaptă piese
+    waiting_parts = bookings.filter(status=Booking.STATUS_WAITING_PARTS).order_by('-updated_at')[:2]
+    if not waiting_parts:
+        waiting_parts = bookings_with_tag(bookings.order_by('-updated_at'), Booking.TAG_WAITING_PART)[:2]
+    for booking in waiting_parts:
+        attention.append({
+            'title': 'Așteaptă piesă',
+            'description': f'{booking.client_name} · {booking.car_brand} {booking.car_model}',
+            'meta': 'Lipsă componentă necesară',
+            'badge': 'warning text-dark',
+            'icon': 'bi-tools',
+            'url': f'/services/dashboard/programari/{booking.pk}/',
+        })
+    
+    # Stoc critic
+    for part in parts.filter(stock__lte=F('minimum_stock')).order_by('stock', 'name')[:2]:
+        attention.append({
+            'title': 'Stoc minim atins',
+            'description': f'{part.name} · {part.stock} {part.unit} rămase',
             'meta': part.center.name,
             'badge': 'warning text-dark' if part.stock > 0 else 'danger',
             'icon': 'bi-box-seam',
             'url': '/services/dashboard/piese/',
         })
-    uninvoiced_done = bookings.filter(status=Booking.STATUS_DONE, invoices__isnull=True).order_by('-booking_date')[:3]
+    
+    # Lucrări finalizate fără factură
+    uninvoiced_done = bookings.filter(status=Booking.STATUS_DONE, invoices__isnull=True).order_by('-booking_date')[:2]
     for booking in uninvoiced_done:
         attention.append({
-            'title': 'Lucrare finalizată fără factură',
+            'title': 'Fără factură',
             'description': f'{booking.client_name} · {booking.car_brand} {booking.car_model}',
-            'meta': booking.booking_date.strftime('%d.%m.%Y'),
+            'meta': f'Finalizată {booking.booking_date.strftime("%d.%m.%Y")}',
             'badge': 'info text-dark',
             'icon': 'bi-receipt',
             'url': f'/invoices/creare/?booking={booking.pk}',
@@ -217,14 +279,17 @@ def build_dashboard_metrics(centers):
     ]
 
     categories = [
-        {'title': 'Programări', 'description': 'Calendar, listă completă și management statusuri.', 'icon': 'bi-calendar-check', 'url': '/services/dashboard/programari/', 'count': bookings.exclude(status=Booking.STATUS_CANCELLED).count()},
-        {'title': 'Clienți', 'description': 'Acces rapid la istoricul clienților și contact.', 'icon': 'bi-people', 'url': '/invoices/clienti/', 'count': bookings.values('client_email').exclude(client_email='').distinct().count()},
-        {'title': 'Mașini', 'description': 'Istoric mașini și intervenții efectuate.', 'icon': 'bi-car-front', 'url': '/services/dashboard/istoric-masini/', 'count': bookings.values('car_plate').distinct().count()},
-        {'title': 'Lucrări / Reparații', 'description': 'Urmărește lucrările în curs și finalizate.', 'icon': 'bi-tools', 'url': '/services/dashboard/programari/?status=in_progress', 'count': bookings.filter(status__in=[Booking.STATUS_IN_PROGRESS, Booking.STATUS_DONE]).count()},
-        {'title': 'Piese / Stoc', 'description': 'Situația stocului și alertele critice.', 'icon': 'bi-box-seam', 'url': '/services/dashboard/piese/', 'count': parts.count()},
-        {'title': 'Facturi / Documente', 'description': 'Facturi draft, finalizate și emitere rapidă.', 'icon': 'bi-receipt', 'url': '/invoices/creare/', 'count': invoices.count()},
-        {'title': 'Rapoarte', 'description': 'Indicatori financiari și operaționali pentru service.', 'icon': 'bi-graph-up-arrow', 'url': '/services/dashboard/rapoarte/', 'count': None},
-        {'title': 'Setări service', 'description': 'Date service, profil, galerii și configurări.', 'icon': 'bi-gear', 'url': f'/services/dashboard/service/{centers.first().pk}/' if centers else '#', 'count': centers.count()},
+        {'title': 'Calendar', 'description': 'Vizualizare programări pe zi/săptămână/lună.', 'icon': 'bi-calendar3', 'url': '/services/dashboard/calendar/', 'count': bookings.filter(booking_date__gte=today).exclude(status=Booking.STATUS_CANCELLED).count()},
+        {'title': 'Programări', 'description': 'Toate programările și management statusuri.', 'icon': 'bi-calendar-check', 'url': '/services/dashboard/programari/', 'count': bookings.exclude(status=Booking.STATUS_CANCELLED).count()},
+        {'title': 'Clienți', 'description': 'Istoric clienți și date de contact.', 'icon': 'bi-people', 'url': '/invoices/clienti/', 'count': active_clients},
+        {'title': 'Mașini', 'description': 'Istoric tehnic și intervenții pe mașini.', 'icon': 'bi-car-front', 'url': '/services/dashboard/istoric-masini/', 'count': bookings.values('car_plate').distinct().count()},
+        {'title': 'Lucrări', 'description': 'Fișe lucrări și status intervenții.', 'icon': 'bi-tools', 'url': '/services/dashboard/programari/?status=in_progress', 'count': bookings.filter(status__in=[Booking.STATUS_IN_PROGRESS, Booking.STATUS_DONE]).count()},
+        {'title': 'Piese / Stoc', 'description': 'Inventar, stoc și alerte aprovizionare.', 'icon': 'bi-box-seam', 'url': '/services/dashboard/piese/', 'count': parts.count()},
+        {'title': 'Facturi / Devize', 'description': 'Documente financiare și oferte.', 'icon': 'bi-receipt', 'url': '/invoices/creare/', 'count': invoices.count()},
+        {'title': 'Rapoarte', 'description': 'Indicatori și statistici service.', 'icon': 'bi-graph-up-arrow', 'url': '/services/dashboard/rapoarte/', 'count': None},
+        {'title': 'Setări service', 'description': 'Profil, galerii și configurări.', 'icon': 'bi-gear', 'url': f'/services/dashboard/service/{centers.first().pk}/' if centers else '#', 'count': None},
+        {'title': 'Mecanici / echipă', 'description': 'Gestionare personal și alocări.', 'icon': 'bi-person-badge', 'url': '/services/dashboard/mechanici/', 'count': ServiceMechanic.objects.filter(center__in=centers).count()},
+        {'title': 'Notificări', 'description': 'Mesaje și alerte importante.', 'icon': 'bi-bell', 'url': '/services/dashboard/notificari/', 'count': None},
     ]
 
     return {

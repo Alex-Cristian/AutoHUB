@@ -187,11 +187,15 @@ def my_bookings(request):
         'center', 'center__category', 'service_item', 'garage', 'mechanic'
     ).prefetch_related(
         'attachments',
+        'job_card__recommendations',
+        'job_card__part_usages__part',
+        'invoices',
     ).order_by('-created_at')
 
     booking_list = list(bookings)
     for b in booking_list:
         b.mechanic_work_log = None
+        b.job_card_obj = None
         if b.mechanic_id:
             try:
                 b.mechanic_work_log = MechanicWorkLog.objects.filter(
@@ -199,6 +203,10 @@ def my_bookings(request):
                 ).prefetch_related('photos').first()
             except Exception:
                 pass
+        try:
+            b.job_card_obj = b.job_card
+        except Exception:
+            b.job_card_obj = None
 
     return render(request, 'bookings/my_bookings.html', {'bookings': booking_list})
 

@@ -1,195 +1,407 @@
-# 🚗 AutoEMG — Marketplace Service Auto
+# AutoEMG / AutoHub
 
-Marketplace Django pentru service-uri auto din România.
+Platformă Django pentru relația dintre clienți și service-uri auto: căutare service, programări online, calendar operațional, fișe de lucru, dosar digital al mașinii, inventar piese, documente și notificări.
 
-## Stack
-- **Backend**: Django 5, Python 3.11+
-- **DB**: SQLite (dev)
-- **Frontend**: Bootstrap 5 + Django Templates
-- **Design**: Temă dark industrială, roșu/negru
+## Ce problemă rezolvă
 
-## Structură proiect
+AutoHub transformă interacțiunea clasică dintre client și service într-un flux clar și urmărit:
 
-```
-autohub/
-├── autohub/           # Settings, URLs principale
-├── core/              # Landing page, context processors
-├── accounts/          # Auth: login, register, profil
-├── services/          # Models + views service-uri, categorii, API JSON
-│   ├── management/
-│   │   └── commands/
-│   │       └── seed_autohub.py   ← seed data
-│   ├── models.py      ← ServiceCategory, ServiceCenter, ServiceItem, Review, Favorite
-│   ├── views.py       ← list, detail, categories, favorite toggle
-│   ├── api_views.py   ← GET /api/services/ (JsonResponse)
-│   └── admin.py       ← Admin complet cu inline-uri
-├── bookings/          # Programări
-│   ├── models.py      ← Booking cu validare dată
-│   ├── forms.py       ← BookingForm cu validări
-│   ├── views.py       ← create, success, my_bookings
-│   └── admin.py       ← Admin cu status badge + actions
-└── templates/
-    ├── base.html              ← Layout + navbar
-    ├── core/home.html         ← Landing page
-    ├── services/
-    │   ├── categories.html    ← Grid 6 categorii
-    │   ├── service_list.html  ← Filtre + listare + map placeholder
-    │   └── service_detail.html← Profil + servicii + reviews
-    ├── bookings/
-    │   ├── booking_create.html← Form programare
-    │   ├── booking_success.html
-    │   └── my_bookings.html
-    └── accounts/
-        ├── login.html
-        ├── register.html
-        └── profile.html
-```
+- clientul găsește un service potrivit, rezervă online și vede statusul lucrării;
+- service-ul își organizează programările, lucrările, mecanicii, piesele și documentele dintr-un singur loc;
+- istoricul mașinii rămâne centralizat și util pe termen lung.
 
-## E) Instalare și rulare
+## Pentru cine este
 
-### 1. Clonare / dezarhivare proiect
+- clienți care vor programare rapidă, transparență și istoric tehnic clar;
+- service-uri auto care au nevoie de calendar, workflow operațional și evidență simplă;
+- dezvoltatori care vor o bază reală pentru un marketplace / CRM auto vertical.
+
+## Funcționalități principale
+
+### Client
+
+- înregistrare, autentificare, verificare email și acceptare documente legale;
+- căutare service-uri cu filtre, rating și pagini publice detaliate;
+- programare online cu alegere interval și durată estimată;
+- listă „Programările mele” cu status, cost estimat/final, recomandări și fișiere;
+- secțiune „Mașinile mele” și istoric auto;
+- remindere pentru acte auto și revizii;
+- recenzii și favorite.
+
+### Service
+
+- dashboard operațional cu programările zilei, lucrări active și alerte;
+- calendar pe zi / săptămână / lună cu filtre și intervale blocate;
+- detaliu de programare extins cu timeline, fișă de lucru și jurnal;
+- fișe de lucru cu operațiuni, recomandări, costuri și piese consumate;
+- inventar piese cu stoc minim, mișcări de stoc și consum pe lucrare;
+- profiluri clienți și dosar digital pe mașină;
+- facturi și documente legate de programare și lucrare;
+- notificări interne, email și SMS unde integrarea externă este configurată.
+
+### Capabilități pregătite pentru integrare externă
+
+- Cloudinary pentru media;
+- Twilio pentru SMS;
+- OpenAI pentru fluxuri de asistență AI / scanare documente;
+- Render pentru deploy web + cron jobs.
+
+## Fluxul principal întărit în proiect
+
+1. Clientul caută service-ul și trimite programarea.
+2. Service-ul confirmă, ofertează sau reprogramează.
+3. Programarea intră în calendarul operațional.
+4. Din programare se creează fișa lucrării.
+5. Service-ul adaugă operațiuni, recomandări, piese și costuri.
+6. Clientul vede statusurile și informațiile relevante.
+7. Lucrarea finalizată intră în dosarul auto și poate genera factură.
+
+## Module și arhitectură
+
+### Aplicații Django
+
+- `core`:
+  pagini generale, context global, middleware și servicii comune
+- `accounts`:
+  auth, profil utilizator, mașini, acte auto, verificare email
+- `services`:
+  service-uri, dashboard, calendar, mecanici, review-uri, favorite, inventar, job cards
+- `bookings`:
+  programări, statusuri, atașamente, activitate și remindere
+- `invoices`:
+  facturi, linii de factură și legătura cu programările
+
+### Zone importante în cod
+
+- `services/business.py`:
+  logică de business pentru fișe de lucru, consum piese și dosar auto
+- `services/reporting.py`:
+  dashboard și rapoarte
+- `templates/services/`:
+  interfața service-ului
+- `templates/bookings/`:
+  experiența clientului pentru programări
+- `services/management/commands/seed_autohub.py`:
+  seed demo pentru prezentare și testare
+
+## Stack tehnologic
+
+- Python 3.11+
+- Django 5.2
+- Django Templates + Bootstrap 5
+- SQLite în local, `dj-database-url` pentru Postgres în deploy
+- WhiteNoise pentru fișiere statice
+- Cloudinary pentru media
+- WeasyPrint / ReportLab pentru PDF-uri
+- Twilio pentru SMS
+- OpenAI SDK pentru fluxuri AI
+- Render pentru hosting și joburi cron
+
+## Cerințe
+
+- Python 3.11 sau mai nou
+- pip
+- mediu virtual recomandat
+
+## Instalare locală
+
+### 1. Clonează proiectul
 
 ```bash
-cd autohub/
+git clone <repo-url>
+cd autohub
 ```
 
-### 2. Creare mediu virtual
+### 2. Creează și activează mediul virtual
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate        # Linux/Mac
-# SAU
-venv\Scripts\activate           # Windows
+python -m venv .venv
 ```
 
-### 3. Instalare dependențe
+Windows:
+
+```bash
+.venv\Scripts\activate
+```
+
+macOS / Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+### 3. Instalează dependențele
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Migrații
+### 4. Configurează fișierul `.env`
+
+Creează un fișier `.env` în rădăcina proiectului.
+
+Exemplu minim pentru local:
+
+```env
+DJANGO_SECRET_KEY=django-insecure-change-me
+DEBUG=True
+ALLOWED_HOSTS=127.0.0.1,localhost
+CSRF_TRUSTED_ORIGINS=http://127.0.0.1:8000,http://localhost:8000
+USE_CLOUDINARY=False
+SITE_BASE_URL=http://127.0.0.1:8000
+DEFAULT_FROM_EMAIL=AutoEMG <admin@autoemg.local>
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+TWILIO_SMS_ENABLED=False
+LEGAL_DOCUMENTS_VERSION=2026-03-19
+```
+
+### 5. Rulează migrațiile
 
 ```bash
-python manage.py makemigrations core accounts services bookings
 python manage.py migrate
 ```
 
-### 5. Seed data (30+ service-uri, 6 categorii, recenzii mock)
+### 6. Creează un superuser
 
 ```bash
-python manage.py seed_autohub
+python manage.py createsuperuser
 ```
 
-Output așteptat:
-```
-✅ Seed finalizat cu succes!
-  📂 Categorii:  6
-  🏢 Service-uri: 30
-  🔧 Servicii:   ~220
-  ⭐ Recenzii:   ~60
-  👤 Utilizatori: 9
-```
-
-### 6. Pornire server
+### 7. Pornește serverul
 
 ```bash
 python manage.py runserver
 ```
 
-**Aplicație**: http://127.0.0.1:8000/  
-**Admin**: http://127.0.0.1:8000/admin/ — `admin / admin123`
+Aplicația va fi disponibilă la `http://127.0.0.1:8000/`.
 
----
+## Seed / date demo
 
-## Rute principale
+Comanda de seed creează date credibile pentru prezentare și testare:
 
-| URL | Descriere |
-|-----|-----------|
-| `/` | Landing page |
-| `/services/` | Listare cu filtre + sortare |
-| `/services/categorii/` | Grid categorii |
-| `/services/<slug>/` | Detalii service |
-| `/bookings/programare/<slug>/` | Form programare |
-| `/bookings/programarile-mele/` | Programările mele (auth) |
-| `/accounts/login/` | Autentificare |
-| `/accounts/register/` | Înregistrare |
-| `/accounts/profil/` | Profil + favorite |
-| `/api/services/` | API JSON filtrare |
-| `/admin/` | Django Admin |
+- categorii și service-uri în mai multe orașe;
+- garaje și servicii oferite;
+- mecanici;
+- piese în stoc;
+- programări cu statusuri variate;
+- fișe de lucru, recomandări și consum de piese;
+- facturi demo;
+- recenzii și imagini;
+- conturi demo pentru client și service.
 
-## API JSON
+Rulare:
 
-```
-GET /api/services/?city=cluj-napoca&category=mecanica&min_rating=4&price_min=50&price_max=500&limit=20
+```bash
+python manage.py seed_autohub
 ```
 
-Răspuns:
-```json
-{
-  "count": 3,
-  "results": [
-    {
-      "id": 8,
-      "name": "AutoService Cluj Premium",
-      "city": "cluj-napoca",
-      "city_display": "Cluj-Napoca",
-      "address": "Calea Turzii 178",
-      "phone": "0264 100 200",
-      "category": "Mecanică",
-      "category_slug": "mecanica",
-      "rating": 4.7,
-      "review_count": 3,
-      "price_range": "80–1800 RON",
-      "availability": "Lun-Vin: 08:00-18:00, Sam: 09:00-14:00",
-      "is_featured": true,
-      "url": "/services/autoservice-cluj-premium/"
-    }
-  ]
-}
+La final vei avea și conturi demo utile:
+
+- `client_demo / client1234`
+- `service_demo / service1234`
+- `admin / admin123` dacă nu exista deja
+
+Notă:
+seed-ul recreează datele demo operaționale. Nu îl rula pe o bază de producție.
+
+## Comenzi utile
+
+```bash
+python manage.py test
+python manage.py check
+python manage.py send_booking_reminders
+python manage.py notify_stale_pending_bookings
+python manage.py send_expiry_email_reminders
 ```
 
-## Filtre disponibile (query params)
+## Media și Cloudinary
 
-| Param | Descriere | Exemplu |
-|-------|-----------|---------|
-| `q` | Căutare text | `q=revizie` |
-| `city` | Slug oraș | `city=bucuresti` |
-| `category` | Slug categorie | `category=detailing` |
-| `min_rating` | Rating minim | `min_rating=4` |
-| `price_min` | Preț minim | `price_min=100` |
-| `price_max` | Preț maxim | `price_max=500` |
-| `sort` | Sortare | `sort=rating` \| `price_asc` \| `price_desc` \| `reviews` \| `name` |
+Aplicația poate funcționa în două moduri:
 
-## Categorii disponibile
+- local, cu `FileSystemStorage` dacă `USE_CLOUDINARY=False`;
+- cloud, cu Cloudinary dacă `USE_CLOUDINARY=True` și cheile sunt setate.
 
-| Slug | Categorie |
-|------|-----------|
-| `detailing` | ✨ Detailing |
-| `mecanica` | 🔧 Mecanică |
-| `electrica` | ⚡ Electrică |
-| `tractari` | 🚛 Tractări |
-| `vulcanizari` | 🛞 Vulcanizări |
-| `tinichigerie` | 🔨 Tinichigerie / Vopsitorie |
+Variabile relevante:
 
-## Orașe disponibile
+```env
+USE_CLOUDINARY=True
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+```
 
-București, Cluj-Napoca, Timișoara, Iași, Brașov, Constanța, Craiova, Sibiu, Ploiești
+## Email și SMS
 
-## Funcționalități implementate
+### Email
 
-- [x] Landing page cu hero, search, categorii, "Cum funcționează"
-- [x] Pagina categorii (grid 6)
-- [x] Listare service-uri cu filtre server-side (categorie, oraș, rating, preț)
-- [x] Sortare (rating, recenzii, preț asc/desc, nume)
-- [x] Detalii service: profil, servicii + prețuri, rating breakdown, reviews
-- [x] Buton Favorite (toggle, doar pentru autentificați)
-- [x] Formular programare cu validare (dată nu în trecut, an mașină valid)
-- [x] Programare legată de cont sau guest
-- [x] "Programările mele" pentru utilizatori autentificați
-- [x] Auth complet: login, register, logout, profil
-- [x] Profil cu programări recente și favorite
-- [x] API JSON `/api/services/` cu filtre
-- [x] Admin complet: inline ServiceItem, search, filtre, actions
-- [x] Seed command idempotent cu 30 service-uri
-- [x] Map placeholder (pregătit pentru Google Maps / Leaflet)
+Pentru local poți folosi backend-ul de consolă.
+
+Pentru SMTP:
+
+```env
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=
+EMAIL_HOST_PASSWORD=
+EMAIL_USE_TLS=True
+EMAIL_USE_SSL=False
+EMAIL_TIMEOUT=20
+DEFAULT_FROM_EMAIL=AutoEMG <no-reply@autoemg.com>
+```
+
+### SMS / Twilio
+
+```env
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+TWILIO_SMS_ENABLED=True
+```
+
+Dacă aceste variabile nu sunt configurate, proiectul rămâne funcțional și folosește fallback-ul disponibil în interfață / email.
+
+## AI și scanare documente
+
+Proiectul are suport pentru fluxuri AI asistate, nu pentru salvare oarbă:
+
+- utilizatorul încarcă documentul;
+- sistemul propune date extrase;
+- utilizatorul confirmă sau corectează;
+- abia apoi datele se salvează.
+
+Variabile utile:
+
+```env
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+Dacă cheia nu este setată, proiectul trebuie considerat „pregătit pentru integrare”, nu complet activ pe partea AI.
+
+## Deploy pe Render
+
+Fișierul [`render.yaml`](/c:/Users/alexu/Desktop/autohub/render.yaml) include:
+
+- un serviciu web pentru aplicația Django;
+- un cron pentru reminderele de programări.
+
+Flux de bază:
+
+1. conectezi repository-ul în Render;
+2. setezi variabilele de mediu;
+3. Render rulează `pip install`, `collectstatic` și `migrate`;
+4. aplicația pornește cu `gunicorn autohub.wsgi:application`.
+
+Variabile importante pentru deploy:
+
+- `DJANGO_SECRET_KEY`
+- `DEBUG=False`
+- `ALLOWED_HOSTS`
+- `CSRF_TRUSTED_ORIGINS`
+- `USE_CLOUDINARY`
+- `CLOUDINARY_*`
+- `EMAIL_*`
+- `TWILIO_*`
+- `SITE_BASE_URL`
+
+## Structura proiectului
+
+```text
+autohub/
+├── accounts/
+├── autohub/
+├── bookings/
+├── core/
+├── invoices/
+├── services/
+├── templates/
+├── static/
+├── media/
+├── requirements.txt
+├── render.yaml
+└── manage.py
+```
+
+## Roluri și permisiuni
+
+### Client
+
+- poate vedea doar programările, mașinile și documentele proprii;
+- poate accepta sau refuza ofertele primite;
+- poate consulta istoricul auto și documentele asociate.
+
+### Service owner
+
+- vede doar datele service-ului pe care îl administrează;
+- gestionează programări, calendar, mecanici, piese, lucrări și documente;
+- poate actualiza statusuri și comunica cu clientul.
+
+### Admin
+
+- are acces complet prin Django Admin și prin fluxurile interne unde este permis explicit.
+
+## Stare actuală a produsului
+
+Zone mature în proiect:
+
+- fluxul principal programare -> lucrare -> istoric;
+- dashboard service și calendar operațional;
+- inventar și mișcări de stoc;
+- dosar auto și fișe de lucru;
+- seed demo pentru prezentare;
+- suită de teste pentru zonele critice existente.
+
+## Known limitations
+
+- integrarea AI depinde de chei externe și de configurarea providerului;
+- SMS-urile reale necesită cont Twilio activ;
+- unele documente financiare sunt potrivite pentru demo / flux intern, dar pot necesita adaptări fiscale înainte de producție;
+- proiectul folosește încă template-uri Django clasice, nu un frontend SPA;
+- seed-ul este orientat spre demo și testare, nu spre migrare de date reale.
+
+## Future improvements
+
+- workflow complet de ofertă / deviz separat de factură;
+- upload și management mai avansat pentru documente fiscale;
+- audit trail extins pe toate entitățile critice;
+- rapoarte financiare și operaționale mai profunde;
+- permisiuni mai granulare pentru echipă / mecanici / recepție;
+- integrare cu furnizori de piese și disponibilitate în timp real.
+
+## Roadmap scurt
+
+- consolidarea completă a fluxului ofertă -> aprobare client -> facturare;
+- extinderea modulelor de CRM service;
+- îmbunătățirea validărilor pentru scanare documente și review-uri cu poze;
+- mai multe automatizări pentru notificări și remindere.
+
+## Capturi de ecran
+
+Poți adăuga ușor imagini în această secțiune, de exemplu:
+
+```md
+![Dashboard service](docs/screenshots/dashboard-service.png)
+![Calendar operațional](docs/screenshots/calendar-service.png)
+![Programările clientului](docs/screenshots/client-bookings.png)
+```
+
+## Verificare rapidă după setup
+
+După instalare, un flux minim recomandat este:
+
+1. rulezi migrațiile;
+2. rulezi `python manage.py seed_autohub`;
+3. pornești serverul;
+4. intri cu `service_demo / service1234`;
+5. verifici dashboard-ul, calendarul, piesele și programările;
+6. intri cu `client_demo / client1234` și verifici istoricul clientului.
+
+## Licență / utilizare
+
+Adaugă aici politica de licențiere a proiectului dacă vrei să îl publici sau să îl distribui.

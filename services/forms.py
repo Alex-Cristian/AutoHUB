@@ -6,7 +6,21 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from decimal import Decimal, ROUND_HALF_UP
 
-from .models import ServiceCenter, ServiceCategory, ServiceGarage, ServiceImage, ServiceMechanic, Review, ServicePart
+from .models import (
+    JobCard,
+    JobOperation,
+    JobPartUsage,
+    JobRecommendation,
+    ServiceAvailabilityBlock,
+    ServiceCenter,
+    ServiceCategory,
+    ServiceGarage,
+    ServiceImage,
+    ServiceMechanic,
+    Review,
+    ServicePart,
+    StockMovement,
+)
 from .reporting import REPORT_CHOICES, PRESET_CHOICES, MONTH_CHOICES
 from bookings.forms import BookingForm
 from bookings.models import Booking
@@ -535,18 +549,25 @@ class ServiceOwnerBookingForm(BookingForm):
 class ServicePartForm(forms.ModelForm):
     class Meta:
         model = ServicePart
-        fields = ['name', 'part_number', 'category', 'brand', 'supplier', 'price', 'stock', 'minimum_stock', 'unit', 'shelf', 'notes']
+        fields = [
+            'name', 'part_number', 'category', 'brand', 'supplier',
+            'purchase_price', 'sale_price', 'price',
+            'stock', 'minimum_stock', 'unit', 'shelf', 'notes', 'is_active',
+        ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Filtru ulei'}),
             'part_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Cod piesă (opțional)'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
             'brand': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Bosch, Mann, Brembo'}),
             'supplier': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Inter Cars'}),
+            'purchase_price': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01', 'placeholder': 'Ex: 60.00'}),
+            'sale_price': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01', 'placeholder': 'Ex: 89.90'}),
             'price': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01', 'placeholder': 'Ex: 89.90'}),
             'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'minimum_stock': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'unit': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'buc'}),
             'shelf': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Raft A3'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Detalii opționale'}),
         }
 
@@ -560,10 +581,18 @@ class ServicePartForm(forms.ModelForm):
         cleaned = super().clean()
         stock = cleaned.get('stock')
         minimum_stock = cleaned.get('minimum_stock')
+        purchase_price = cleaned.get('purchase_price')
+        sale_price = cleaned.get('sale_price')
+        price = cleaned.get('price')
         if stock is not None and stock < 0:
             self.add_error('stock', 'Stocul nu poate fi negativ.')
         if minimum_stock is not None and minimum_stock < 0:
             self.add_error('minimum_stock', 'Pragul minim nu poate fi negativ.')
+        for field_name, value in [('purchase_price', purchase_price), ('sale_price', sale_price), ('price', price)]:
+            if value is not None and value < 0:
+                self.add_error(field_name, 'Pretul nu poate fi negativ.')
+        if purchase_price is not None and sale_price is not None and sale_price < purchase_price:
+            self.add_error('sale_price', 'Pretul de vanzare ar trebui sa fie cel putin egal cu pretul de achizitie.')
         if (
             stock is not None and minimum_stock is not None
             and stock == 0 and minimum_stock == 0
@@ -571,6 +600,142 @@ class ServicePartForm(forms.ModelForm):
         ):
             self.add_error('notes', 'Adauga o observatie scurta daca piesa este complet fara stoc si fara prag minim.')
         return cleaned
+
+
+class JobCardForm(forms.ModelForm):
+    class Meta:
+        model = JobCard
+        fields = [
+            'status', 'mechanic', 'mileage',
+            'estimated_hours', 'actual_hours',
+            'estimated_cost', 'final_cost',
+            'diagnostic_summary', 'work_performed',
+            'customer_notes', 'internal_notes',
+            'next_service_date', 'next_service_km',
+        ]
+        widgets = {
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'mechanic': forms.Select(attrs={'class': 'form-select'}),
+            'mileage': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'estimated_hours': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.25'}),
+            'actual_hours': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.25'}),
+            'estimated_cost': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01'}),
+            'final_cost': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01'}),
+            'diagnostic_summary': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'work_performed': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'customer_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'internal_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'next_service_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'next_service_km': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        center = kwargs.pop('center', None)
+        super().__init__(*args, **kwargs)
+        if center:
+            self.fields['mechanic'].queryset = center.mechanics.filter(is_active=True).order_by('name')
+        self.fields['mechanic'].required = False
+
+
+class JobOperationForm(forms.ModelForm):
+    class Meta:
+        model = JobOperation
+        fields = ['title', 'description', 'estimated_cost', 'final_cost', 'is_visible_to_customer']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Schimb ulei si filtru'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'estimated_cost': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01'}),
+            'final_cost': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01'}),
+            'is_visible_to_customer': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class JobRecommendationForm(forms.ModelForm):
+    class Meta:
+        model = JobRecommendation
+        fields = ['title', 'details', 'priority', 'due_date', 'is_visible_to_customer']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Inlocuire placute spate in urmatoarele 1.000 km'}),
+            'details': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'priority': forms.Select(attrs={'class': 'form-select'}),
+            'due_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'is_visible_to_customer': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class JobPartUsageForm(forms.Form):
+    part = forms.ModelChoiceField(
+        queryset=ServicePart.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Piesa'
+    )
+    quantity = forms.IntegerField(
+        min_value=1,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+        label='Cantitate'
+    )
+    status = forms.ChoiceField(
+        choices=JobPartUsage.STATUS_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Tip miscare'
+    )
+    note = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: rezervat pentru lucrare sau consumat la montaj'}),
+        label='Observatie'
+    )
+
+    def __init__(self, *args, **kwargs):
+        center = kwargs.pop('center', None)
+        super().__init__(*args, **kwargs)
+        if center:
+            self.fields['part'].queryset = center.parts.filter(is_active=True).order_by('name')
+
+
+class StockMovementForm(forms.Form):
+    part_id = forms.IntegerField(widget=forms.HiddenInput())
+    movement_type = forms.ChoiceField(
+        choices=StockMovement.MOVEMENT_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Tip miscare'
+    )
+    quantity = forms.IntegerField(
+        min_value=1,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+        label='Cantitate'
+    )
+    note = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: livrare furnizor / inventar / retur'}),
+        label='Observatie'
+    )
+
+
+class AvailabilityBlockForm(forms.ModelForm):
+    class Meta:
+        model = ServiceAvailabilityBlock
+        fields = ['garage', 'mechanic', 'block_type', 'title', 'notes', 'starts_at', 'ends_at']
+        widgets = {
+            'garage': forms.Select(attrs={'class': 'form-select'}),
+            'mechanic': forms.Select(attrs={'class': 'form-select'}),
+            'block_type': forms.Select(attrs={'class': 'form-select'}),
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Pauza de pranz / Concediu / Post inchis'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'starts_at': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'ends_at': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        center = kwargs.pop('center', None)
+        super().__init__(*args, **kwargs)
+        if center:
+            self.fields['garage'].queryset = center.garages.order_by('name')
+            self.fields['mechanic'].queryset = center.mechanics.order_by('name')
+        else:
+            self.fields['garage'].queryset = ServiceGarage.objects.none()
+            self.fields['mechanic'].queryset = ServiceMechanic.objects.none()
+        self.fields['garage'].required = False
+        self.fields['mechanic'].required = False
 
 
 class ReportFilterForm(forms.Form):

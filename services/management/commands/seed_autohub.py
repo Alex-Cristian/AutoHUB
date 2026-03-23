@@ -493,6 +493,25 @@ REVIEW_BODIES = [
 ]
 
 
+MECHANIC_PROFILES = [
+    ('Mihai Pop', 'Diagnoza multimarca si mentenanta rapida'),
+    ('Andrei Ionescu', 'Revizii, distributii si lucrari de motor'),
+    ('Catalin Rusu', 'Sistem de franare, suspensie si directie'),
+    ('Radu Marinescu', 'Electric, diagnoza si accesorii'),
+    ('Vlad Stancu', 'Interventii rapide si clienti de flota'),
+]
+
+PARTS_CATALOG = [
+    ('Filtru ulei', 'consumabile', 'Mann', 'Inter Cars', 12, 4, 28, 42, 'buc'),
+    ('Filtru aer', 'consumabile', 'Bosch', 'Inter Cars', 10, 4, 35, 55, 'buc'),
+    ('Placute frana fata', 'franare', 'ATE', 'Unix Auto', 6, 2, 145, 220, 'set'),
+    ('Discuri frana fata', 'franare', 'ATE', 'Unix Auto', 4, 2, 210, 320, 'set'),
+    ('Baterie AGM 70Ah', 'electric', 'Bosch', 'Autonet', 3, 1, 420, 560, 'buc'),
+    ('Bujii set', 'motor', 'NGK', 'Autonet', 8, 3, 55, 90, 'set'),
+    ('Amortizor fata', 'suspensie', 'Monroe', 'Inter Cars', 4, 2, 180, 270, 'buc'),
+    ('Anvelopa 205/55 R16', 'anvelope', 'Michelin', 'Best Tires', 10, 4, 320, 420, 'buc'),
+]
+
 class Command(BaseCommand):
     help = 'Populează baza de date cu date demo pentru AutoEMG'
 
@@ -516,13 +535,41 @@ class Command(BaseCommand):
         return image_path
 
     def handle(self, *args, **options):
-        from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review, ReviewImage
+        from services.business import create_job_part_usage, ensure_job_card, sync_booking_from_job_card
+        from services.models import (
+            JobCard,
+            JobOperation,
+            JobRecommendation,
+            MechanicPhoto,
+            MechanicWorkLog,
+            Review,
+            ReviewImage,
+            ServiceCategory,
+            ServiceCenter,
+            ServiceGarage,
+            ServiceImage,
+            ServiceItem,
+            ServiceMechanic,
+            ServicePart,
+            StockMovement,
+        )
         from bookings.models import Booking, BookingAttachment
+        from invoices.models import Invoice, InvoiceLine
         from accounts.models import Car, CarExpiryProfile
 
         self.stdout.write(self.style.WARNING('🚀 Pornind seed AutoEMG...'))
 
         self.stdout.write('🧹 Ștergere date anterioare...')
+        MechanicPhoto.objects.all().delete()
+        MechanicWorkLog.objects.all().delete()
+        JobOperation.objects.all().delete()
+        JobRecommendation.objects.all().delete()
+        StockMovement.objects.all().delete()
+        JobCard.objects.all().delete()
+        InvoiceLine.objects.all().delete()
+        Invoice.objects.all().delete()
+        ServicePart.objects.all().delete()
+        ServiceMechanic.objects.all().delete()
         ReviewImage.objects.all().delete()
         Review.objects.all().delete()
         BookingAttachment.objects.all().delete()
@@ -635,18 +682,87 @@ class Command(BaseCommand):
                 pt = round(price_to * random.uniform(0.9, 1.1))
                 ServiceItem.objects.create(center=center, name=name, price_from=pf, price_to=pt, duration_minutes=duration, is_popular=(i in popular_indices))
 
+        self.stdout.write('👨‍🔧 Creare mecanici și stoc demo...')
+        mechanics_map = {}
+        parts_map = {}
+        for center, cat_slug in created_centers:
+            center_categories = list(center.categories.all()) or [cats[cat_slug]]
+            garages = list(center.garages.all())
+            mechanics = []
+            for idx, (name, specialization) in enumerate(MECHANIC_PROFILES[: random.randint(2, 4)], start=1):
+                garage = garages[(idx - 1) % len(garages)] if garages else None
+                mechanic = ServiceMechanic.objects.create(
+                    center=center,
+                    name=name,
+                    email=f"{center.slug}.mecanic{idx}@autohub.ro",
+                    phone=f"07{random.randint(10000000, 99999999)}",
+                    specialization=specialization,
+                    garage=garage,
+                )
+                mechanic.service_categories.add(*center_categories[:2])
+                mechanics.append(mechanic)
+            mechanics_map[center.pk] = mechanics
+
+            center_parts = []
+            for idx, (name, category, brand, supplier, stock, minimum, purchase, sale, unit) in enumerate(PARTS_CATALOG[: random.randint(5, 7)], start=1):
+                part = ServicePart.objects.create(
+                    center=center,
+                    name=name,
+                    part_number=f"{center.slug[:4].upper()}-{idx:03d}",
+                    category=category,
+                    brand=brand,
+                    supplier=supplier,
+                    stock=stock,
+                    minimum_stock=minimum,
+                    price=sale,
+                    purchase_price=purchase,
+                    sale_price=sale,
+                    unit=unit,
+                    shelf=f"R{random.randint(1, 4)}-P{idx}",
+                    notes='Piesa demo pentru inventar, rezervari si consum pe lucrari.',
+                    is_active=True,
+                )
+                center_parts.append(part)
+            parts_map[center.pk] = center_parts
+
         self.stdout.write('📅 Creare programări demo...')
         created_bookings = []
         for center, cat_slug in created_centers:
             garages = list(center.garages.all())
             items = list(center.serviceitem_set.all())
+            mechanics = mechanics_map.get(center.pk, [])
             for idx, user in enumerate(random.sample(mock_users, k=min(3, len(mock_users))), start=1):
                 garage = random.choice(garages) if garages else None
+                service_item = random.choice(items) if items else None
+                mechanic = random.choice(mechanics) if mechanics else None
+                status = random.choice([
+                    Booking.STATUS_PENDING,
+                    Booking.STATUS_QUOTED,
+                    Booking.STATUS_CONFIRMED,
+                    Booking.STATUS_IN_PROGRESS,
+                    Booking.STATUS_WAITING_PARTS,
+                    Booking.STATUS_DONE,
+                ])
+                if status == Booking.STATUS_DONE:
+                    booking_date = timezone.now().date() - timezone.timedelta(days=random.randint(3, 45))
+                elif status in {Booking.STATUS_IN_PROGRESS, Booking.STATUS_WAITING_PARTS}:
+                    booking_date = timezone.now().date() - timezone.timedelta(days=random.randint(0, 2))
+                else:
+                    booking_date = timezone.now().date() + timezone.timedelta(days=random.randint(1, 10))
+                estimated_price = None
+                if service_item and service_item.price_from and service_item.price_to:
+                    estimated_price = round((service_item.price_from + service_item.price_to) / 2, 2)
                 booking = Booking.objects.create(
                     user=user,
                     center=center,
                     garage=garage,
-                    service_item=random.choice(items) if items else None,
+                    service_item=service_item,
+                    mechanic=mechanic if status in {
+                        Booking.STATUS_CONFIRMED,
+                        Booking.STATUS_IN_PROGRESS,
+                        Booking.STATUS_WAITING_PARTS,
+                        Booking.STATUS_DONE,
+                    } else None,
                     client_name=(user.get_full_name() or user.username),
                     client_phone=f'07{random.randint(10000000, 99999999)}',
                     client_email=user.email or f'{user.username}@example.ro',
@@ -656,9 +772,13 @@ class Command(BaseCommand):
                     car_fuel=random.choice(['benzina', 'motorina', 'hibrid']),
                     car_plate=f'B{random.randint(10,99)}AUT',
                     problem_description='Programare demo generată automat pentru testare.',
-                    booking_date=timezone.now().date() + timezone.timedelta(days=random.randint(1, 7)),
+                    booking_date=booking_date,
                     booking_time=garage.open_time if garage else timezone.datetime.strptime('09:00', '%H:%M').time(),
-                    status=random.choice([Booking.STATUS_PENDING, Booking.STATUS_CONFIRMED, Booking.STATUS_DONE]),
+                    duration_minutes=(service_item.duration_minutes if service_item and service_item.duration_minutes else (garage.slot_minutes if garage else 60)),
+                    estimated_price=estimated_price,
+                    status=status,
+                    notes='Programare demo pentru prezentarea fluxului operational.',
+                    operational_tags=[Booking.TAG_WAITING_PART] if status == Booking.STATUS_WAITING_PARTS else [],
                 )
                 created_bookings.append(booking)
 
@@ -666,6 +786,140 @@ class Command(BaseCommand):
                     attach_path = self._generate_seed_image(f'booking_{center.slug}_{user.username}', f'Problemă {center.name}', cats[cat_slug].color)
                     with attach_path.open('rb') as fh:
                         BookingAttachment.objects.create(booking=booking, file=File(fh, name=attach_path.name), media_kind='image')
+
+        self.stdout.write('🧾 Creare fise de lucru, consum si facturi demo...')
+        for booking in created_bookings:
+            if booking.status in {Booking.STATUS_PENDING, Booking.STATUS_QUOTED, Booking.STATUS_CANCELLED}:
+                continue
+
+            job_card, _ = ensure_job_card(booking, actor=service_user)
+            job_card.mechanic = booking.mechanic
+            job_card.diagnostic_summary = 'Verificare initiala, test operational si constatare tehnica.'
+            job_card.work_performed = 'Flux demo pentru urmarirea lucrarii in dashboard si dosarul masinii.'
+            job_card.internal_notes = 'Date generate automat pentru prezentare.'
+            job_card.customer_notes = 'Masina este actualizata in platforma pe masura ce lucrarea avanseaza.'
+            job_card.mileage = random.randint(45000, 210000)
+            job_card.estimated_hours = round((booking.effective_duration_minutes() or 60) / 60, 2)
+            job_card.actual_hours = job_card.estimated_hours if booking.status == Booking.STATUS_DONE else None
+            job_card.estimated_cost = booking.estimated_price or 0
+            job_card.next_service_date = booking.booking_date + timedelta(days=random.choice([90, 120, 180]))
+            job_card.next_service_km = (job_card.mileage or 0) + random.choice([10000, 15000])
+            if booking.status == Booking.STATUS_CONFIRMED:
+                job_card.status = JobCard.STATUS_APPROVED
+            elif booking.status == Booking.STATUS_IN_PROGRESS:
+                job_card.status = JobCard.STATUS_IN_PROGRESS
+            elif booking.status == Booking.STATUS_WAITING_PARTS:
+                job_card.status = JobCard.STATUS_WAITING_PARTS
+            else:
+                job_card.status = JobCard.STATUS_COMPLETED
+            job_card.save()
+
+            JobOperation.objects.get_or_create(
+                job_card=job_card,
+                title='Constatare tehnica',
+                defaults={
+                    'description': 'Inspectie generala si confirmarea simptomelor raportate.',
+                    'estimated_cost': 80,
+                    'final_cost': 80 if booking.status == Booking.STATUS_DONE else None,
+                    'position': 1,
+                },
+            )
+            JobOperation.objects.get_or_create(
+                job_card=job_card,
+                title=booking.service_item.name if booking.service_item else 'Interventie generala',
+                defaults={
+                    'description': 'Executie principala a lucrarii planificate.',
+                    'estimated_cost': booking.estimated_price or 180,
+                    'final_cost': (booking.estimated_price or 180) if booking.status == Booking.STATUS_DONE else None,
+                    'position': 2,
+                },
+            )
+            JobRecommendation.objects.get_or_create(
+                job_card=job_card,
+                title='Revizie consumabile la urmatoarea vizita',
+                defaults={
+                    'details': 'Se recomanda verificarea completa a consumabilelor si a sistemului de franare.',
+                    'priority': random.choice(['low', 'medium', 'high']),
+                    'is_visible_to_customer': True,
+                    'is_resolved': booking.status == Booking.STATUS_DONE and random.choice([True, False]),
+                    'due_date': booking.booking_date + timedelta(days=120),
+                },
+            )
+
+            center_parts = parts_map.get(booking.center_id, [])
+            if center_parts:
+                part = random.choice(center_parts)
+                if booking.status == Booking.STATUS_WAITING_PARTS:
+                    create_job_part_usage(
+                        job_card,
+                        part=part,
+                        quantity=1,
+                        status='reserved',
+                        actor=service_user,
+                        note='Piesa rezervata pentru lucrare demo.',
+                    )
+                elif booking.status == Booking.STATUS_DONE:
+                    create_job_part_usage(
+                        job_card,
+                        part=part,
+                        quantity=1,
+                        status='consumed',
+                        actor=service_user,
+                        note='Consum automat pentru lucrare demo.',
+                    )
+
+            if booking.mechanic_id:
+                work_log, _ = MechanicWorkLog.objects.get_or_create(
+                    booking=booking,
+                    mechanic=booking.mechanic,
+                )
+                work_log.repair_description = 'Fisa demo pentru istoric tehnic si urmarirea lucrarii.'
+                work_log.parts_used = ', '.join(job_card.part_usages.values_list('description', flat=True)) or 'Consumabile standard'
+                if booking.status in {Booking.STATUS_IN_PROGRESS, Booking.STATUS_WAITING_PARTS, Booking.STATUS_DONE}:
+                    work_log.started_at = timezone.now() - timedelta(hours=random.randint(1, 8))
+                if booking.status == Booking.STATUS_DONE:
+                    work_log.finished_at = timezone.now() - timedelta(hours=random.randint(0, 2))
+                work_log.save()
+
+            if booking.status == Booking.STATUS_DONE:
+                final_cost = job_card.operations_final_total + job_card.parts_total
+                job_card.final_cost = final_cost or booking.estimated_price or 0
+                job_card.status = JobCard.STATUS_INVOICED
+                job_card.save(update_fields=['final_cost', 'status', 'updated_at'])
+                sync_booking_from_job_card(job_card, actor=service_user)
+
+                invoice = Invoice.objects.create(
+                    center=booking.center,
+                    booking=booking,
+                    issue_date=timezone.localdate(),
+                    due_date=timezone.localdate() + timedelta(days=7),
+                    company_name=booking.center.name,
+                    company_address=booking.center.address,
+                    company_city=booking.center.get_city_display(),
+                    company_phone=booking.center.phone,
+                    company_email=booking.center.email,
+                    client_name=booking.client_name,
+                    client_email=booking.client_email,
+                    client_phone=booking.client_phone,
+                    notes='Factura demo generata automat din fisa lucrarii.',
+                    status=random.choice([Invoice.STATUS_FINAL, Invoice.STATUS_PAID]),
+                )
+                invoice.assign_next_number_if_needed()
+                invoice.save(update_fields=['invoice_no'])
+                InvoiceLine.objects.create(
+                    invoice=invoice,
+                    description='Manopera service',
+                    quantity=1,
+                    unit_price=job_card.operations_final_total or job_card.estimated_cost or 0,
+                )
+                for usage in job_card.part_usages.all():
+                    InvoiceLine.objects.create(
+                        invoice=invoice,
+                        description=usage.description,
+                        quantity=usage.quantity,
+                        unit_price=usage.unit_price or usage.unit_cost or 0,
+                    )
+                invoice.recalc_totals(save=True)
 
         self.stdout.write('⭐ Creare recenzii...')
         for center, cat_slug in created_centers:
@@ -711,17 +965,22 @@ class Command(BaseCommand):
             User.objects.create_superuser(username='admin', email='admin@autohub.ro', password='admin123', first_name='Admin', last_name='AutoEMG')
             self.stdout.write(self.style.SUCCESS('👑 Superuser creat: admin / admin123'))
 
-        from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, Review, ReviewImage
+        from services.models import JobCard, ServiceCategory, ServiceCenter, ServiceGarage, ServiceImage, ServiceItem, ServiceMechanic, ServicePart, Review, ReviewImage
         from bookings.models import Booking, BookingAttachment
+        from invoices.models import Invoice
         self.stdout.write('\n' + '='*50)
         self.stdout.write(self.style.SUCCESS('✅ Seed finalizat cu succes!'))
         self.stdout.write(f'  📂 Categorii:   {ServiceCategory.objects.count()}')
         self.stdout.write(f'  🏢 Service-uri: {ServiceCenter.objects.count()}')
         self.stdout.write(f'  🏗️ Garaje:      {ServiceGarage.objects.count()}')
+        self.stdout.write(f'  👨‍🔧 Mecanici:   {ServiceMechanic.objects.count()}')
         self.stdout.write(f'  🖼️ Poze:        {ServiceImage.objects.count()} + {ServiceCenter.objects.exclude(card_image='').count()} poze de card')
         self.stdout.write(f'  🔧 Servicii:    {ServiceItem.objects.count()}')
+        self.stdout.write(f'  🧰 Piese stoc:  {ServicePart.objects.count()}')
         self.stdout.write(f'  📅 Programări:  {Booking.objects.count()}')
+        self.stdout.write(f'  🧾 Fișe lucru:  {JobCard.objects.count()}')
         self.stdout.write(f'  📎 Atașamente:  {BookingAttachment.objects.count()}')
+        self.stdout.write(f'  🧾 Facturi:     {Invoice.objects.count()}')
         self.stdout.write(f'  ⭐ Recenzii:    {Review.objects.count()}')
         self.stdout.write(f'  🖼️ Review imgs: {ReviewImage.objects.count()}')
         self.stdout.write(f'  👤 Utilizatori: {User.objects.count()}')
