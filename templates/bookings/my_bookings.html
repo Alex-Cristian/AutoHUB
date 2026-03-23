@@ -1,271 +1,179 @@
-{% extends 'base.html' %}
-{% block title %}Programările mele — AutoEMG{% endblock %}
+{% extends "base.html" %}
+{% block title %}Programarile Mele | AutoHub{% endblock %}
 
 {% block extra_css %}
 <style>
-  .work-photo-grid { display:flex; flex-wrap:wrap; gap:.5rem; }
-  .work-photo-thumb {
-    width:100px; height:100px; object-fit:cover; border-radius:12px;
-    border:1px solid var(--ah-border); cursor:pointer;
-    transition:transform .15s, border-color .15s;
-  }
-  .work-photo-thumb:hover { transform:scale(1.04); border-color:var(--ah-red); }
-  .work-section-label {
-    display:inline-flex; align-items:center; gap:.4rem;
-    font-size:.72rem; font-weight:700; text-transform:uppercase;
-    letter-spacing:.07em; padding:.28rem .65rem; border-radius:999px;
-  }
-  .work-section-label.before { background:rgba(234,179,8,0.12); color:#fde047; border:1px solid rgba(234,179,8,0.3); }
-  .work-section-label.after  { background:rgba(34,197,94,0.12);  color:#4ade80; border:1px solid rgba(34,197,94,0.3); }
-  .transparency-banner {
-    background: linear-gradient(135deg, rgba(230,57,70,0.10), var(--ah-dark2) 60%);
-    border: 1px solid rgba(230,57,70,0.25);
-    border-radius: 16px;
-    padding: 1rem 1.25rem;
-  }
+  .myb-card { background:var(--ah-dark2); border:1px solid var(--ah-border); border-radius:22px; padding:1.2rem; box-shadow:0 16px 42px rgba(0,0,0,.16); }
+  .myb-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:1rem; }
+  .myb-box { background:var(--ah-dark3); border-radius:18px; padding:.9rem; }
+  .myb-label { color:var(--ah-muted); font-size:.76rem; text-transform:uppercase; letter-spacing:.08em; margin-bottom:.25rem; }
+  .myb-step { border:1px solid var(--ah-border); border-radius:18px; padding:.85rem; background:var(--ah-dark3); }
+  @media (max-width: 900px) { .myb-grid { grid-template-columns:1fr; } }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <h2 class="section-title mb-1">
-    <i class="bi bi-calendar-check me-2 text-red"></i>Programările mele
-  </h2>
-  <p class="text-muted-custom mb-4">{{ bookings.count }} programări</p>
+<div class="container py-4 py-lg-5">
+  <section class="ah-page-header">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+      <div>
+        <div class="ah-page-eyebrow"><i class="bi bi-calendar-check"></i>Client AutoHub</div>
+        <h1 class="section-title mb-1">Programarile mele</h1>
+        <p class="ah-page-subtitle">Vezi statusul, costul estimat sau final, recomandarile si documentele pentru fiecare vizita in service.</p>
+      </div>
+      <a href="{% url 'services:list' %}" class="btn btn-nav-cta"><i class="bi bi-search me-1"></i>Cauta un service</a>
+    </div>
+  </section>
 
   {% if bookings %}
-  <div class="row g-3">
-    {% for b in bookings %}
-    <div class="col-12">
-      <div class="rounded-xl p-4" style="background:var(--ah-dark2);border:1px solid var(--ah-border);">
-
-        <!-- Header programare -->
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
-          <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-              <h6 class="fw-bold mb-0">{{ b.center.name }}</h6>
-              <span class="badge bg-{{ b.get_status_badge }} small">
-                {{ b.get_status_icon }} {{ b.get_status_display }}
-              </span>
-            </div>
-            <p class="text-muted-custom small mb-1">
-              <i class="bi bi-calendar me-1 text-red"></i>
-              <strong>{{ b.booking_date|date:"d M Y" }}</strong> la {{ b.booking_time|time:"H:i" }}
-              {% if b.duration_minutes %}<span class="mx-2">·</span><span>durată: {{ b.get_duration_display }}</span>{% endif %}{% if b.estimated_price %}<span class="mx-2">·</span><span>cost aprox.: {{ b.estimated_price }} RON</span>{% endif %}
-              <span class="mx-2">·</span>
-              <i class="bi bi-geo-alt me-1"></i>{{ b.center.get_city_display }}
-            </p>
-            <p class="text-muted-custom small mb-0">
-              <i class="bi bi-car-front me-1 text-red"></i>
-              {{ b.car_brand }} {{ b.car_model }} ({{ b.car_year }}) · {{ b.car_plate }}
-            </p>
+  <div class="d-grid gap-3">
+    {% for booking in bookings %}
+    <article class="myb-card">
+      <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+            <h3 class="mb-0">{{ booking.center.name }}</h3>
+            <span class="badge bg-{{ booking.get_status_badge }}">{{ booking.get_status_icon }} {{ booking.get_status_display }}</span>
           </div>
-          <div class="text-end">
-            <p class="text-muted-custom x-small mb-1" style="font-size:0.75rem;">
-              Înregistrat: {{ b.created_at|date:"d.m.Y H:i" }}
-            </p>
-            <a href="{{ b.center.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-shop me-1"></i>Detalii service
-            </a>
+          <div class="text-muted-custom small">
+            {{ booking.booking_date|date:"d.m.Y" }} la {{ booking.booking_time|time:"H:i" }}
+            · {{ booking.car_brand }} {{ booking.car_model }} · {{ booking.car_plate }}
           </div>
         </div>
-
-        {% if b.problem_description %}
-        <div class="mt-3 p-2 rounded-3 small text-muted-custom" style="background:var(--ah-dark3);">
-          <i class="bi bi-chat-text me-1"></i>{{ b.problem_description|truncatewords:30 }}
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{{ booking.center.get_absolute_url }}" class="btn btn-sm btn-outline-light">Vezi service</a>
+          <a href="{% url 'bookings:create' booking.center.slug %}" class="btn btn-sm btn-outline-warning">Programare noua</a>
         </div>
-        {% endif %}
-
-        <div class="mt-3 p-3 rounded-3" style="background:rgba(230,57,70,0.08);border:1px solid rgba(230,57,70,0.18);">
-          <div class="small text-muted-custom mb-1">Urmatorul pas</div>
-          {% if b.status == 'pending' %}
-          <div class="fw-semibold text-white">Service-ul analizeaza cererea si poate trimite o oferta sau confirmarea rezervarii.</div>
-          {% elif b.status == 'quoted' %}
-          <div class="fw-semibold text-white">Ai oferta disponibila. Poti accepta sau refuza direct de aici.</div>
-          {% elif b.status == 'confirmed' %}
-          <div class="fw-semibold text-white">Programarea este confirmata. Pregateste masina si documentele pentru intervalul rezervat.</div>
-          {% elif b.status == 'in_progress' %}
-          <div class="fw-semibold text-white">Masina este in lucru. Vei vedea aici update-urile importante si pozele incarcate de service.</div>
-          {% elif b.status == 'done' %}
-          <div class="fw-semibold text-white">Lucrarea este finalizata. Poti reveni rapid pentru aceeasi interventie daca ai nevoie.</div>
-          {% else %}
-          <div class="fw-semibold text-white">Programarea este inchisa. Poti relua rapid cererea catre acelasi service.</div>
-          {% endif %}
-        </div>
-
-        {% if b.status == "quoted" %}
-        <div class="mt-3 p-3 rounded-3" style="background:rgba(244,162,97,0.08);border:1px solid rgba(244,162,97,0.25);">
-          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-            <div>
-              <div class="fw-bold text-white mb-1">{{ b.center.name }} ți-a trimis oferta</div>
-              <div class="small text-muted-custom">{{ b.booking_date|date:"d M Y" }} la {{ b.booking_time|time:"H:i" }} · durată {{ b.get_duration_display }} · cost aproximativ {{ b.estimated_price }} RON</div>
-            </div>
-            <div class="d-flex gap-2 flex-wrap">
-              <form method="post" action="{% url 'bookings:accept_quote' b.pk %}">{% csrf_token %}<button class="btn btn-success btn-sm" type="submit">Acceptă oferta</button></form>
-              <form method="post" action="{% url 'bookings:reject_quote' b.pk %}">{% csrf_token %}<button class="btn btn-outline-danger btn-sm" type="submit">Refuză</button></form>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-
-        <div class="d-flex justify-content-end gap-2 flex-wrap mt-3">
-          <a href="{{ b.center.get_absolute_url }}" class="btn btn-sm btn-outline-light">
-            <i class="bi bi-shop me-1"></i>Vezi service
-          </a>
-          <a href="{% url 'bookings:create' b.center.slug %}{% if b.service_item_id %}?service_item={{ b.service_item_id }}{% endif %}" class="btn btn-sm btn-outline-warning">
-            <i class="bi bi-arrow-repeat me-1"></i>Re-book
-          </a>
-        </div>
-
-        <!-- ══════════════════════════════════════════
-             POZE LUCRARE — adăugate de mecanic
-        ══════════════════════════════════════════ -->
-        {% with wl=b.mechanic_work_log %}
-        {% if wl and wl.photos.all %}
-        <div class="transparency-banner mt-4">
-          <div class="d-flex align-items-center gap-2 mb-3">
-            <i class="bi bi-camera-fill text-red"></i>
-            <div>
-              <div class="fw-bold text-white" style="font-size:.95rem;">Poze lucrare{% if b.mechanic %} — {{ b.mechanic.name }}{% endif %}</div>
-              <div class="small text-muted-custom">Pozele încărcate live de mecanic sunt vizibile mai jos.</div>
-            </div>
-          </div>
-
-          <div class="mb-3">
-            <span class="work-section-label before mb-2 d-inline-flex"><i class="bi bi-arrow-down-circle"></i> La intrare</span>
-            <div class="work-photo-grid mt-2">
-              {% for photo in wl.photos.all %}{% if photo.photo_type == 'before' %}
-                <img src="{{ photo.photo.url }}" class="work-photo-thumb" onclick="openPhotoModal('{{ photo.photo.url }}', 'La intrare — {{ b.car_brand }} {{ b.car_model }}')" alt="Poză intrare mașină">
-              {% endif %}{% endfor %}
-            </div>
-          </div>
-
-          <div class="mb-3">
-            <span class="work-section-label mb-2 d-inline-flex" style="background:rgba(249,115,22,0.12);color:#fb923c;border:1px solid rgba(249,115,22,0.3);"><i class="bi bi-camera-video"></i> În timpul lucrării</span>
-            <div class="work-photo-grid mt-2">
-              {% for photo in wl.photos.all %}{% if photo.photo_type == 'during' %}
-                <img src="{{ photo.photo.url }}" class="work-photo-thumb" onclick="openPhotoModal('{{ photo.photo.url }}', 'În lucru — {{ b.car_brand }} {{ b.car_model }}')" alt="Poză lucrare">
-              {% endif %}{% endfor %}
-            </div>
-          </div>
-
-          <div class="mb-2">
-            <span class="work-section-label after mb-2 d-inline-flex"><i class="bi bi-arrow-up-circle"></i> La ieșire</span>
-            <div class="work-photo-grid mt-2">
-              {% for photo in wl.photos.all %}{% if photo.photo_type == 'after' %}
-                <img src="{{ photo.photo.url }}" class="work-photo-thumb" onclick="openPhotoModal('{{ photo.photo.url }}', 'La ieșire — {{ b.car_brand }} {{ b.car_model }}')" alt="Poză ieșire mașină">
-              {% endif %}{% endfor %}
-            </div>
-          </div>
-
-          {% if wl.repair_description %}
-          <div class="mt-3 pt-3" style="border-top:1px solid var(--ah-border);">
-            <div class="small text-muted-custom mb-1"><i class="bi bi-file-text me-1"></i>Ce s-a lucrat:</div>
-            <div class="small text-white">{{ wl.repair_description }}</div>
-          </div>
-          {% endif %}
-        </div>
-        {% endif %}
-        {% endwith %}
-        <!-- ══ END POZE LUCRARE ══ -->
-
-        <!-- Pozele clientului -->
-        {% if b.attachments.all %}
-        <div class="mt-3">
-          <div class="small text-muted-custom mb-2"><i class="bi bi-paperclip me-1"></i>Fișierele tale atașate</div>
-          <div class="row g-2">
-            {% for attachment in b.attachments.all %}
-            <div class="col-md-4">
-              <div class="p-2 rounded-3 h-100" style="background:var(--ah-dark3);border:1px solid var(--ah-border);">
-                {% if attachment.is_image %}
-                  <div style="height:200px;border-radius:12px;overflow:hidden;cursor:zoom-in;margin-bottom:.5rem;" onclick="openLightbox('{{ attachment.file.url }}')">
-                    <img src="{{ attachment.file.url }}" alt="Poză programare {{ b.pk }}" style="width:100%;height:100%;object-fit:cover;">
-                  </div>
-                {% else %}
-                  <video controls class="w-100 rounded-3 mb-2" style="height:220px;object-fit:contain;background:#000;">
-                    <source src="{{ attachment.file.url }}">
-                  </video>
-                {% endif %}
-                <div class="d-flex justify-content-between align-items-center gap-2">
-                  <span class="small text-muted-custom">{{ attachment.uploaded_at|date:"d.m.Y H:i" }}</span>
-                  <form method="post" action="{% url 'bookings:attachment_delete' attachment.pk %}">
-                    {% csrf_token %}
-                    <button class="btn btn-sm btn-outline-danger" type="submit">Șterge</button>
-                  </form>
-                </div>
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-
       </div>
-    </div>
+
+      <div class="myb-grid mt-3">
+        <div class="myb-box">
+          <div class="myb-label">Urmatorul pas</div>
+          {% if booking.status == 'pending' %}
+          <div class="fw-semibold">Service-ul analizeaza cererea si poate reveni cu oferta sau confirmare.</div>
+          {% elif booking.status == 'quoted' %}
+          <div class="fw-semibold">Ai primit oferta. O poti accepta sau refuza chiar de aici.</div>
+          {% elif booking.status == 'confirmed' %}
+          <div class="fw-semibold">Programarea este confirmata. Pregateste masina pentru intervalul rezervat.</div>
+          {% elif booking.status == 'in_progress' %}
+          <div class="fw-semibold">Masina este in lucru. Service-ul poate adauga poze, costuri si update-uri.</div>
+          {% elif booking.status == 'waiting_parts' %}
+          <div class="fw-semibold">Lucrarea asteapta piese. Service-ul te poate anunta cand reia interventia.</div>
+          {% elif booking.status == 'done' %}
+          <div class="fw-semibold">Lucrarea este finalizata. Verifica sumarul si recomandarile ramase.</div>
+          {% else %}
+          <div class="fw-semibold">Programarea este inchisa.</div>
+          {% endif %}
+        </div>
+        <div class="myb-box">
+          <div class="myb-label">Costuri</div>
+          <div>
+            Estimare:
+            {% if booking.estimated_price %}
+              {{ booking.estimated_price }} RON
+            {% elif booking.job_card_obj and booking.job_card_obj.estimated_cost %}
+              {{ booking.job_card_obj.estimated_cost }} RON
+            {% else %}
+              -
+            {% endif %}
+          </div>
+          <div class="mt-1">
+            Final:
+            {% if booking.job_card_obj and booking.job_card_obj.final_cost %}
+              {{ booking.job_card_obj.final_cost }} RON
+            {% else %}
+              -
+            {% endif %}
+          </div>
+        </div>
+        <div class="myb-box">
+          <div class="myb-label">Documente si media</div>
+          <div>{{ booking.attachments.count }} atasamente</div>
+          <div class="mt-1">{{ booking.invoices.count }} facturi / documente</div>
+        </div>
+      </div>
+
+      {% if booking.status == 'quoted' %}
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <form method="post" action="{% url 'bookings:accept_quote' booking.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-success" type="submit">Accepta oferta</button>
+        </form>
+        <form method="post" action="{% url 'bookings:reject_quote' booking.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-outline-danger" type="submit">Refuza oferta</button>
+        </form>
+      </div>
+      {% endif %}
+
+      {% if booking.job_card_obj and booking.job_card_obj.recommendations.all %}
+      <div class="mt-3">
+        <div class="small text-muted-custom mb-2">Recomandari tehnice</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for recommendation in booking.job_card_obj.recommendations.all %}
+            {% if not recommendation.is_resolved and recommendation.is_visible_to_customer %}
+            <span class="ah-badge-soft"><i class="bi bi-clipboard-pulse"></i>{{ recommendation.title }}</span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if booking.mechanic_work_log and booking.mechanic_work_log.photos.all %}
+      <div class="mt-3">
+        <div class="small text-muted-custom mb-2">Poze de la lucrare</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for photo in booking.mechanic_work_log.photos.all %}
+          <img src="{{ photo.photo.url }}" alt="Foto lucrare" style="width:88px;height:88px;object-fit:cover;border-radius:12px;cursor:zoom-in;border:1px solid var(--ah-border);" onclick="openLightbox('{{ photo.photo.url }}')">
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if booking.attachments.all %}
+      <div class="mt-3">
+        <div class="small text-muted-custom mb-2">Fisierele tale</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for attachment in booking.attachments.all %}
+            {% if attachment.is_image %}
+            <div style="position:relative;">
+              <img src="{{ attachment.file.url }}" alt="Atasament" style="width:88px;height:88px;object-fit:cover;border-radius:12px;cursor:zoom-in;border:1px solid var(--ah-border);" onclick="openLightbox('{{ attachment.file.url }}')">
+              <form method="post" action="{% url 'bookings:attachment_delete' attachment.pk %}" style="position:absolute;top:4px;right:4px;">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger" type="submit">×</button>
+              </form>
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </article>
     {% endfor %}
   </div>
   {% else %}
-  <div class="text-center py-5">
-    <div style="font-size:4rem;opacity:0.2;">📅</div>
-    <h4 class="fw-bold mt-3">Nu ai nicio programare</h4>
-    <p class="text-muted-custom">Găsește un service și fă prima ta programare online.</p>
-    <a href="{% url 'services:list' %}" class="btn btn-primary">
-      <i class="bi bi-search me-1"></i>Caută service-uri
-    </a>
+  <div class="ah-empty-state">
+    <strong>Nu ai programari inca</strong>
+    Gaseste un service potrivit si fa prima programare online.
   </div>
   {% endif %}
 </div>
 
-<!-- Modal lightbox pentru poze -->
-<div class="modal fade" id="photoModal" tabindex="-1">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content" style="background:#000;border:1px solid var(--ah-border);">
-      <div class="modal-header" style="border-color:var(--ah-border);">
-        <span class="small text-muted-custom" id="photoModalLabel"></span>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body p-2 text-center">
-        <img id="photoModalImg" src="" style="max-width:100%;max-height:75vh;object-fit:contain;border-radius:8px;">
-      </div>
-    </div>
-  </div>
+<div id="lightbox" onclick="closeLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
+  <img id="lb-img" style="max-width:92vw;max-height:92vh;border-radius:14px;">
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-function openPhotoModal(url, label) {
-  document.getElementById('photoModalImg').src = url;
-  document.getElementById('photoModalLabel').textContent = label;
-  new bootstrap.Modal(document.getElementById('photoModal')).show();
-}
-
-let lbZoomed = false;
 function openLightbox(src) {
-  const lb = document.getElementById('lightbox');
-  const img = document.getElementById('lb-img');
-  img.src = src;
-  img.style.transform = 'scale(1)';
-  lbZoomed = false;
-  lb.style.display = 'flex';
+  document.getElementById('lb-img').src = src;
+  document.getElementById('lightbox').style.display = 'flex';
   document.body.style.overflow = 'hidden';
 }
 function closeLightbox() {
   document.getElementById('lightbox').style.display = 'none';
   document.body.style.overflow = '';
-  lbZoomed = false;
 }
-function toggleZoom(e) {
-  e.stopPropagation();
-  const img = document.getElementById('lb-img');
-  lbZoomed = !lbZoomed;
-  img.style.transform = lbZoomed ? 'scale(2.5)' : 'scale(1)';
-  img.style.cursor = lbZoomed ? 'zoom-out' : 'grab';
-}
-document.addEventListener('keydown', function(e) { if(e.key==='Escape') closeLightbox(); });
 </script>
-
-<div id="lightbox" onclick="closeLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
-  <img id="lb-img" style="max-width:92vw;max-height:92vh;border-radius:12px;transition:transform .25s;cursor:grab;" ondblclick="toggleZoom(event)">
-  <div onclick="closeLightbox()" style="position:fixed;top:1rem;right:1.5rem;color:#fff;font-size:2.2rem;cursor:pointer;line-height:1;user-select:none;">×</div>
-  <div style="position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.45);font-size:.78rem;">Dublu-click pentru zoom · Escape pentru închide</div>
-</div>
 {% endblock %}

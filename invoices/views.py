@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from bookings.models import Booking
 from services.models import ServiceCenter
+from services.business import build_clients_snapshot, build_vehicle_dossier
 
 from .forms import InvoiceForm, InvoiceLineFormSet
 from .models import Invoice
@@ -193,3 +194,47 @@ def invoice_pdf(request, pk):
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="{filename}"'
     return response
+
+
+@login_required
+def clients_list(request):
+    centers = _owned_centers(request.user)
+    if not centers.exists() and not request.user.is_staff:
+        messages.info(request, 'Nu ai inca un service inregistrat.')
+        return redirect('services:register_service')
+
+    query = (request.GET.get('q') or '').strip()
+    bookings = Booking.objects.filter(center__in=centers).exclude(status=Booking.STATUS_CANCELLED).order_by('-created_at')
+    if query:
+        bookings = bookings.filter(
+            booking_search_q(query)
+        )
+
+    clients_data = build_clients_snapshot(bookings)
+    for item in clients_data:
+        last_booking = item['last_booking']
+        item['count'] = item['booking_count']
+        dossier = build_vehicle_dossier(vin=(next(iter(item['vin_values']), '')), plate=(next(iter(item['plate_values']), '')))
+        item['dossier_summary'] = dossier['summary']
+        item['center'] = last_booking.center if last_booking else None
+
+    page_obj = Paginator(clients_data, 20).get_page(request.GET.get('page'))
+    return render(request, 'invoices/clients_list.html', {
+        'clients': page_obj.object_list,
+        'page_obj': page_obj,
+        'total_clients': len(clients_data),
+        'total_bookings': bookings.count(),
+        'search_query': query,
+    })
+
+
+def booking_search_q(query):
+    from django.db.models import Q
+
+    return (
+        Q(client_name__icontains=query)
+        | Q(client_phone__icontains=query)
+        | Q(client_email__icontains=query)
+        | Q(car_plate__icontains=query)
+        | Q(car_vin__icontains=query)
+    )

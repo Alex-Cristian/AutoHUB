@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
 
-from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db import models
 from django.utils import timezone
-from services.models import ServiceCenter, ServiceItem, ServiceGarage
+
+from services.models import ServiceCenter, ServiceGarage, ServiceItem
 
 
 class Booking(models.Model):
@@ -12,8 +13,10 @@ class Booking(models.Model):
     STATUS_QUOTED = 'quoted'
     STATUS_CONFIRMED = 'confirmed'
     STATUS_IN_PROGRESS = 'in_progress'
+    STATUS_WAITING_PARTS = 'waiting_parts'
     STATUS_DONE = 'done'
     STATUS_CANCELLED = 'cancelled'
+
     TAG_URGENT = 'urgent'
     TAG_WAITING_PART = 'waiting_part'
     TAG_LOYAL_CLIENT = 'loyal_client'
@@ -22,12 +25,13 @@ class Booking(models.Model):
     TAG_BLOCKED = 'blocked'
 
     STATUS_CHOICES = [
-        (STATUS_PENDING, 'În așteptare'),
-        (STATUS_QUOTED, 'În așteptarea clientului'),
-        (STATUS_CONFIRMED, 'Confirmată'),
-        (STATUS_IN_PROGRESS, 'În lucru'),
-        (STATUS_DONE, 'Finalizată'),
-        (STATUS_CANCELLED, 'Anulată'),
+        (STATUS_PENDING, 'In asteptare'),
+        (STATUS_QUOTED, 'Oferta trimisa'),
+        (STATUS_CONFIRMED, 'Confirmata'),
+        (STATUS_IN_PROGRESS, 'In lucru'),
+        (STATUS_WAITING_PARTS, 'Asteapta piese'),
+        (STATUS_DONE, 'Finalizata'),
+        (STATUS_CANCELLED, 'Anulata'),
     ]
     TAG_CHOICES = [
         (TAG_URGENT, 'Urgent'),
@@ -37,10 +41,9 @@ class Booking(models.Model):
         (TAG_PRIORITY, 'Prioritar'),
         (TAG_BLOCKED, 'Blocat'),
     ]
-
     FUEL_CHOICES = [
-        ('benzina', 'Benzină'),
-        ('motorina', 'Motorină'),
+        ('benzina', 'Benzina'),
+        ('motorina', 'Motorina'),
         ('hibrid', 'Hibrid'),
         ('electric', 'Electric'),
         ('gpl', 'GPL'),
@@ -62,7 +65,6 @@ class Booking(models.Model):
         ServiceItem, null=True, blank=True, on_delete=models.SET_NULL,
         verbose_name='Serviciu ales'
     )
-
     mechanic = models.ForeignKey(
         'services.ServiceMechanic', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='bookings', verbose_name='Mecanic alocat'
@@ -72,50 +74,50 @@ class Booking(models.Model):
     client_phone = models.CharField(max_length=20, verbose_name='Telefon')
     client_email = models.EmailField(verbose_name='Email')
 
-    car_brand = models.CharField(max_length=100, verbose_name='Marcă')
+    car_brand = models.CharField(max_length=100, verbose_name='Marca')
     car_model = models.CharField(max_length=100, verbose_name='Model')
-    car_year = models.PositiveIntegerField(verbose_name='An fabricație')
+    car_year = models.PositiveIntegerField(verbose_name='An fabricatie')
     car_fuel = models.CharField(
         max_length=20, choices=FUEL_CHOICES, verbose_name='Combustibil'
     )
-    car_plate = models.CharField(max_length=20, verbose_name='Nr. înmatriculare')
-    car_vin = models.CharField(max_length=17, default='', verbose_name='Serie șasiu (VIN)')
+    car_plate = models.CharField(max_length=20, verbose_name='Nr. inmatriculare')
+    car_vin = models.CharField(max_length=17, default='', verbose_name='Serie sasiu (VIN)')
 
     problem_description = models.TextField(
-        verbose_name='Descriere problemă / serviciu dorit'
+        verbose_name='Descriere problema / serviciu dorit'
     )
 
-    booking_date = models.DateField(verbose_name='Data programării')
-    booking_time = models.TimeField(verbose_name='Ora programării')
+    booking_date = models.DateField(verbose_name='Data programarii')
+    booking_time = models.TimeField(verbose_name='Ora programarii')
     duration_minutes = models.PositiveIntegerField(
-        null=True, blank=True, verbose_name='Durată blocare garaj (minute)'
+        null=True, blank=True, verbose_name='Durata blocare garaj (minute)'
     )
     estimated_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Preț aproximativ (RON)'
+        max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Pret aproximativ (RON)'
     )
 
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES,
         default=STATUS_PENDING, verbose_name='Status'
     )
-    notes = models.TextField(blank=True, verbose_name='Note interne (admin)')
+    notes = models.TextField(blank=True, verbose_name='Note interne')
     used_services = models.TextField(blank=True, verbose_name='Servicii / piese folosite')
-    additional_description = models.TextField(blank=True, verbose_name='Descriere suplimentară pentru fișă')
+    additional_description = models.TextField(blank=True, verbose_name='Descriere suplimentara pentru fisa')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    reminder_sent_1d = models.BooleanField(default=False, verbose_name='Reminder SMS trimis cu o zi înainte')
-    wants_offer = models.BooleanField(default=False, verbose_name='Client dorește ofertă înainte de confirmare')
+    reminder_sent_1d = models.BooleanField(default=False, verbose_name='Reminder SMS trimis cu o zi inainte')
+    wants_offer = models.BooleanField(default=False, verbose_name='Client doreste oferta inainte de confirmare')
     operational_tags = models.JSONField(default=list, blank=True, verbose_name='Tag-uri operationale')
 
     class Meta:
         verbose_name = 'Programare'
-        verbose_name_plural = 'Programări'
+        verbose_name_plural = 'Programari'
         ordering = ['-created_at']
 
     def __str__(self):
         garage_label = f" / {self.garage.name}" if self.garage_id else ''
         return (
-            f"#{self.pk} {self.client_name} – "
+            f"#{self.pk} {self.client_name} - "
             f"{self.car_brand} {self.car_model} "
             f"@ {self.center.name}{garage_label} [{self.booking_date}]"
         )
@@ -141,30 +143,34 @@ class Booking(models.Model):
         return start + timedelta(minutes=self.effective_duration_minutes())
 
     def clean(self):
-        if self.booking_date and self.booking_date < timezone.now().date():
+        if self.booking_date and self.booking_date < timezone.localdate():
             raise ValidationError({
-                'booking_date': 'Data programării nu poate fi în trecut.'
+                'booking_date': 'Data programarii nu poate fi in trecut.'
             })
         current_year = timezone.now().year
         if self.car_year and (self.car_year < 1950 or self.car_year > current_year + 1):
             raise ValidationError({
-                'car_year': f'Anul mașinii trebuie să fie între 1950 și {current_year + 1}.'
+                'car_year': f'Anul masinii trebuie sa fie intre 1950 si {current_year + 1}.'
             })
+
         vin = ''.join(ch for ch in (self.car_vin or '').upper().strip() if ch.isalnum())
         self.car_vin = vin
         if not vin:
             raise ValidationError({'car_vin': 'VIN-ul este obligatoriu.'})
         if len(vin) != 17:
-            raise ValidationError({'car_vin': 'VIN-ul trebuie să aibă exact 17 caractere.'})
+            raise ValidationError({'car_vin': 'VIN-ul trebuie sa aiba exact 17 caractere.'})
         if any(ch in {'I', 'O', 'Q'} for ch in vin):
-            raise ValidationError({'car_vin': 'VIN-ul nu poate conține literele I, O sau Q.'})
+            raise ValidationError({'car_vin': 'VIN-ul nu poate contine literele I, O sau Q.'})
+
         duration = self.effective_duration_minutes()
         if duration < 30 or duration > 12 * 60:
             raise ValidationError({'duration_minutes': 'Durata trebuie sa fie intre 30 minute si 12 ore.'})
+
         if self.garage_id and self.center_id and self.garage.center_id != self.center_id:
-            raise ValidationError({'garage': 'Garajul selectat nu aparține service-ului ales.'})
+            raise ValidationError({'garage': 'Garajul selectat nu apartine service-ului ales.'})
         if self.mechanic_id and self.center_id and self.mechanic.center_id != self.center_id:
             raise ValidationError({'mechanic': 'Mecanicul selectat nu apartine service-ului ales.'})
+
         if self.garage_id and self.booking_date and self.booking_time:
             start_dt = datetime.combine(self.booking_date, self.booking_time)
             end_dt = start_dt + timedelta(minutes=duration)
@@ -180,6 +186,7 @@ class Booking(models.Model):
                 booking_status=self.status,
             ):
                 raise ValidationError({'booking_time': 'Intervalul ales nu mai este disponibil pentru garajul selectat.'})
+
         if self.mechanic_id and self.booking_date and self.booking_time:
             if not self.mechanic.is_time_available(
                 self.booking_date,
@@ -188,6 +195,7 @@ class Booking(models.Model):
                 exclude_booking_id=self.pk,
             ):
                 raise ValidationError({'mechanic': 'Mecanicul selectat este deja alocat in acest interval.'})
+
         allowed_tags = {choice[0] for choice in self.TAG_CHOICES}
         selected_tags = self.operational_tags or []
         invalid_tags = [tag for tag in selected_tags if tag not in allowed_tags]
@@ -200,44 +208,55 @@ class Booking(models.Model):
         if hours and mins:
             return f"{hours}:{mins:02d}"
         if hours:
-            return f"{hours} ore" if hours != 1 else '1 oră'
+            return '1 ora' if hours == 1 else f"{hours} ore"
         return f"{mins} min"
 
     def get_status_badge(self):
         classes = {
-            'pending': 'warning text-dark',
-            'quoted': 'secondary',
-            'confirmed': 'info text-dark',
-            'in_progress': 'primary',
-            'done': 'success',
-            'cancelled': 'danger',
+            self.STATUS_PENDING: 'warning text-dark',
+            self.STATUS_QUOTED: 'secondary',
+            self.STATUS_CONFIRMED: 'info text-dark',
+            self.STATUS_IN_PROGRESS: 'primary',
+            self.STATUS_WAITING_PARTS: 'warning text-dark',
+            self.STATUS_DONE: 'success',
+            self.STATUS_CANCELLED: 'danger',
         }
         return classes.get(self.status, 'secondary')
 
     def get_status_icon(self):
         icons = {
-            'pending': '⏳',
-            'quoted': '💬',
-            'confirmed': '✅',
-            'in_progress': '🔧',
-            'done': '🏁',
-            'cancelled': '❌',
+            self.STATUS_PENDING: '⏳',
+            self.STATUS_QUOTED: '💬',
+            self.STATUS_CONFIRMED: '✅',
+            self.STATUS_IN_PROGRESS: '🔧',
+            self.STATUS_WAITING_PARTS: '🧰',
+            self.STATUS_DONE: '🏁',
+            self.STATUS_CANCELLED: '❌',
         }
-        return icons.get(self.status, '❓')
+        return icons.get(self.status, '❔')
+
+    def has_operational_tag(self, tag):
+        return tag in (self.operational_tags or [])
 
     def operational_tag_labels(self):
         labels = dict(self.TAG_CHOICES)
         return [labels[tag] for tag in (self.operational_tags or []) if tag in labels]
 
     def needs_attention(self):
-        active_statuses = {self.STATUS_PENDING, self.STATUS_QUOTED, self.STATUS_CONFIRMED, self.STATUS_IN_PROGRESS}
+        active_statuses = {
+            self.STATUS_PENDING,
+            self.STATUS_QUOTED,
+            self.STATUS_CONFIRMED,
+            self.STATUS_IN_PROGRESS,
+            self.STATUS_WAITING_PARTS,
+        }
         if self.status not in active_statuses:
             return False
-        if self.status in {self.STATUS_CONFIRMED, self.STATUS_IN_PROGRESS} and not self.garage_id:
+        if self.status in {self.STATUS_CONFIRMED, self.STATUS_IN_PROGRESS, self.STATUS_WAITING_PARTS} and not self.garage_id:
             return True
-        if self.status == self.STATUS_IN_PROGRESS and not self.mechanic_id:
+        if self.status in {self.STATUS_IN_PROGRESS, self.STATUS_WAITING_PARTS} and not self.mechanic_id:
             return True
-        return self.TAG_BLOCKED in (self.operational_tags or []) or self.TAG_WAITING_PART in (self.operational_tags or [])
+        return self.has_operational_tag(self.TAG_BLOCKED) or self.has_operational_tag(self.TAG_WAITING_PART)
 
 
 class BookingAttachment(models.Model):
@@ -247,8 +266,8 @@ class BookingAttachment(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Atașament programare'
-        verbose_name_plural = 'Atașamente programări'
+        verbose_name = 'Atasament programare'
+        verbose_name_plural = 'Atasamente programari'
         ordering = ['uploaded_at']
 
     def __str__(self):
@@ -268,7 +287,7 @@ class BookingNotification(models.Model):
     KIND_STATUS_UPDATE = 'status_update'
 
     KIND_CHOICES = [
-        (KIND_BOOKING_NEW, 'Programare nouă'),
+        (KIND_BOOKING_NEW, 'Programare noua'),
         (KIND_STATUS_UPDATE, 'Actualizare status'),
     ]
 
@@ -286,7 +305,7 @@ class BookingNotification(models.Model):
 
     class Meta:
         verbose_name = 'Notificare programare'
-        verbose_name_plural = 'Notificări programări'
+        verbose_name_plural = 'Notificari programari'
         ordering = ['-created_at']
 
     def __str__(self):

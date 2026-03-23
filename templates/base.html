@@ -44,8 +44,13 @@
     .navbar-autohub { background: var(--ah-navbar-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--ah-border); padding: 0.6rem 0; position: sticky; top: 0; z-index: 1030; }
     .navbar-brand { font-family: 'Barlow Condensed', sans-serif; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.03em; color: var(--ah-text) !important; }
     .navbar-brand span.accent { color: var(--ah-red); }
-    .navbar-autohub .nav-link { color: var(--ah-text-soft) !important; font-weight: 500; font-size: 0.92rem; padding: 0.4rem 0.8rem !important; border-radius: 6px; transition: color 0.2s, background 0.2s; }
-    .navbar-autohub .nav-link:hover, .navbar-autohub .nav-link.active { color: var(--ah-text) !important; background: var(--ah-dark4); }
+    .navbar-autohub .nav-link { color: var(--ah-text-soft) !important; font-weight: 500; font-size: 0.92rem; padding: 0.4rem 0.8rem !important; border-radius: 10px; border: 1px solid transparent; transition: color 0.2s, background 0.2s, border-color 0.2s; }
+    .navbar-autohub .nav-link:hover, .navbar-autohub .nav-link.active { color: var(--ah-text) !important; background: var(--ah-dark4); border-color: rgba(255,255,255,0.06); }
+    .service-owner-nav { display:flex; flex-wrap:nowrap; gap:.22rem; align-items:center; min-width:0; overflow-x:auto; scrollbar-width:none; }
+    .service-owner-nav::-webkit-scrollbar { display:none; }
+    .service-owner-nav .nav-item { display:flex; }
+    .service-owner-nav .nav-link { display:flex; align-items:center; gap:.34rem; white-space:nowrap; padding:0.42rem 0.58rem !important; font-size:0.84rem; line-height:1.2; }
+    .service-owner-nav .nav-link i { flex:0 0 auto; }
     .btn-nav-cta { background: var(--ah-red); color: #fff !important; font-weight: 600; border-radius: 8px; padding: 0.4rem 1rem !important; font-size: 0.9rem; transition: background 0.2s, transform 0.1s; }
     .btn-nav-cta:hover { background: var(--ah-red-dark); transform: translateY(-1px); }
     .navbar-search { max-width: 340px; flex: 1; }
@@ -141,12 +146,13 @@
     .dropdown-menu-dark, .dropdown-menu { background: var(--ah-dark2) !important; border-color: var(--ah-border) !important; }
     .dropdown-item { color: var(--ah-text) !important; }
     .dropdown-item:hover, .dropdown-item:focus { background: var(--ah-dark3) !important; color: var(--ah-text) !important; }
-    .btn-theme-toggle { border: 1px solid var(--ah-border); background: var(--ah-dark2); color: var(--ah-text); border-radius: 999px; padding: .45rem .9rem; font-weight: 600; }
+    .btn-theme-toggle { border: 1px solid var(--ah-border); background: var(--ah-dark2); color: var(--ah-text); border-radius: 999px; padding: .32rem .68rem; font-weight: 600; font-size: .84rem; line-height: 1.1; }
     .btn-theme-toggle:hover { background: var(--ah-dark3); color: var(--ah-text); }
-    .theme-toggle-icon { width: 1rem; display: inline-flex; justify-content: center; }
+    .theme-toggle-icon { width: .95rem; display: inline-flex; justify-content: center; }
+    #themeToggleLabel { display:inline-flex; align-items:center; }
     html[data-theme='light'] .text-white { color: var(--ah-text) !important; }
-    html[data-theme='light'] .btn-outline-light { color: var(--ah-text) !important; border-color: var(--ah-border) !important; }
-    html[data-theme='light'] .btn-outline-light:hover { background: var(--ah-dark3) !important; }
+    html[data-theme='light'] .btn-outline-light { color: var(--ah-text) !important; border-color: var(--ah-border) !important; background: #fff !important; }
+    html[data-theme='light'] .btn-outline-light:hover { background: var(--ah-dark3) !important; border-color: rgba(230,57,70,0.28) !important; color: var(--ah-text) !important; }
     html[data-theme='light'] .navbar-toggler .text-white { color: var(--ah-text) !important; }
     html[data-theme='light'] .text-muted-custom { color: var(--ah-muted) !important; }
     html[data-theme='light'] .alert { color: var(--ah-text); }
@@ -156,6 +162,65 @@
     }
     html[data-theme='light'] .ah-surface-card { box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05); }
     html[data-theme='light'] .ah-empty-state { background: linear-gradient(180deg, #ffffff, #f6f8fa); }
+    html[data-theme='light'] .navbar-autohub .nav-link {
+      color: var(--ah-text-soft) !important;
+      background: transparent;
+      border-color: transparent;
+    }
+    html[data-theme='light'] .navbar-autohub .nav-link:hover {
+      color: var(--ah-text) !important;
+      background: rgba(21,32,43,0.04);
+      border-color: rgba(21,32,43,0.08);
+    }
+    html[data-theme='light'] .navbar-autohub .nav-link.active {
+      color: var(--ah-red) !important;
+      background: rgba(230,57,70,0.09);
+      border-color: rgba(230,57,70,0.18);
+    }
+    html[data-theme='light'] .service-owner-nav .nav-link {
+      box-shadow: none;
+    }
+    html[data-theme='light'] .navbar-autohub .dropdown-menu {
+      background: #ffffff !important;
+      border-color: var(--ah-border) !important;
+      box-shadow: 0 18px 40px rgba(15,23,42,0.08);
+    }
+    html[data-theme='light'] .navbar-autohub .dropdown-item { color: var(--ah-text) !important; }
+    html[data-theme='light'] .navbar-autohub .dropdown-item:hover,
+    html[data-theme='light'] .navbar-autohub .dropdown-item:focus { background: var(--ah-dark3) !important; }
+    html[data-theme='light'] .btn-theme-toggle {
+      background: #ffffff;
+      color: var(--ah-text);
+      border-color: var(--ah-border);
+      box-shadow: 0 8px 18px rgba(15,23,42,0.05);
+    }
+    html[data-theme='light'] .btn-theme-toggle:hover {
+      background: var(--ah-dark3);
+      border-color: rgba(230,57,70,0.18);
+    }
+    html[data-theme='light'] .navbar-toggler {
+      background: #ffffff;
+      border: 1px solid var(--ah-border) !important;
+      border-radius: 10px;
+      padding: .35rem .55rem;
+    }
+    @media (min-width: 992px) {
+      .navbar-autohub .navbar-collapse {
+        display:flex !important;
+        align-items:center;
+        gap:.75rem;
+      }
+      .navbar-autohub .service-owner-nav {
+        flex:1 1 auto;
+      }
+      .navbar-autohub .navbar-nav.align-items-center {
+        flex:0 0 auto;
+        display:flex;
+        flex-direction:row;
+        align-items:center;
+        flex-wrap:nowrap;
+      }
+    }
     ::-webkit-scrollbar-thumb { background: var(--ah-dark4); border-radius: 4px; }
     html[data-theme='light'] ::-webkit-scrollbar-track { background: var(--ah-dark3); }
     html[data-theme='light'] ::-webkit-scrollbar-thumb { background: var(--ah-dark4); }
@@ -381,9 +446,8 @@
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" href="{% url 'services:notifications' %}">
-            <i class="bi bi-bell me-1"></i>Notificări
-            <span class="badge bg-danger ms-1 {% if not service_unread_notifications %}d-none{% endif %}" id="serviceUnreadBadge">{{ service_unread_notifications }}</span>
+          <a class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" href="{% url 'services:reports' %}">
+            <i class="bi bi-graph-up-arrow me-1"></i>Rapoarte
           </a>
         </li>
         <li class="nav-item">
@@ -496,68 +560,6 @@
       });
     }
 
-    {% if user.is_authenticated and has_service_center %}
-    const unreadBadge = document.getElementById('serviceUnreadBadge');
-    let lastUnreadCount = Number(unreadBadge?.textContent || 0);
-
-    function syncNotificationBadge(count) {
-      if (!unreadBadge) return;
-      unreadBadge.textContent = count;
-      unreadBadge.classList.toggle('d-none', !count);
-    }
-
-    async function refreshNotificationFeed() {
-      try {
-        const response = await fetch("{% url 'services:notifications_feed' %}", {
-          headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          credentials: 'same-origin'
-        });
-        if (!response.ok) return;
-        const payload = await response.json();
-        if (!payload.ok) return;
-        syncNotificationBadge(payload.unread_count || 0);
-        if ((payload.unread_count || 0) > lastUnreadCount) {
-          const delta = (payload.unread_count || 0) - lastUnreadCount;
-          showLiveToast(delta === 1 ? 'Ai o notificare noua.' : `Ai ${delta} notificari noi.`, 'info');
-        }
-        lastUnreadCount = payload.unread_count || 0;
-      } catch (error) {
-        console.debug('Notification polling unavailable', error);
-      }
-    }
-
-    function showLiveToast(message, level) {
-      if (!window.bootstrap || !message) return;
-      const host = document.querySelector('.toast-container-custom') || (() => {
-        const el = document.createElement('div');
-        el.className = 'toast-container-custom';
-        document.body.appendChild(el);
-        return el;
-      })();
-      const toast = document.createElement('div');
-      toast.className = `toast toast-autohub ${level || 'info'} mb-3`;
-      toast.setAttribute('role', 'alert');
-      toast.setAttribute('aria-live', 'assertive');
-      toast.setAttribute('aria-atomic', 'true');
-      toast.setAttribute('data-bs-delay', '3200');
-      toast.innerHTML = `
-        <div class="toast-header">
-          <i class="bi bi-bell-fill text-red me-2"></i>
-          <strong class="me-auto">AutoEMG</strong>
-          <small class="text-muted">acum</small>
-          <button type="button" class="btn-close btn-close-white ms-2" data-bs-dismiss="toast"></button>
-        </div>
-        <div class="toast-body">${message}</div>
-      `;
-      host.appendChild(toast);
-      const instance = new bootstrap.Toast(toast);
-      toast.addEventListener('hidden.bs.toast', () => toast.remove());
-      instance.show();
-    }
-
-    refreshNotificationFeed();
-    window.setInterval(refreshNotificationFeed, 45000);
-    {% endif %}
   });
 </script>
 </body>

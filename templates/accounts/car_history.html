@@ -1,45 +1,113 @@
 {% extends "base.html" %}
-{% block title %}Istoric {{ car.make }} {{ car.model }} — AutoEMG{% endblock %}
+{% block title %}Istoric Auto | AutoHub{% endblock %}
+
+{% block extra_css %}
+<style>
+  .car-summary-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:1rem; }
+  .car-summary-card { background:var(--ah-dark2); border:1px solid var(--ah-border); border-radius:20px; padding:1rem; }
+  .car-summary-value { font:800 2rem 'Barlow Condensed', sans-serif; line-height:1; }
+  .car-timeline-item { background:var(--ah-dark2); border:1px solid var(--ah-border); border-radius:20px; padding:1rem; }
+  @media (max-width: 900px) { .car-summary-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  @media (max-width: 640px) { .car-summary-grid { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-5">
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-    <div>
-      <h1 class="mb-1">Istoric pentru {{ car.make }} {{ car.model }}</h1>
-      <p class="text-muted-custom mb-0">{{ car.plate_number }} • VIN: {{ car.vin }}</p>
+<div class="container py-4 py-lg-5">
+  <section class="ah-page-header">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+      <div>
+        <div class="ah-page-eyebrow"><i class="bi bi-car-front"></i>Dosarul masinii</div>
+        <h1 class="section-title mb-1">{{ car.make }} {{ car.model }}</h1>
+        <p class="ah-page-subtitle">{{ car.plate_number }} · VIN {{ car.vin }} · vezi toate lucrarile, costurile si recomandarile intr-un singur loc.</p>
+      </div>
+      <a href="{% url 'accounts:cars' %}" class="btn btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Inapoi la masini</a>
     </div>
-    <a href="{% url 'accounts:cars' %}" class="btn btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Înapoi la mașini</a>
+  </section>
+
+  <div class="car-summary-grid mb-4">
+    <div class="car-summary-card">
+      <div class="text-muted-custom small">Interventii finalizate</div>
+      <div class="car-summary-value">{{ dossier.summary.interventions_count }}</div>
+    </div>
+    <div class="car-summary-card">
+      <div class="text-muted-custom small">Cost total</div>
+      <div class="car-summary-value">{{ dossier.summary.total_cost|default:"0" }}</div>
+      <div class="small text-muted-custom mt-1">RON</div>
+    </div>
+    <div class="car-summary-card">
+      <div class="text-muted-custom small">Ultima vizita</div>
+      <div class="car-summary-value" style="font-size:1.5rem;">{% if dossier.summary.last_visit %}{{ dossier.summary.last_visit.booking_date|date:"d.m.Y" }}{% else %}-{% endif %}</div>
+    </div>
+    <div class="car-summary-card">
+      <div class="text-muted-custom small">Urmatoarea revizie</div>
+      <div class="car-summary-value" style="font-size:1.5rem;">{% if dossier.summary.next_service_date %}{{ dossier.summary.next_service_date|date:"d.m.Y" }}{% else %}-{% endif %}</div>
+    </div>
   </div>
 
-  <div class="row g-3">
-    {% for booking in history %}
-    <div class="col-12">
-      <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
-        <div class="d-flex flex-wrap justify-content-between gap-3 mb-3">
-          <div>
-            <h4 class="mb-1">{{ booking.center.name }}</h4>
-            <div class="text-muted-custom small">{{ booking.booking_date|date:"d.m.Y" }} • {{ booking.booking_time|time:"H:i" }}</div>
-          </div>
-          <span class="badge bg-success">Finalizată</span>
-        </div>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <div class="small text-muted-custom">Ce s-a făcut</div>
-            <div class="fw-semibold">{{ booking.used_services|default:booking.problem_description|linebreaksbr }}</div>
-          </div>
-          <div class="col-md-4">
-            <div class="small text-muted-custom">Observații service</div>
-            <div>{{ booking.additional_description|default:'—'|linebreaksbr }}</div>
-          </div>
-          <div class="col-md-2">
-            <div class="small text-muted-custom">Mecanic</div>
-            <div>{{ booking.mechanic.name|default:'—' }}</div>
-          </div>
-        </div>
+  {% if dossier.open_recommendations %}
+  <section class="ah-surface-card p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+      <div>
+        <h2 class="h4 mb-1">Recomandari ramase</h2>
+        <p class="text-muted-custom small mb-0">Ce a ramas de facut sau verificat la masina ta.</p>
+      </div>
+      <span class="ah-badge-soft"><i class="bi bi-clipboard-pulse"></i>{{ dossier.open_recommendations|length }} active</span>
+    </div>
+    <div class="d-grid gap-2">
+      {% for recommendation in dossier.open_recommendations %}
+      <div class="car-timeline-item">
+        <div class="fw-semibold">{{ recommendation.title }}</div>
+        <div class="text-muted-custom small mt-1">{{ recommendation.details|default:"Fara detalii suplimentare." }}</div>
+        <div class="small text-muted-custom mt-2">Prioritate {{ recommendation.get_priority_display|lower }}{% if recommendation.due_date %} · recomandat pana la {{ recommendation.due_date|date:"d.m.Y" }}{% endif %}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="ah-surface-card p-4">
+    <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+      <div>
+        <h2 class="h4 mb-1">Cronologie service</h2>
+        <p class="text-muted-custom small mb-0">Istoricul complet al lucrarilor si programarilor gasite pentru aceasta masina.</p>
       </div>
     </div>
-    {% empty %}
-    <div class="col-12"><div class="p-4 bg-dark2 border rounded-xl text-muted-custom" style="border-color:var(--ah-border) !important;">Nu există încă intervenții finalizate pentru această mașină.</div></div>
-    {% endfor %}
-  </div>
+    <div class="d-grid gap-3">
+      {% for booking in history %}
+      <article class="car-timeline-item">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+          <div>
+            <div class="fw-semibold">{{ booking.center.name }}</div>
+            <div class="text-muted-custom small">{{ booking.booking_date|date:"d.m.Y" }} · {{ booking.booking_time|time:"H:i" }} · {{ booking.get_status_display }}</div>
+          </div>
+          <span class="badge bg-{{ booking.get_status_badge }}">{{ booking.get_status_display }}</span>
+        </div>
+        <div class="mt-3">
+          <div class="small text-muted-custom mb-1">Ce s-a facut</div>
+          <div class="fw-semibold">{{ booking.used_services|default:booking.problem_description|linebreaksbr }}</div>
+        </div>
+        {% if booking.job_card %}
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <div class="small text-muted-custom">Cost final</div>
+            <div>{{ booking.job_card.final_cost|default:booking.job_card.estimated_cost|default:"-" }} RON</div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-muted-custom">Kilometraj</div>
+            <div>{{ booking.job_card.mileage|default:"-" }}</div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-muted-custom">Mecanic</div>
+            <div>{{ booking.mechanic.name|default:"-" }}</div>
+          </div>
+        </div>
+        {% endif %}
+      </article>
+      {% empty %}
+      <div class="ah-empty-state"><strong>Nu exista interventii inca</strong>Istoricul se completeaza automat dupa ce folosesti platforma pentru programari si lucrari.</div>
+      {% endfor %}
+    </div>
+  </section>
 </div>
 {% endblock %}
