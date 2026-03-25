@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.models import Car
+from services.business import transition_booking_status
 from services.models import ServiceCenter, ServiceGarage, ServiceItem, ServiceCategory
 from .ai import estimate_booking_duration, normalize_duration_minutes
 from .forms import BookingForm
@@ -193,16 +194,12 @@ def my_bookings(request):
     ).order_by('-created_at')
 
     booking_list = list(bookings)
+    work_logs = {
+        work_log.booking_id: work_log
+        for work_log in MechanicWorkLog.objects.filter(booking__in=booking_list).prefetch_related('photos')
+    }
     for b in booking_list:
-        b.mechanic_work_log = None
-        b.job_card_obj = None
-        if b.mechanic_id:
-            try:
-                b.mechanic_work_log = MechanicWorkLog.objects.filter(
-                    booking=b
-                ).prefetch_related('photos').first()
-            except Exception:
-                pass
+        b.mechanic_work_log = work_logs.get(b.pk)
         try:
             b.job_card_obj = b.job_card
         except Exception:
@@ -336,12 +333,10 @@ def booking_accept_quote(request, pk):
         booking_status=Booking.STATUS_CONFIRMED,
     ):
         messages.error(request, 'Intervalul nu mai este disponibil. Service-ul trebuie să îți trimită o ofertă nouă.')
-        booking.status = Booking.STATUS_PENDING
-        booking.save(update_fields=['status', 'updated_at'])
+        transition_booking_status(booking, Booking.STATUS_PENDING, actor=request.user)
         return redirect('bookings:my_bookings')
 
-    booking.status = Booking.STATUS_CONFIRMED
-    booking.save(update_fields=['status', 'updated_at'])
+    transition_booking_status(booking, Booking.STATUS_CONFIRMED, actor=request.user)
     log_booking_activity(
         booking,
         'status_changed',
@@ -373,8 +368,7 @@ def booking_reject_quote(request, pk):
         messages.info(request, 'Această ofertă nu mai așteaptă răspunsul tău.')
         return redirect('bookings:my_bookings')
 
-    booking.status = Booking.STATUS_CANCELLED
-    booking.save(update_fields=['status', 'updated_at'])
+    transition_booking_status(booking, Booking.STATUS_CANCELLED, actor=request.user)
     log_booking_activity(
         booking,
         'status_changed',

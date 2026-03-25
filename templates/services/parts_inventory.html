@@ -31,6 +31,14 @@
   .stock-table-wrap { overflow:auto; }
   .stock-row-actions { display:grid; gap:.45rem; }
   .stock-movement { border:1px solid var(--ah-border); border-radius:18px; padding:.9rem; background:var(--ah-dark3); }
+  .stock-mobile-list { display:none; }
+  .stock-mobile-card {
+    background: var(--ah-dark2);
+    border: 1px solid var(--ah-border);
+    border-radius: 20px;
+    padding: 1rem;
+    box-shadow: 0 14px 34px rgba(0,0,0,.14);
+  }
   html[data-theme='light'] .stock-card,
   html[data-theme='light'] .stock-stat {
     box-shadow: 0 12px 28px rgba(15,23,42,.06);
@@ -54,6 +62,8 @@
   }
   @media (max-width: 767px) {
     .stock-stats { grid-template-columns:1fr; }
+    .stock-table-wrap { display:none; }
+    .stock-mobile-list { display:grid; gap:.85rem; }
   }
 </style>
 {% endblock %}
@@ -124,7 +134,7 @@
 
         <form method="get" class="row g-2 mb-3">
           <input type="hidden" name="center" value="{{ selected_center.pk }}">
-          <div class="col-lg-4"><input type="search" name="q" value="{{ selected_query }}" class="form-control" placeholder="Cauta piesa, cod, brand, furnizor"></div>
+          <div class="col-lg-4"><input type="search" name="q" value="{{ selected_query }}" data-testid="inventory-search-input" class="form-control" placeholder="Cauta piesa, cod, brand, furnizor"></div>
           <div class="col-lg-2">
             <select name="category" class="form-select">
               <option value="">Toate categoriile</option>
@@ -173,7 +183,7 @@
             </thead>
             <tbody>
               {% for part in parts %}
-              <tr>
+              <tr data-testid="inventory-part-row" data-part-name="{{ part.name|lower }}">
                 <td>
                   <div class="fw-semibold">{{ part.name }}</div>
                   <div class="small text-muted-custom">
@@ -214,14 +224,14 @@
                       <input type="hidden" name="action" value="record_movement">
                       <input type="hidden" name="center_id" value="{{ selected_center.pk }}">
                       <input type="hidden" name="part_id" value="{{ part.pk }}">
-                      <select name="movement_type" class="form-select form-select-sm">
+                      <select name="movement_type" data-testid="inventory-movement-type" class="form-select form-select-sm">
                         <option value="in">Intrare</option>
                         <option value="out">Iesire</option>
                         <option value="reserve">Rezervare</option>
                         <option value="release">Retur</option>
                       </select>
-                      <input type="number" name="quantity" min="1" value="1" class="form-control form-control-sm" style="max-width:80px;">
-                      <button class="btn btn-sm btn-outline-light" type="submit">Log</button>
+                      <input type="number" name="quantity" min="1" value="1" data-testid="inventory-movement-quantity" class="form-control form-control-sm" style="max-width:80px;">
+                      <button class="btn btn-sm btn-outline-light" data-testid="inventory-log-movement-button" type="submit">Log</button>
                     </form>
                     <form method="post">
                       {% csrf_token %}
@@ -237,6 +247,27 @@
             </tbody>
           </table>
         </div>
+
+        <div class="stock-mobile-list">
+          {% for part in parts %}
+          <article class="stock-mobile-card" data-testid="inventory-part-row" data-part-name="{{ part.name|lower }}">
+            <div class="d-flex justify-content-between gap-3 align-items-start">
+              <div>
+                <div class="fw-semibold">{{ part.name }}</div>
+                <div class="small text-muted-custom mt-1">{{ part.part_number|default:"Fără cod" }} · {{ part.get_category_display }}</div>
+              </div>
+              <span class="badge bg-{{ part.stock_status_badge }}">{{ part.stock_status_label }}</span>
+            </div>
+            <div class="small text-muted-custom mt-3">Stoc: <strong>{{ part.stock }} {{ part.unit }}</strong> · Minim: {{ part.minimum_stock }} {{ part.unit }}</div>
+            <div class="small text-muted-custom mt-1">Vânzare: {{ part.sale_price|default:part.price|default:"-" }} RON</div>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <form method="post">{% csrf_token %}<input type="hidden" name="action" value="adjust_stock"><input type="hidden" name="center_id" value="{{ selected_center.pk }}"><input type="hidden" name="part_id" value="{{ part.pk }}"><input type="hidden" name="delta" value="-1"><button class="btn btn-sm btn-outline-secondary" type="submit">-1</button></form>
+              <form method="post">{% csrf_token %}<input type="hidden" name="action" value="adjust_stock"><input type="hidden" name="center_id" value="{{ selected_center.pk }}"><input type="hidden" name="part_id" value="{{ part.pk }}"><input type="hidden" name="delta" value="1"><button class="btn btn-sm btn-outline-light" type="submit">+1</button></form>
+              <form method="post">{% csrf_token %}<input type="hidden" name="action" value="adjust_stock"><input type="hidden" name="center_id" value="{{ selected_center.pk }}"><input type="hidden" name="part_id" value="{{ part.pk }}"><input type="hidden" name="delta" value="5"><button class="btn btn-sm btn-outline-light" type="submit">+5</button></form>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
         {% else %}
         <div class="ah-empty-state"><strong>Nicio piesa pentru filtrul curent</strong>Adauga piese noi sau schimba filtrele pentru a vedea tot inventarul.</div>
         {% endif %}
@@ -251,7 +282,7 @@
         </div>
         <div class="d-grid gap-2">
           {% for movement in recent_movements %}
-          <article class="stock-movement">
+          <article class="stock-movement" data-testid="inventory-movement-item">
             <div class="d-flex justify-content-between gap-3">
               <div>
                 <div class="fw-semibold">{{ movement.part.name }}</div>

@@ -1,149 +1,426 @@
 {% extends 'base.html' %}
 {% block title %}{{ center.name }} — AutoEMG{% endblock %}
 
+{% block extra_css %}
+<style>
+  .service-detail-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(320px, .8fr);
+    gap: 1.25rem;
+  }
+  .service-hero {
+    background: linear-gradient(135deg, rgba(230,57,70,0.14), var(--ah-dark2) 58%, rgba(244,162,97,0.08));
+    border: 1px solid var(--ah-border);
+    border-radius: 26px;
+    padding: 1.35rem;
+    box-shadow: 0 18px 44px rgba(0,0,0,.16);
+  }
+  .service-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .service-gallery-card {
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid var(--ah-border);
+    background: var(--ah-dark3);
+  }
+  .service-gallery-card img {
+    width: 100%;
+    height: 240px;
+    object-fit: cover;
+    display: block;
+  }
+  .service-service-card,
+  .service-review-card,
+  .service-garage-card {
+    height: 100%;
+    padding: 1rem;
+    border-radius: 18px;
+    border: 1px solid var(--ah-border);
+    background: var(--ah-dark3);
+  }
+  .service-rating-box {
+    min-width: 120px;
+    text-align: right;
+  }
+  .service-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .9rem;
+    margin-top: 1rem;
+  }
+  .service-stats-grid .stat-box {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 18px;
+    padding: .9rem 1rem;
+  }
+  .service-stats-grid .stat-value {
+    font: 800 1.7rem 'Barlow Condensed', sans-serif;
+    line-height: 1;
+  }
+  .service-sidebar {
+    display: grid;
+    gap: 1rem;
+    align-self: start;
+    position: sticky;
+    top: 88px;
+  }
+  .service-cta-card {
+    background: var(--ah-dark2);
+    border: 1px solid var(--ah-border);
+    border-radius: 24px;
+    padding: 1.25rem;
+    box-shadow: 0 18px 42px rgba(0,0,0,.16);
+  }
+  .rating-breakdown {
+    display: grid;
+    gap: .7rem;
+  }
+  .rating-breakdown-row {
+    display: grid;
+    grid-template-columns: 52px 1fr 44px;
+    gap: .75rem;
+    align-items: center;
+  }
+  .rating-breakdown-bar {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--ah-dark4);
+    overflow: hidden;
+  }
+  .rating-breakdown-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--ah-red), var(--ah-orange));
+  }
+  @media (max-width: 1199.98px) {
+    .service-detail-shell {
+      grid-template-columns: 1fr;
+    }
+    .service-sidebar {
+      position: static;
+    }
+  }
+  @media (max-width: 767.98px) {
+    .service-gallery-grid,
+    .service-stats-grid {
+      grid-template-columns: 1fr;
+    }
+    .service-hero {
+      padding: 1.1rem;
+    }
+    .service-rating-box {
+      text-align: left;
+      min-width: 0;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-5">
-  <div class="row g-4">
-    <div class="col-lg-8">
-      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+<div class="container py-4 py-lg-5">
+  <div class="service-detail-shell">
+    <div class="d-grid gap-4">
+      <section class="service-hero">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
           <div>
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
-                    style="width:48px;height:48px;background:var(--ah-dark4);font-size:1.6rem;">
-                {{ center.category.icon }}
-              </span>
+            <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+              <span class="ah-icon-circle" style="font-size:1.2rem;">{{ center.category.icon }}</span>
+              {% if center.verification_status == 'verified' %}
+              <span class="ah-status-pill confirmed"><i class="bi bi-patch-check-fill"></i>Service verificat</span>
+              {% endif %}
               {% if center.is_featured %}
-              <span class="badge-featured">⭐ Recomandat</span>
+              <span class="badge-featured"><i class="bi bi-star-fill"></i> Recomandat</span>
               {% endif %}
             </div>
             <h1 class="section-title mb-1">{{ center.name }}</h1>
-            <p class="text-muted-custom mb-0">
+            <div class="ah-chip-list mb-3">
+              {% for cat in center.display_categories %}
+              <span class="ah-chip"><i class="bi bi-tools"></i>{{ cat.name }}</span>
+              {% endfor %}
+            </div>
+            <p class="text-muted-custom mb-2">
               <i class="bi bi-geo-alt me-1 text-red"></i>{{ center.address }}, {{ center.get_city_display }}
-              <span class="mx-2">·</span>
-              <i class="bi bi-tag me-1"></i>{{ center.category.name }}
             </p>
             {% if center.latitude and center.longitude %}
-              <div id="routeInfo" class="mt-2 small text-muted-custom">
-                <i class="bi bi-signpost-2 text-red me-1"></i>
-                Calculăm distanța până la tine...
-              </div>
-              <div id="centerCoords"
-                  data-lat="{{ center.latitude|stringformat:'f' }}"
-                  data-lng="{{ center.longitude|stringformat:'f' }}"
-                  class="d-none"></div>
+            <div id="routeInfo" class="small text-muted-custom">
+              <i class="bi bi-signpost-2 text-red me-1"></i>Calculăm distanța până la tine...
+            </div>
+            <div id="centerCoords"
+                data-lat="{{ center.latitude|stringformat:'f' }}"
+                data-lng="{{ center.longitude|stringformat:'f' }}"
+                class="d-none"></div>
             {% else %}
-              <div class="mt-2 small text-muted-custom">
-                <i class="bi bi-exclamation-triangle text-warning me-1"></i>
-                Locația acestui service nu este setată încă.
-              </div>
+            <div class="small text-muted-custom">
+              <i class="bi bi-exclamation-triangle text-warning me-1"></i>Locația acestui service nu este configurată încă.
+            </div>
             {% endif %}
           </div>
-          <div class="text-end">
-            <div class="fs-4 fw-bold text-orange">{{ avg_rating|floatformat:1 }}</div>
-            <div class="small text-muted-custom">{{ review_count }} recenzii</div>
+
+          <div class="service-rating-box">
+            <div class="fs-2 fw-bold text-orange">{{ avg_rating|floatformat:1 }}</div>
+            <div class="text-muted-custom small">{{ review_count }} recenzii verificate</div>
           </div>
         </div>
-        <p class="text-muted-custom mb-0">{{ center.description }}</p>
-      </div>
+
+        <p class="text-muted-custom mb-0 mt-3">{{ center.description }}</p>
+
+        <div class="service-stats-grid">
+          <div class="stat-box">
+            <div class="text-muted-custom small">Program</div>
+            <div class="stat-value" style="font-size:1.25rem;">{{ center.schedule|default:"Nesetat" }}</div>
+          </div>
+          <div class="stat-box">
+            <div class="text-muted-custom small">Preț de pornire</div>
+            <div class="stat-value" style="font-size:1.25rem;">{% if center.min_price %}{{ center.min_price|floatformat:0 }} RON{% else %}La cerere{% endif %}</div>
+          </div>
+          <div class="stat-box">
+            <div class="text-muted-custom small">Posturi de lucru</div>
+            <div class="stat-value">{{ center.garages.count }}</div>
+          </div>
+          <div class="stat-box">
+            <div class="text-muted-custom small">Servicii listate</div>
+            <div class="stat-value">{{ services|length }}</div>
+          </div>
+        </div>
+      </section>
 
       {% if center.card_image or center.gallery_images.all %}
-      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
-        <h4 class="mb-3"><i class="bi bi-images me-2 text-red"></i>Poze service</h4>
-        <div class="row g-3">
+      <section class="ah-section-card">
+        <div class="ah-section-title-row">
+          <div>
+            <h2 class="h4 mb-1">Poze service</h2>
+            <p class="ah-section-lead">Spațiul, recepția și exemple din activitatea service-ului.</p>
+          </div>
+        </div>
+        <div class="service-gallery-grid">
           {% if center.card_image %}
-            <div class="col-md-6"><img src="{{ center.card_image.url }}" alt="{{ center.name }}" class="img-fluid rounded-4 w-100" style="height:260px;object-fit:cover;"></div>
+          <div class="service-gallery-card">
+            <img src="{{ center.card_image.url }}" alt="{{ center.name }}">
+          </div>
           {% endif %}
           {% for image in center.gallery_images.all %}
-            <div class="col-md-6"><img src="{{ image.image.url }}" alt="{{ image.caption|default:center.name }}" class="img-fluid rounded-4 w-100" style="height:260px;object-fit:cover;">{% if image.caption %}<div class="small text-muted-custom mt-2">{{ image.caption }}</div>{% endif %}</div>
+          <div class="service-gallery-card">
+            <img src="{{ image.image.url }}" alt="{{ image.caption|default:center.name }}">
+            {% if image.caption %}<div class="p-3 small text-muted-custom">{{ image.caption }}</div>{% endif %}
+          </div>
           {% endfor %}
         </div>
-      </div>
+      </section>
       {% endif %}
+
+      <section class="ah-section-card">
+        <div class="ah-section-title-row">
+          <div>
+            <h2 class="h4 mb-1">Servicii și specializări</h2>
+            <p class="ah-section-lead">Vezi rapid ce face service-ul și care sunt tarifele orientative.</p>
+          </div>
+        </div>
+        <div class="row g-3">
+          {% for service in services %}
+          <div class="col-md-6">
+            <div class="service-service-card">
+              <div class="fw-semibold">{{ service.name }}</div>
+              <div class="small text-muted-custom mt-2">{{ service.description|default:'Descriere disponibilă la programare sau la confirmarea ofertei.' }}</div>
+              <div class="text-orange fw-bold mt-3">{{ service.price_display }}</div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="col-12">
+            <div class="ah-empty-state"><strong>Lista de servicii este în curs de completare</strong>Poți totuși trimite o programare și primi confirmare direct din service.</div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
 
       {% if center.garages.all %}
-      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
-        <h4 class="mb-3"><i class="bi bi-building-gear me-2 text-orange"></i>Garaje disponibile</h4>
-        <div class="row g-3">{% for garage in center.garages.all %}<div class="col-md-6"><div class="border rounded-xl p-3 h-100" style="border-color:var(--ah-border)"><div class="fw-semibold">{{ garage.name }}</div><div class="small text-muted-custom">{{ garage.category.icon }} {{ garage.category.name }}</div></div></div>{% endfor %}</div>
-      </div>
+      <section class="ah-section-card">
+        <div class="ah-section-title-row">
+          <div>
+            <h2 class="h4 mb-1">Posturi de lucru disponibile</h2>
+            <p class="ah-section-lead">Structura internă a service-ului și tipurile de lucrări pe care le acoperă.</p>
+          </div>
+        </div>
+        <div class="row g-3">
+          {% for garage in center.garages.all %}
+          <div class="col-md-6">
+            <div class="service-garage-card">
+              <div class="fw-semibold">{{ garage.name }}</div>
+              <div class="small text-muted-custom mt-2">{{ garage.category.icon }} {{ garage.category.name }}</div>
+              <div class="small text-muted-custom mt-2">{{ garage.open_time|time:"H:i" }} - {{ garage.close_time|time:"H:i" }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
       {% endif %}
 
-      <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
-        <h4 class="mb-3"><i class="bi bi-tools me-2 text-red"></i>Servicii</h4>
-        <div class="row g-3">{% for service in services %}<div class="col-md-6"><div class="border rounded-xl p-3 h-100" style="border-color:var(--ah-border)"><div class="fw-semibold">{{ service.name }}</div><div class="small text-muted-custom mb-2">{{ service.description|default:'Fără descriere suplimentară.' }}</div><div class="text-orange fw-bold">{{ service.price_display }}</div></div></div>{% empty %}<div class="text-muted-custom">Nu există servicii încă.</div>{% endfor %}</div>
-      </div>
+      <section class="ah-section-card">
+        <div class="ah-section-title-row">
+          <div>
+            <h2 class="h4 mb-1">Recenzii și încredere</h2>
+            <p class="ah-section-lead">Feedback public și motive clare pentru care merită sau nu să programezi aici.</p>
+          </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+          <div class="col-lg-5">
+            <div class="service-review-card">
+              <div class="fs-2 fw-bold text-orange">{{ avg_rating|floatformat:1 }}</div>
+              <div class="text-muted-custom mb-3">{{ review_count }} recenzii</div>
+              <div class="rating-breakdown">
+                {% for stars, row in rating_breakdown.items %}
+                <div class="rating-breakdown-row">
+                  <span class="small">{{ stars }} stele</span>
+                  <div class="rating-breakdown-bar"><span style="width:{{ row.pct }}%"></span></div>
+                  <span class="small text-muted-custom text-end">{{ row.count }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            {% if user.is_authenticated and can_review and not user_review %}
+            <form method="post" action="{% url 'services:review_create' center.slug %}" enctype="multipart/form-data" class="service-review-card" data-testid="service-review-form">
+              {% csrf_token %}
+              <div class="row g-2">
+                <div class="col-md-4">{{ review_form.rating }}</div>
+                <div class="col-md-8">{{ review_form.title }}</div>
+                <div class="col-12">{{ review_form.body }}</div>
+                <div class="col-12">{{ review_form.images }}<div class="small text-muted-custom mt-1">Poți adăuga și poze relevante pentru experiența ta.</div></div>
+                <div class="col-12"><button class="btn btn-nav-cta w-100" type="submit" data-testid="service-review-submit">Trimite recenzia</button></div>
+              </div>
+            </form>
+            {% elif user.is_authenticated and user_review %}
+            <div class="alert alert-secondary">Ai lăsat deja o recenzie pentru acest service.</div>
+            {% elif user.is_authenticated %}
+            <div class="alert alert-secondary">Poți lăsa o recenzie după ce ai o programare finalizată la acest service.</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="d-grid gap-3">
+          {% for review in reviews|slice:':5' %}
+          <article class="service-review-card" data-testid="service-review-item">
+            <div class="d-flex justify-content-between gap-3 flex-wrap">
+              <div>
+                <div class="fw-semibold">{{ review.title }}</div>
+                <div class="small text-orange mt-1">{{ review.rating }} stele · {{ review.user.username }}</div>
+              </div>
+            </div>
+            <div class="small text-muted-custom mt-3">{{ review.body }}</div>
+            {% if review.images.all %}
+            <div class="row g-2 mt-2">
+              {% for image in review.images.all %}
+              <div class="col-4"><img src="{{ image.image.url }}" class="img-fluid rounded-3 w-100" style="height:90px;object-fit:cover;" alt="poză recenzie"></div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </article>
+          {% empty %}
+          <div class="ah-empty-state"><strong>Încă nu există recenzii publice</strong>Poți fi primul client care oferă feedback după o lucrare finalizată.</div>
+          {% endfor %}
+        </div>
+      </section>
     </div>
 
-    <!-- ===== SIDEBAR DREAPTA ===== -->
-    <div class="col-lg-4">
+    <aside class="service-sidebar">
+      <section class="service-cta-card">
+        <div class="ah-page-eyebrow mb-2"><i class="bi bi-calendar2-check"></i>Rezervare rapidă</div>
+        <h2 class="h4 mb-2">Programează-te direct</h2>
+        <p class="text-muted-custom mb-3">Vezi intervalele disponibile, descrie problema și urmărește statusul ulterior din contul tău.</p>
+        <div class="ah-kv-list mb-3">
+          <div class="ah-kv-item">
+            <span class="ah-kv-label">Telefon</span>
+            <span class="ah-kv-value">{{ center.phone }}</span>
+          </div>
+          {% if center.email %}
+          <div class="ah-kv-item">
+            <span class="ah-kv-label">Email</span>
+            <span class="ah-kv-value">{{ center.email }}</span>
+          </div>
+          {% endif %}
+          <div class="ah-kv-item">
+            <span class="ah-kv-label">Program</span>
+            <span class="ah-kv-value">{{ center.schedule }}</span>
+          </div>
+          <div class="ah-kv-item">
+            <span class="ah-kv-label">Locație</span>
+            <span class="ah-kv-value">{{ center.get_city_display }}</span>
+          </div>
+        </div>
+        <a href="{% url 'bookings:create' center.slug %}" class="btn btn-nav-cta w-100" data-testid="service-detail-booking-button">Programează acum</a>
+        {% if user.is_authenticated %}
+        <a href="{% url 'services:toggle_favorite' center.slug %}"
+           class="btn btn-outline-secondary w-100 mt-2"
+           data-testid="service-detail-favorite-button">
+          <i class="bi bi-heart{% if is_favorited %}-fill text-red{% endif %} me-1"></i>
+          {% if is_favorited %}Scoate din favorite{% else %}Adaugă la favorite{% endif %}
+        </a>
+        {% endif %}
+      </section>
 
-      <!-- Contact -->
-      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
-        <h5 class="mb-3">Contact</h5>
-        <div class="small text-muted-custom mb-2"><i class="bi bi-telephone me-2"></i>{{ center.phone }}</div>
-        {% if center.email %}<div class="small text-muted-custom mb-2"><i class="bi bi-envelope me-2"></i>{{ center.email }}</div>{% endif %}
-        <div class="small text-muted-custom mb-2"><i class="bi bi-clock me-2"></i>{{ center.schedule }}</div>
-        <a href="{% url 'bookings:create' center.slug %}" class="btn btn-nav-cta w-100 mt-2">Programează acum</a>
-      </div>
-
-      <!-- HARTA -->
       {% if center.latitude and center.longitude %}
-      <div class="p-4 bg-dark2 border rounded-xl mb-4" style="border-color:var(--ah-border) !important;">
-        <h5 class="mb-3"><i class="bi bi-map me-2 text-red"></i>Locație</h5>
-        <div id="detailMap" style="height:260px;border-radius:10px;overflow:hidden;border:1px solid var(--ah-border);"></div>
-        <div class="mt-2 small text-muted-custom">
+      <section class="service-cta-card">
+        <div class="ah-section-title-row">
+          <div>
+            <h3 class="h5 mb-1">Locație și traseu</h3>
+            <p class="ah-section-lead">Verifică ușor drumul până la service.</p>
+          </div>
+        </div>
+        <div id="detailMap" style="height:260px;border-radius:14px;overflow:hidden;border:1px solid var(--ah-border);"></div>
+        <div class="small text-muted-custom mt-3">
           <i class="bi bi-geo-alt text-red me-1"></i>{{ center.address }}, {{ center.get_city_display }}
         </div>
         <a href="https://www.google.com/maps/dir/?api=1&destination={{ center.latitude|stringformat:'f' }},{{ center.longitude|stringformat:'f' }}"
           target="_blank"
-          class="btn btn-outline-secondary btn-sm w-100 mt-2">
+          class="btn btn-outline-secondary btn-sm w-100 mt-3">
           <i class="bi bi-signpost-2 me-1"></i>Deschide în Google Maps
         </a>
         <a href="https://waze.com/ul?ll={{ center.latitude|stringformat:'f' }},{{ center.longitude|stringformat:'f' }}&navigate=yes"
           target="_blank"
           class="btn btn-outline-secondary btn-sm w-100 mt-2">
-          🚗 Deschide în Waze
+          <i class="bi bi-car-front me-1"></i>Deschide în Waze
         </a>
-      </div>
+      </section>
       {% endif %}
 
-      <!-- Recenzii -->
-      <div class="p-4 bg-dark2 border rounded-xl" style="border-color:var(--ah-border) !important;">
-        <h5 class="mb-3">Recenzii</h5>
-        {% if user.is_authenticated and can_review and not user_review %}
-          <form method="post" action="{% url 'services:review_create' center.slug %}" enctype="multipart/form-data" class="mb-4">
-            {% csrf_token %}
-            <div class="row g-2">
-              <div class="col-md-4">{{ review_form.rating }}</div>
-              <div class="col-md-8">{{ review_form.title }}</div>
-              <div class="col-12">{{ review_form.body }}</div>
-              <div class="col-12">{{ review_form.images }}<div class="small text-muted-custom mt-1">Poți adăuga poze la recenzie.</div></div>
-              <div class="col-12"><button class="btn btn-nav-cta w-100" type="submit">Trimite recenzia</button></div>
-            </div>
-          </form>
-        {% elif user.is_authenticated and user_review %}
-          <div class="alert alert-secondary">Ai lăsat deja o recenzie pentru acest service.</div>
-        {% elif user.is_authenticated %}
-          <div class="alert alert-secondary">Poți lăsa o recenzie după ce ai o programare finalizată la acest service.</div>
-        {% endif %}
-
-        {% for review in reviews|slice:':5' %}
-          <div class="border-bottom pb-3 mb-3" style="border-color:var(--ah-border) !important;">
-            <div class="fw-semibold">{{ review.title }}</div>
-            <div class="small text-orange mb-2">{{ review.rating }}★ · {{ review.user.username }}</div>
-            <div class="small text-muted-custom">{{ review.body }}</div>
-            {% if review.images.all %}
-              <div class="row g-2 mt-2">
-                {% for image in review.images.all %}
-                  <div class="col-4"><img src="{{ image.image.url }}" class="img-fluid rounded-3 w-100" style="height:90px;object-fit:cover;" alt="poză recenzie"></div>
-                {% endfor %}
-              </div>
-            {% endif %}
+      <section class="service-cta-card">
+        <div class="ah-section-title-row">
+          <div>
+            <h3 class="h5 mb-1">De ce să alegi acest service</h3>
+            <p class="ah-section-lead">Elementele pe care le vede imediat un client înainte de programare.</p>
           </div>
-        {% empty %}<div class="text-muted-custom">Nicio recenzie încă.</div>{% endfor %}
-      </div>
-
-    </div>
+        </div>
+        <div class="ah-info-list">
+          <div class="ah-info-item">
+            <span class="ah-icon-circle"><i class="bi bi-shield-check"></i></span>
+            <div>
+              <div class="fw-semibold">Profil public complet</div>
+              <div class="small text-muted-custom">Adresă, program, servicii și informații de contact vizibile clar.</div>
+            </div>
+          </div>
+          <div class="ah-info-item">
+            <span class="ah-icon-circle"><i class="bi bi-star"></i></span>
+            <div>
+              <div class="fw-semibold">Reputație ușor de verificat</div>
+              <div class="small text-muted-custom">Ratingul, numărul de recenzii și feedback-ul recent sunt afișate transparent.</div>
+            </div>
+          </div>
+          <div class="ah-info-item">
+            <span class="ah-icon-circle"><i class="bi bi-camera"></i></span>
+            <div>
+              <div class="fw-semibold">Poze și specializări vizibile</div>
+              <div class="small text-muted-custom">Vezi rapid dacă service-ul pare potrivit pentru nevoia ta reală.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </aside>
   </div>
 </div>
 {% endblock %}
@@ -153,13 +430,11 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-  /* Stiluri pentru ruta ORS pe harta */
   .route-line {
     stroke: #e63946;
     stroke-width: 4;
     stroke-opacity: 0.85;
   }
-  /* Ascunde controalele urâte Leaflet Routing Machine dacă le folosim */
   .leaflet-routing-container { display: none !important; }
 </style>
 
@@ -177,7 +452,6 @@
     attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
   }).addTo(detailMap);
 
-  // Marker service
   const serviceIcon = L.divIcon({
     html: `<div style="background:#e63946;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 12px rgba(230,57,70,0.5);border:3px solid white;">{{ center.category.icon }}</div>`,
     className: '', iconSize: [36,36], iconAnchor: [18,36], popupAnchor: [0,-36]
@@ -191,7 +465,6 @@
   let routeLayer = null;
   let userMarkerDetail = null;
 
-  // ===== DESENEAZA RUTA REALA PE SOSELE =====
   async function deseneazaRutaORS(userLat, userLng) {
     try {
       const resp = await fetch(
@@ -204,8 +477,8 @@
           },
           body: JSON.stringify({
             coordinates: [
-              [userLng, userLat],   // start: utilizator [lng, lat]
-              [serviceLng, serviceLat]  // end: service [lng, lat]
+              [userLng, userLat],
+              [serviceLng, serviceLat]
             ]
           })
         }
@@ -214,10 +487,8 @@
       const data = await resp.json();
 
       if (data.features && data.features.length > 0) {
-        // Sterge ruta veche daca exista
         if (routeLayer) detailMap.removeLayer(routeLayer);
 
-        // Deseneaza ruta reala
         routeLayer = L.geoJSON(data, {
           style: {
             color: '#e63946',
@@ -228,21 +499,17 @@
           }
         }).addTo(detailMap);
 
-        // Fit bounds sa se vada toata ruta
         detailMap.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
 
-        // Distanta si durata
         const summary = data.features[0].properties.summary;
         const km = (summary.distance / 1000).toFixed(1);
         const min = Math.round(summary.duration / 60);
 
         const routeInfo = document.getElementById('routeInfo');
         if (routeInfo) {
-          routeInfo.innerHTML = `<i class="bi bi-signpost-2 text-red me-1"></i><strong>${km} km</strong> pe șosele <span class="mx-2">·</span><i class="bi bi-car-front me-1"></i>~${min} min cu mașina`;
+          routeInfo.innerHTML = `<i class="bi bi-signpost-2 text-red me-1"></i><strong>${km} km</strong> pe șosea <span class="mx-2">·</span><i class="bi bi-car-front me-1"></i>aprox. ${min} min cu mașina`;
         }
-
       } else {
-        // Fallback la linie dreapta daca ORS esueaza
         deseneazaLinieDirecta(userLat, userLng);
       }
 
@@ -252,7 +519,6 @@
     }
   }
 
-  // Fallback — linie dreapta daca API esueaza
   function deseneazaLinieDirecta(userLat, userLng) {
     if (routeLayer) detailMap.removeLayer(routeLayer);
     routeLayer = L.polyline([[userLat, userLng], [serviceLat, serviceLng]], {
@@ -261,7 +527,6 @@
     detailMap.fitBounds([[userLat, userLng], [serviceLat, serviceLng]], { padding: [30, 30] });
   }
 
-  // Marker utilizator
   function adaugaMarkerUser(lat, lng) {
     if (userMarkerDetail) detailMap.removeLayer(userMarkerDetail);
     const userIcon = L.divIcon({
@@ -273,7 +538,6 @@
       .bindPopup('<strong>Locația ta</strong>');
   }
 
-  // La incarcare — verifica localStorage
   const savedLoc = localStorage.getItem("user_loc");
   if (savedLoc) {
     const loc = JSON.parse(savedLoc);
@@ -282,7 +546,6 @@
   }
   {% endif %}
 
-  // ===== DISTANTA CU ORS (header) =====
   const coordsEl = document.getElementById("centerCoords");
   const routeInfo = document.getElementById("routeInfo");
 
@@ -299,10 +562,10 @@
           const summary = data.features[0].properties.summary;
           const km = (summary.distance / 1000).toFixed(1);
           const min = Math.round(summary.duration / 60);
-          routeInfo.innerHTML = `<i class="bi bi-signpost-2 text-red me-1"></i><strong>${km} km</strong> pe șosele <span class="mx-2">·</span><i class="bi bi-car-front me-1"></i>~${min} min cu mașina`;
+          routeInfo.innerHTML = `<i class="bi bi-signpost-2 text-red me-1"></i><strong>${km} km</strong> pe șosea <span class="mx-2">·</span><i class="bi bi-car-front me-1"></i>aprox. ${min} min cu mașina`;
         })
         .catch(() => {
-          routeInfo.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Nu am putut calcula ruta.';
+          routeInfo.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Nu am putut calcula ruta acum.';
         });
     }
 
@@ -329,7 +592,6 @@
       );
     }
 
-    // Doar daca nu avem deja ruta din harta
     {% if center.latitude and center.longitude %}
     if (!savedLoc) getUserLocation();
     {% else %}

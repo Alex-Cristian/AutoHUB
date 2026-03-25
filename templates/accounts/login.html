@@ -23,6 +23,7 @@
               type="text"
               name="username"
               id="id_username"
+              data-testid="login-username"
               class="form-control form-control-lg"
               style="min-height:48px; font-size:16px; background:var(--ah-dark); border-color:var(--ah-border); color:#fff;"
               autocomplete="username"
@@ -39,6 +40,7 @@
               type="password"
               name="password"
               id="id_password"
+              data-testid="login-password"
               class="form-control form-control-lg"
               style="min-height:48px; font-size:16px; background:var(--ah-dark); border-color:var(--ah-border); color:#fff;"
               autocomplete="current-password"
@@ -52,7 +54,7 @@
           <div class="alert alert-danger">{{ form.non_field_errors }}</div>
           {% endif %}
 
-          <button type="submit" class="btn btn-primary w-100" style="min-height:52px; font-size:17px;">
+          <button type="submit" data-testid="login-submit" class="btn btn-primary w-100" style="min-height:52px; font-size:17px;">
             <i class="bi bi-box-arrow-in-right me-2"></i>Autentificare
           </button>
         </form>

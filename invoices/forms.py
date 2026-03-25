@@ -5,6 +5,14 @@ from .models import Invoice, InvoiceLine
 
 
 class InvoiceForm(forms.ModelForm):
+    def clean(self):
+        cleaned = super().clean()
+        issue_date = cleaned.get('issue_date')
+        due_date = cleaned.get('due_date')
+        if issue_date and due_date and due_date < issue_date:
+            self.add_error('due_date', 'Scadenta nu poate fi inaintea datei emiterii.')
+        return cleaned
+
     class Meta:
         model = Invoice
         fields = [
@@ -13,9 +21,9 @@ class InvoiceForm(forms.ModelForm):
             'notes',
         ]
         widgets = {
-            'issue_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'client_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'issue_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
+            'due_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
+            'client_name': forms.TextInput(attrs={'class': 'form-control', 'data-testid': 'invoice-client-name'}),
             'client_email': forms.EmailInput(attrs={'class': 'form-control'}),
             'client_phone': forms.TextInput(attrs={'class': 'form-control'}),
             'client_address': forms.TextInput(attrs={'class': 'form-control'}),
@@ -25,13 +33,21 @@ class InvoiceForm(forms.ModelForm):
 
 
 class InvoiceLineForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Liniile extra trebuie sa porneasca goale; altfel formularul devine invalid
+        # din cauza valorilor implicite ale modelului pe randurile necompletate.
+        if not self.is_bound and not getattr(self.instance, "pk", None):
+            self.initial.setdefault('quantity', '')
+            self.initial.setdefault('unit_price', '')
+
     class Meta:
         model = InvoiceLine
         fields = ['description', 'quantity', 'unit_price']
         widgets = {
-            'description': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Schimb ulei + filtru'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'description': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Schimb ulei + filtru', 'data-testid': 'invoice-line-description'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'data-testid': 'invoice-line-quantity'}),
+            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'data-testid': 'invoice-line-unit-price'}),
         }
 
 
@@ -39,6 +55,6 @@ InvoiceLineFormSet = inlineformset_factory(
     Invoice,
     InvoiceLine,
     form=InvoiceLineForm,
-    extra=3,
+    extra=1,
     can_delete=True,
 )

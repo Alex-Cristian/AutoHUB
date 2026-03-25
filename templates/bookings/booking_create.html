@@ -25,6 +25,29 @@
     font-size: .75rem; font-weight: 700; text-transform: uppercase;
     letter-spacing: .1em; color: var(--ah-red); margin-bottom: 1rem;
   }
+  .bc-meta-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem;
+    margin-top: 1.1rem;
+  }
+  .bc-meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .5rem .85rem;
+    border-radius: 999px;
+    border: 1px solid var(--ah-border);
+    background: rgba(255,255,255,0.03);
+    color: var(--ah-text-soft);
+    font-size: .84rem;
+  }
+  .bc-card-copy {
+    color: var(--ah-muted);
+    font-size: .84rem;
+    margin: -.55rem 0 1rem;
+    line-height: 1.5;
+  }
   .car-card {
     border: 1px solid var(--ah-border); border-radius: 14px;
     padding: .85rem 1rem; cursor: pointer; transition: all .15s;
@@ -163,7 +186,11 @@
   }
   .field-hint-box strong { display:block; margin-bottom:.2rem; color:var(--ah-text); font-size:.9rem; }
   .field-hint-box span { display:block; color:var(--ah-muted); font-size:.8rem; line-height:1.45; }
-  @media (max-width: 767.98px) { .field-hint-grid { grid-template-columns:1fr; } }
+  @media (max-width: 767.98px) {
+    .field-hint-grid { grid-template-columns:1fr; }
+    .bc-meta-strip { gap: .5rem; }
+    .bc-meta-chip { width: 100%; justify-content: center; }
+  }
 </style>
 {% endblock %}
 
@@ -196,18 +223,27 @@
         </div>
       </div>
     </div>
+    <div class="bc-meta-strip">
+      <span class="bc-meta-chip"><i class="bi bi-clock"></i>{{ center.schedule|default:"Program disponibil la cerere" }}</span>
+      {% if center.verification_status == 'verified' %}
+      <span class="bc-meta-chip"><i class="bi bi-patch-check-fill text-red"></i>Service verificat</span>
+      {% endif %}
+      {% if center.review_count %}
+      <span class="bc-meta-chip"><i class="bi bi-star-fill text-warning"></i>{{ center.avg_rating|floatformat:1 }} din 5 · {{ center.review_count }} recenzii</span>
+      {% endif %}
+    </div>
     <div class="field-hint-grid">
       <div class="field-hint-box">
-        <strong>1. Adauga masina</strong>
-        <span>Poti selecta una salvata sau completa manual toate datele.</span>
+        <strong>1. Alege mașina</strong>
+        <span>Poți selecta una salvată sau completa manual datele esențiale.</span>
       </div>
       <div class="field-hint-box">
-        <strong>2. Alege ziua si ora</strong>
-        <span>Iti afisam doar sloturile disponibile pentru service-ul selectat.</span>
+        <strong>2. Alege ziua și ora</strong>
+        <span>Îți afișăm doar intervalele disponibile pentru domeniul selectat.</span>
       </div>
       <div class="field-hint-box">
-        <strong>3. Confirma programarea</strong>
-        <span>Primesti apoi oferta si actualizarile de status direct pe email.</span>
+        <strong>3. Confirmă cererea</strong>
+        <span>Primești apoi actualizări de status și, la nevoie, ofertă înainte de confirmare.</span>
       </div>
     </div>
   </div>
@@ -222,6 +258,7 @@
     <!-- MAȘINA -->
     <div class="bc-card">
       <div class="bc-sec"><i class="bi bi-car-front me-2"></i>Datele mașinii</div>
+      <p class="bc-card-copy">Dacă alegi o mașină salvată, completăm automat formularul. Dacă este o mașină nouă, ai nevoie doar de datele esențiale.</p>
       {% if cars %}
       <div class="mb-3">
         <div class="small text-muted-custom mb-2">Mașinile tale salvate — apasă pentru a selecta:</div>
@@ -268,6 +305,7 @@
     <!-- DATE CONTACT -->
     <div class="bc-card">
       <div class="bc-sec"><i class="bi bi-person me-2"></i>Date de contact</div>
+      <p class="bc-card-copy">Folosim aceste date pentru confirmare, actualizări de status și, dacă alegi, pentru trimiterea ofertei.</p>
       <div class="row g-3">
         <div class="col-md-4"><label class="form-label">Nume complet <span class="text-red">*</span></label>{{ form.client_name }}</div>
         <div class="col-md-4"><label class="form-label">Telefon <span class="text-red">*</span></label>{{ form.client_phone }}</div>
@@ -278,6 +316,7 @@
     <!-- DOMENIU -->
     <div class="bc-card">
       <div class="bc-sec"><i class="bi bi-grid me-2"></i>Alege domeniul</div>
+      <p class="bc-card-copy">Selectează tipul principal de intervenție ca să vezi sloturile și posturile de lucru potrivite.</p>
       <div class="d-flex flex-wrap gap-2">
         {% for cat in categories %}
         <button type="button"
@@ -293,7 +332,8 @@
     <!-- DESCRIERE + AI -->
     <div class="bc-card">
       <div class="bc-sec"><i class="bi bi-chat-text me-2"></i>Descrie ce ai nevoie</div>
-      <textarea name="problem_description" id="id_problem_description"
+      <p class="bc-card-copy">Descrie pe scurt problema, când apare și dacă ai mai făcut intervenții recente. Un mesaj clar ajută service-ul să se pregătească mai bine.</p>
+      <textarea name="problem_description" id="id_problem_description" data-testid="booking-problem-description"
         placeholder="Ex: Am un zgomot ciudat la pornire, cred că e de la curea distribuție. Frânele mai scârțâie și ele..."
         rows="4"></textarea>
       <div class="small text-muted-custom mt-2">
@@ -314,6 +354,7 @@
     <!-- DATA -->
     <div class="bc-card">
       <div class="bc-sec"><i class="bi bi-calendar2-week me-2"></i>Alege data</div>
+      <p class="bc-card-copy">Începi cu data potrivită pentru tine, apoi alegi ora liberă din programul afișat.</p>
       <div class="date-row" id="date-row"></div>
       <button type="button" class="btn-toggle-cal" onclick="toggleCal()">
         <i class="bi bi-calendar3" id="cal-toggle-icon"></i>
@@ -341,6 +382,7 @@
     <!-- GARAJE -->
     <div class="bc-card" id="card-garaje" style="display:none;">
       <div class="bc-sec"><i class="bi bi-building me-2"></i>Alege service-ul și ora</div>
+      <p class="bc-card-copy">După selectarea datei, îți arătăm posturile disponibile și intervalele unde programarea poate fi confirmată imediat.</p>
       <div id="g-loading" class="small text-muted-custom py-2" style="display:none;">
         <i class="bi bi-hourglass-split me-1"></i>Se verifică disponibilitatea...
       </div>
@@ -353,6 +395,7 @@
     <!-- POZE -->
     <div class="bc-card">
       <div class="bc-sec"><i class="bi bi-camera me-2"></i>Poze / video (opțional)</div>
+      <p class="bc-card-copy">Adaugă imagini sau video doar dacă te ajută să explici mai clar problema. Nu sunt obligatorii.</p>
 
       {# input-ul Django ascuns — îl sincronizăm prin JS #}
       <div style="display:none;">{{ form.attachments }}</div>
@@ -396,7 +439,8 @@
     <!-- OFERTĂ -->
     <div class="bc-card">
       <div class="bc-sec"><i class="bi bi-tag me-2"></i>Ofertă de preț</div>
-      <div id="offer-box" onclick="toggleOffer()" style="display:flex;align-items:flex-start;gap:.75rem;padding:1rem 1.1rem;border-radius:14px;border:2px solid var(--ah-border);background:var(--ah-dark3);cursor:pointer;transition:all .2s;">
+      <p class="bc-card-copy">Poți cere o ofertă înainte de confirmarea finală dacă vrei mai multă claritate asupra costului estimat.</p>
+      <div id="offer-box" data-testid="booking-offer-toggle" onclick="toggleOffer()" style="display:flex;align-items:flex-start;gap:.75rem;padding:1rem 1.1rem;border-radius:14px;border:2px solid var(--ah-border);background:var(--ah-dark3);cursor:pointer;transition:all .2s;">
         <div id="ofc-icon" style="width:22px;height:22px;border-radius:6px;border:2px solid var(--ah-border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;background:var(--ah-dark2);transition:all .15s;">
           <i class="bi bi-check2" id="ofc-check" style="color:#fff;font-size:.75rem;display:none;"></i>
         </div>
@@ -424,7 +468,7 @@
         <div class="confirm-lbl">Programarea ta</div>
         <div class="confirm-val" id="confirm-val">—</div>
       </div>
-      <button type="submit" class="btn btn-nav-cta px-4 py-2" style="font-size:.95rem;">
+      <button type="submit" data-testid="confirm-booking-button" class="btn btn-nav-cta px-4 py-2" style="font-size:.95rem;">
         <i class="bi bi-calendar-check me-2"></i>Confirmă programarea
       </button>
     </div>
@@ -563,7 +607,7 @@ function buildDateScroll() {
     const d=new Date(today); d.setDate(today.getDate()+i);
     const ds=fmtDateStr(d);
     const el=document.createElement('div');
-    el.className='date-card'; el.dataset.date=ds;
+    el.className='date-card'; el.dataset.date=ds; el.dataset.testid='booking-date-card';
     el.innerHTML=`<div class="dn">${DAYS[d.getDay()]}</div><div class="dd">${d.getDate()}</div><div class="dm">${MONTHS_SHORT[d.getMonth()]}</div>${i===0?'<div style="font-size:.6rem;color:var(--ah-red)">azi</div>':''}`;
     el.addEventListener('click',()=>selectDate(ds));
     row.appendChild(el);
@@ -663,9 +707,9 @@ function renderGaraje(gs,durMin) {
     const slotsHtml=g.slots.length===0
       ?`<div class="no-slots"><i class="bi bi-calendar-x me-1"></i>Nicio oră disponibilă.</div>`
       :`<div class="small text-muted-custom mb-2" style="font-size:.75rem;"><i class="bi bi-clock me-1"></i>Program ${g.open_time}–${g.close_time}${durLbl}</div>
-        <div class="slots-row">${g.slots.map(s=>`<button type="button" class="slot-btn" onclick="pickSlot(this,${g.id},'${g.name.replace(/'/g,"\\'")}','${s}')">${s}</button>`).join('')}</div>`;
+        <div class="slots-row">${g.slots.map(s=>`<button type="button" data-testid="booking-slot-button" class="slot-btn" onclick="pickSlot(this,${g.id},'${g.name.replace(/'/g,"\\'")}','${s}')">${s}</button>`).join('')}</div>`;
     const block=document.createElement('div');
-    block.className='garage-block'; block.id='gb-'+g.id;
+    block.className='garage-block'; block.id='gb-'+g.id; block.dataset.testid='booking-garage-block';
     block.innerHTML=`
       <div class="g-head">
         <div><div class="g-name">${g.name}</div><div class="g-meta">${g.category}</div></div>

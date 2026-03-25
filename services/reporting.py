@@ -8,6 +8,7 @@ from typing import Iterable
 
 from django.db.models import Count, F, Min, Q, Sum, Value, DecimalField
 from django.db.models.functions import Coalesce, TruncDay, TruncMonth
+from django.urls import reverse
 from django.utils import timezone
 
 from bookings.models import Booking
@@ -264,28 +265,28 @@ def build_dashboard_metrics(centers):
             'meta': f'Finalizată {booking.booking_date.strftime("%d.%m.%Y")}',
             'badge': 'info text-dark',
             'icon': 'bi-receipt',
-            'url': f'/invoices/creare/?booking={booking.pk}',
+            'url': f"{reverse('invoices:create')}?booking={booking.pk}",
         })
 
     quick_actions = [
         {'title': 'Adaugă programare', 'icon': 'bi-calendar-plus', 'url': f'/services/dashboard/service/{centers.first().pk}/programare-noua/' if centers else '#'},
         {'title': 'Vezi toate programările', 'icon': 'bi-calendar3', 'url': '/services/dashboard/programari/'},
         {'title': 'Adaugă lucrare', 'icon': 'bi-tools', 'url': '/services/dashboard/programari/'},
-        {'title': 'Vezi clienți', 'icon': 'bi-people', 'url': '/invoices/clienti/'},
+        {'title': 'Vezi clienți', 'icon': 'bi-people', 'url': reverse('invoices:clients')},
         {'title': 'Vezi mașini', 'icon': 'bi-car-front', 'url': '/services/dashboard/istoric-masini/'},
         {'title': 'Vezi stoc', 'icon': 'bi-box-seam', 'url': '/services/dashboard/piese/'},
         {'title': 'Generează raport', 'icon': 'bi-bar-chart', 'url': '/services/dashboard/rapoarte/'},
-        {'title': 'Emite factură', 'icon': 'bi-receipt-cutoff', 'url': '/invoices/creare/'},
+        {'title': 'Emite factură', 'icon': 'bi-receipt-cutoff', 'url': reverse('invoices:create')},
     ]
 
     categories = [
         {'title': 'Calendar', 'description': 'Vizualizare programări pe zi/săptămână/lună.', 'icon': 'bi-calendar3', 'url': '/services/dashboard/calendar/', 'count': bookings.filter(booking_date__gte=today).exclude(status=Booking.STATUS_CANCELLED).count()},
         {'title': 'Programări', 'description': 'Toate programările și management statusuri.', 'icon': 'bi-calendar-check', 'url': '/services/dashboard/programari/', 'count': bookings.exclude(status=Booking.STATUS_CANCELLED).count()},
-        {'title': 'Clienți', 'description': 'Istoric clienți și date de contact.', 'icon': 'bi-people', 'url': '/invoices/clienti/', 'count': active_clients},
+        {'title': 'Clienți', 'description': 'Istoric clienți și date de contact.', 'icon': 'bi-people', 'url': reverse('invoices:clients'), 'count': active_clients},
         {'title': 'Mașini', 'description': 'Istoric tehnic și intervenții pe mașini.', 'icon': 'bi-car-front', 'url': '/services/dashboard/istoric-masini/', 'count': bookings.values('car_plate').distinct().count()},
         {'title': 'Lucrări', 'description': 'Fișe lucrări și status intervenții.', 'icon': 'bi-tools', 'url': '/services/dashboard/programari/?status=in_progress', 'count': bookings.filter(status__in=[Booking.STATUS_IN_PROGRESS, Booking.STATUS_DONE]).count()},
         {'title': 'Piese / Stoc', 'description': 'Inventar, stoc și alerte aprovizionare.', 'icon': 'bi-box-seam', 'url': '/services/dashboard/piese/', 'count': parts.count()},
-        {'title': 'Facturi / Devize', 'description': 'Documente financiare și oferte.', 'icon': 'bi-receipt', 'url': '/invoices/creare/', 'count': invoices.count()},
+        {'title': 'Facturi / Devize', 'description': 'Documente financiare și oferte.', 'icon': 'bi-receipt', 'url': reverse('invoices:create'), 'count': invoices.count()},
         {'title': 'Rapoarte', 'description': 'Indicatori și statistici service.', 'icon': 'bi-graph-up-arrow', 'url': '/services/dashboard/rapoarte/', 'count': None},
         {'title': 'Setări service', 'description': 'Profil, galerii și configurări.', 'icon': 'bi-gear', 'url': f'/services/dashboard/service/{centers.first().pk}/' if centers else '#', 'count': None},
         {'title': 'Mecanici / echipă', 'description': 'Gestionare personal și alocări.', 'icon': 'bi-person-badge', 'url': '/services/dashboard/mechanici/', 'count': ServiceMechanic.objects.filter(center__in=centers).count()},

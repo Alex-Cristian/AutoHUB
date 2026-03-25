@@ -20,11 +20,14 @@ from django.urls import reverse
 from .business import (
     apply_stock_movement,
     build_vehicle_dossier,
-    bookings_with_tag,
+    build_work_order_services_text,
     create_job_part_usage,
     ensure_job_card,
     rollback_job_part_usage,
     sync_booking_from_job_card,
+    transition_booking_status,
+    transition_job_card_status,
+    validate_job_card_status_for_booking,
 )
 from .models import (
     JobCard,
@@ -711,6 +714,7 @@ def service_reports(request):
 
     report_payload = build_report(centers, cleaned)
     return render(request, 'services/service_reports.html', {
+        'centers': centers,
         'form': form,
         'report': report_payload,
         'report_chart_json': json.dumps(report_payload.get('chart', {})),
@@ -786,7 +790,7 @@ def service_calendar(request):
     service_items = ServiceItem.objects.filter(center__in=centers).order_by('center__name', 'name')
     recent_blocks = ServiceAvailabilityBlock.objects.filter(center__in=centers).select_related(
         'center', 'garage', 'mechanic'
-    ).order_by('starts_at')[:8]
+    ).order_by('-created_at', '-starts_at', '-pk')[:8]
 
     return render(request, 'services/service_calendar.html', {
         'centers': centers,
@@ -1149,28 +1153,35 @@ def booking_detail(request, pk):
             if form.is_valid():
                 previous_status = job_card.status
                 previous_mechanic_id = job_card.mechanic_id
-                job_card = form.save(commit=False)
-                job_card.booking = booking
-                job_card.center = booking.center
-                job_card.updated_by = request.user
-                if not job_card.created_by_id:
-                    job_card.created_by = request.user
-                job_card.save()
-                if previous_status != job_card.status:
-                    log_booking_activity(
-                        booking,
-                        'status_changed',
-                        f'Fisa lucrarii a fost actualizata in statusul {job_card.get_status_display()}.',
-                        actor=request.user,
-                        metadata={'old': previous_status, 'new': job_card.status, 'scope': 'job_card'},
-                    )
-                if previous_mechanic_id != job_card.mechanic_id:
-                    booking.mechanic = job_card.mechanic
-                    booking.save(update_fields=['mechanic', 'updated_at'])
-                sync_booking_from_job_card(job_card, actor=request.user)
-                messages.success(request, 'Fisa lucrarii a fost actualizata.')
-            else:
-                messages.error(request, '; '.join(form.errors.get_json_data(escape_html=False).keys()) or 'Formularul fisei lucrarii contine erori.')
+                candidate = form.save(commit=False)
+                try:
+                    validate_job_card_status_for_booking(booking, candidate.status)
+                except ValidationError as exc:
+                    form.add_error('status', exc.message)
+                else:
+                    job_card = candidate
+                    job_card.booking = booking
+                    job_card.center = booking.center
+                    job_card.updated_by = request.user
+                    if not job_card.created_by_id:
+                        job_card.created_by = request.user
+                    job_card.save()
+                    if previous_status != job_card.status:
+                        log_booking_activity(
+                            booking,
+                            'status_changed',
+                            f'Fisa lucrarii a fost actualizata in statusul {job_card.get_status_display()}.',
+                            actor=request.user,
+                            metadata={'old': previous_status, 'new': job_card.status, 'scope': 'job_card'},
+                        )
+                    if previous_mechanic_id != job_card.mechanic_id:
+                        booking.mechanic = job_card.mechanic
+                        booking.save(update_fields=['mechanic', 'updated_at'])
+                    sync_booking_from_job_card(job_card, actor=request.user)
+                    messages.success(request, 'Fisa lucrarii a fost actualizata.')
+                    return redirect('services:booking_detail', pk=booking.pk)
+
+            messages.error(request, '; '.join(form.errors.get_json_data(escape_html=False).keys()) or 'Formularul fisei lucrarii contine erori.')
             return redirect('services:booking_detail', pk=booking.pk)
 
         if action == 'add_operation':
@@ -1236,8 +1247,7 @@ def booking_detail(request, pk):
                     messages.error(request, '; '.join(exc.messages))
                 else:
                     if usage.status == JobPartUsage.STATUS_RESERVED and job_card.status not in {JobCard.STATUS_WAITING_PARTS, JobCard.STATUS_IN_PROGRESS}:
-                        job_card.status = JobCard.STATUS_APPROVED
-                        job_card.save(update_fields=['status', 'updated_at'])
+                        transition_job_card_status(job_card, JobCard.STATUS_APPROVED, actor=request.user, sync_booking=True)
                     log_booking_activity(
                         booking,
                         'note_updated',
@@ -1385,20 +1395,26 @@ def booking_detail(request, pk):
                     return JsonResponse({'ok': False, 'msg': 'Status invalid.'})
                 messages.error(request, 'Statusul selectat nu este valid.')
                 return redirect('services:booking_detail', pk=booking.pk)
-            old_status = booking.status
-            booking.status = new_status
-            booking.save(update_fields=['status', 'updated_at'])
-            booking_to_job_status = {
-                Booking.STATUS_CONFIRMED: JobCard.STATUS_APPROVED,
-                Booking.STATUS_IN_PROGRESS: JobCard.STATUS_IN_PROGRESS,
-                Booking.STATUS_WAITING_PARTS: JobCard.STATUS_WAITING_PARTS,
-                Booking.STATUS_DONE: JobCard.STATUS_COMPLETED,
-            }
-            mapped_job_status = booking_to_job_status.get(new_status)
-            if mapped_job_status and job_card.status != mapped_job_status:
-                job_card.status = mapped_job_status
-                job_card.updated_by = request.user
-                job_card.save(update_fields=['status', 'updated_by', 'updated_at'])
+            try:
+                old_status, changed, job_card = transition_booking_status(
+                    booking,
+                    new_status,
+                    actor=request.user,
+                    sync_job_card=True,
+                    create_job_card=True,
+                )
+            except ValidationError as exc:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    from django.http import JsonResponse
+                    return JsonResponse({'ok': False, 'msg': '; '.join(exc.messages)})
+                messages.error(request, '; '.join(exc.messages))
+                return redirect('services:booking_detail', pk=booking.pk)
+            if not changed:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    from django.http import JsonResponse
+                    return JsonResponse({'ok': True, 'msg': 'Statusul era deja setat.', 'status_display': booking.get_status_display(), 'status_badge': booking.get_status_badge()})
+                messages.info(request, 'Programarea are deja acest status.')
+                return redirect('services:booking_detail', pk=booking.pk)
             log_booking_activity(
                 booking,
                 'status_changed',
@@ -1446,13 +1462,19 @@ def booking_detail(request, pk):
 @login_required
 def booking_print(request, pk):
     booking = get_object_or_404(
-        Booking.objects.select_related('center', 'service_item', 'user', 'garage', 'mechanic'),
+        Booking.objects.select_related('center', 'service_item', 'user', 'garage', 'mechanic').prefetch_related(
+            'job_card__operations',
+            'job_card__part_usages',
+        ),
         pk=pk,
     )
     if not (request.user.is_staff or booking.center.owner_id == request.user.id):
         return redirect('core:home')
 
-    return render(request, 'services/booking_print.html', {'booking': booking})
+    return render(request, 'services/booking_print.html', {
+        'booking': booking,
+        'work_order_services_text': build_work_order_services_text(booking),
+    })
 
 
 @login_required
@@ -1626,12 +1648,12 @@ def booking_accept(request, pk):
             messages.error(request, 'Prețul aproximativ nu poate fi negativ.')
             return _post_redirect(request, 'services:dashboard')
 
-        booking.status = Booking.STATUS_QUOTED
         booking.duration_minutes = duration_minutes
         booking.estimated_price = estimated_price
         try:
             booking.full_clean()
-            booking.save(update_fields=['status', 'duration_minutes', 'estimated_price', 'updated_at'])
+            old_status, _, _ = transition_booking_status(booking, Booking.STATUS_QUOTED, actor=request.user)
+            booking.save(update_fields=['duration_minutes', 'estimated_price', 'updated_at'])
         except ValidationError as exc:
             messages.error(request, '; '.join(exc.messages))
             return _post_redirect(request, 'services:dashboard')
@@ -1640,7 +1662,7 @@ def booking_accept(request, pk):
             'offer_updated',
             f'A fost trimisa o oferta de {estimated_price:.2f} RON cu durata {booking.get_duration_display()}.',
             actor=request.user,
-            metadata={'estimated_price': estimated_price, 'duration_minutes': duration_minutes},
+            metadata={'old': old_status, 'new': booking.status, 'estimated_price': estimated_price, 'duration_minutes': duration_minutes},
         )
         if booking.user:
             BookingNotification.objects.create(
@@ -1672,14 +1694,17 @@ def booking_reject(request, pk):
         if booking.status != Booking.STATUS_PENDING:
             messages.info(request, 'Această programare nu mai este în așteptare.')
             return redirect('services:dashboard')
-        booking.status = Booking.STATUS_CANCELLED
-        booking.save(update_fields=['status', 'updated_at'])
+        try:
+            old_status, _, _ = transition_booking_status(booking, Booking.STATUS_CANCELLED, actor=request.user)
+        except ValidationError as exc:
+            messages.error(request, '; '.join(exc.messages))
+            return redirect('services:dashboard')
         log_booking_activity(
             booking,
             'status_changed',
             'Programarea a fost anulata de service inainte de confirmare.',
             actor=request.user,
-            metadata={'old': Booking.STATUS_PENDING, 'new': Booking.STATUS_CANCELLED},
+            metadata={'old': old_status, 'new': Booking.STATUS_CANCELLED},
         )
         if booking.user:
             BookingNotification.objects.create(
@@ -1742,7 +1767,7 @@ def notification_mark_read(request, pk):
 
 
 @login_required
-def parts_inventory(request):
+def _legacy_parts_inventory_unused(request):
     centers = _require_service_owner(request)
     if centers is None:
         return redirect('services:register_service')
@@ -1877,7 +1902,7 @@ def parts_inventory(request):
 
 
 @login_required
-def service_car_history(request):
+def _legacy_service_car_history_unused(request):
     centers = _require_service_owner(request)
     if centers is None:
         return redirect('services:register_service')
@@ -1927,11 +1952,12 @@ def mechanic_profile(request, pk):
         return redirect('core:home')
 
     active_bookings = Booking.objects.filter(
-        mechanic=mechanic, status__in=['confirmed', 'in_progress']
+        mechanic=mechanic,
+        status__in=[Booking.STATUS_CONFIRMED, Booking.STATUS_IN_PROGRESS, Booking.STATUS_WAITING_PARTS],
     ).select_related('center', 'service_item', 'garage').order_by('booking_date', 'booking_time')
 
     done_bookings = Booking.objects.filter(
-        mechanic=mechanic, status='done'
+        mechanic=mechanic, status=Booking.STATUS_DONE
     ).select_related('center', 'service_item').order_by('-booking_date')[:20]
 
     if request.method == 'POST':
@@ -1989,9 +2015,17 @@ def mechanic_profile(request, pk):
                 if booking.status == new_status:
                     messages.info(request, 'Programarea are deja acest status.')
                     return redirect('services:mechanic_profile', pk=pk)
-                old_status = booking.status
-                booking.status = new_status
-                booking.save(update_fields=['status', 'updated_at'])
+                try:
+                    old_status, _, _ = transition_booking_status(
+                        booking,
+                        new_status,
+                        actor=request.user,
+                        sync_job_card=True,
+                        create_job_card=True,
+                    )
+                except ValidationError as exc:
+                    messages.error(request, '; '.join(exc.messages))
+                    return redirect('services:mechanic_profile', pk=pk)
                 log_booking_activity(
                     booking,
                     'status_changed',

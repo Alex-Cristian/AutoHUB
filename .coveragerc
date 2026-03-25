@@ -1,0 +1,21 @@
+[run]
+source =
+    accounts
+    bookings
+    core
+    invoices
+    services
+omit =
+    */migrations/*
+    */management/commands/*
+    */tests.py
+    */test_*.py
+    */wsgi.py
+    manage.py
+
+[report]
+show_missing = True
+skip_covered = False
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
