@@ -1,36 +1,168 @@
 {% extends 'base.html' %}
 {% block title %}Factură{% if invoice.invoice_no %} #{{ invoice.invoice_no }}{% endif %}{% endblock %}
 
+{% block extra_css %}
+<style>
+  .invoice-detail-shell { padding: 2rem 0; }
+  .invoice-detail-hero,
+  .invoice-detail-stat,
+  .invoice-page {
+    border-radius: 24px;
+    box-shadow: 0 16px 42px rgba(0,0,0,.14);
+  }
+  .invoice-detail-hero {
+    background: linear-gradient(135deg, rgba(230,57,70,.10), var(--ah-dark2) 58%, rgba(244,162,97,.08));
+    border: 1px solid var(--ah-border);
+    padding: 1.5rem;
+    margin-bottom: 1.2rem;
+  }
+  .invoice-detail-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.4rem;
+  }
+  .invoice-detail-stat {
+    background: var(--ah-dark2);
+    border: 1px solid var(--ah-border);
+    padding: 1rem;
+  }
+  .invoice-detail-label {
+    color: var(--ah-muted);
+    font-size: .76rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: .3rem;
+  }
+  .invoice-detail-value {
+    color: var(--ah-text);
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+  .invoice-page {
+    max-width: 210mm;
+    margin: 0 auto 28px;
+    background: #fff;
+    color: #111;
+    border: 1px solid #e6e6e6;
+    padding: 18mm 16mm;
+  }
+  .invoice-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #111;
+  }
+  .invoice-supplier-name { font-size: 18px; font-weight: 800; letter-spacing: .2px; }
+  .invoice-title { font-size: 24px; font-weight: 900; letter-spacing: .6px; text-align: right; }
+  .invoice-meta { min-width: 240px; text-align: right; }
+  .meta-row { display: flex; justify-content: space-between; gap: 12px; }
+  .meta-strong { font-weight: 800; }
+  .muted { color: #555; font-size: 12px; }
+  .strong { font-weight: 800; }
+  .invoice-parties {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .party-box { border: 1px solid #e6e6e6; border-radius: 12px; padding: 10px 12px; }
+  .party-title { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: .6px; }
+  .party-name { font-weight: 800; margin-top: 2px; }
+  .invoice-lines { margin-top: 14px; }
+  .invoice-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .invoice-table th,
+  .invoice-table td { border: 1px solid #e6e6e6; padding: 8px 8px; vertical-align: top; }
+  .invoice-table thead th { background: #f6f6f6; font-weight: 800; }
+  .right { text-align: right; }
+  .center { text-align: center; }
+  .invoice-totals { display: flex; justify-content: flex-end; margin-top: 12px; }
+  .totals-box { width: 320px; border: 1px solid #e6e6e6; border-radius: 12px; padding: 10px 12px; }
+  .tot-row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .tot-row.grand { margin-top: 8px; padding-top: 10px; border-top: 2px solid #111; font-weight: 900; }
+  .invoice-notes { margin-top: 14px; border: 1px dashed #d6d6d6; border-radius: 12px; padding: 10px 12px; }
+  .notes-title { font-weight: 900; margin-bottom: 6px; }
+  .notes-body { font-size: 12px; color: #222; }
+  .invoice-footer { display: flex; justify-content: space-between; gap: 14px; margin-top: 18px; }
+  .sig { flex: 1; }
+  .sig-title { font-size: 12px; color: #555; margin-bottom: 8px; }
+  .sig-line { border-bottom: 1px solid #111; height: 34px; }
+  @page { size: A4; margin: 12mm; }
+  @media print {
+    .no-print, .navbar, .navbar-autohub, footer, .btn, .badge { display: none !important; }
+    body { background: #fff !important; color: #111 !important; }
+    .invoice-page {
+      box-shadow: none !important;
+      border: none !important;
+      border-radius: 0 !important;
+      padding: 0 !important;
+      max-width: none !important;
+    }
+  }
+  @media (max-width: 768px) {
+    .invoice-detail-shell { padding: 1.25rem 0 2rem; }
+    .invoice-detail-hero,
+    .invoice-detail-stat,
+    .invoice-page { border-radius: 20px; }
+    .invoice-page { padding: 14px; }
+    .invoice-header,
+    .invoice-footer { flex-direction: column; }
+    .invoice-parties { grid-template-columns: 1fr; }
+    .invoice-meta { min-width: 0; text-align: left; }
+    .meta-row { justify-content: flex-start; gap: 8px; }
+    .invoice-table { display: block; overflow-x: auto; white-space: nowrap; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-5 no-print">
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-    <div>
-      <h1 class="mb-1">
-        Factură {% if invoice.invoice_no %}#{{ invoice.invoice_no }}{% else %}<span class="text-muted-custom">(draft)</span>{% endif %}
-      </h1>
-      <p class="text-muted-custom mb-0">{{ invoice.center.name }} • {{ invoice.issue_date }}</p>
-    </div>
+<div class="container invoice-detail-shell no-print">
+  <section class="invoice-detail-hero">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+      <div>
+        <div class="ah-page-eyebrow"><i class="bi bi-receipt-cutoff"></i>Document financiar</div>
+        <h1 class="mb-1" data-testid="invoice-detail-title">
+          Factură {% if invoice.invoice_no %}#{{ invoice.invoice_no }}{% else %}<span class="text-muted-custom">(draft)</span>{% endif %}
+        </h1>
+        <p class="ah-page-subtitle mb-0">{{ invoice.center.name }} · emisă la {{ invoice.issue_date|date:"d.m.Y" }} pentru {{ invoice.client_name }}</p>
+      </div>
 
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-light" href="{% url 'invoices:clients' %}"><i class="bi bi-people me-1"></i>Clienți</a>
-      <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
-
-      {% if invoice.status == 'draft' %}
+      <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-light" href="{% url 'invoices:clients' %}"><i class="bi bi-people me-1"></i>Clienți</a>
+        <a class="btn btn-outline-light" href="{% url 'services:dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+        {% if invoice.status == 'draft' %}
         <form method="post" action="{% url 'invoices:finalize' invoice.pk %}">
           {% csrf_token %}
-          <button class="btn btn-success" type="submit"><i class="bi bi-check2-circle me-1"></i>Finalizează</button>
+          <button class="btn btn-success" type="submit" data-testid="invoice-finalize-button"><i class="bi bi-check2-circle me-1"></i>Finalizează</button>
         </form>
-      {% endif %}
-
-      <a class="btn btn-outline-warning" href="{% url 'invoices:pdf' invoice.pk %}" target="_blank"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
-      <button class="btn btn-nav-cta" type="button" onclick="window.print()">
-        <i class="bi bi-printer me-1"></i>Print
-      </button>
+        {% endif %}
+        <a class="btn btn-outline-warning" href="{% url 'invoices:pdf' invoice.pk %}" target="_blank"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+        <button class="btn btn-nav-cta" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i>Tipărește</button>
+      </div>
     </div>
-  </div>
+  </section>
+
+  <section class="invoice-detail-stats">
+    <div class="invoice-detail-stat">
+      <div class="invoice-detail-label">Status</div>
+      <div class="invoice-detail-value">{{ invoice.get_status_display }}</div>
+    </div>
+    <div class="invoice-detail-stat">
+      <div class="invoice-detail-label">Client</div>
+      <div class="invoice-detail-value">{{ invoice.client_name }}</div>
+    </div>
+    <div class="invoice-detail-stat">
+      <div class="invoice-detail-label">Scadență</div>
+      <div class="invoice-detail-value">{{ invoice.due_date|date:"d.m.Y"|default:"—" }}</div>
+    </div>
+    <div class="invoice-detail-stat">
+      <div class="invoice-detail-label">Total</div>
+      <div class="invoice-detail-value" data-testid="invoice-total-value">{{ invoice.total }} RON</div>
+    </div>
+  </section>
 </div>
 
-<!-- "Hârtia" facturii (A4) -->
 <div class="invoice-page" id="invoice-paper">
   <header class="invoice-header">
     <div>
@@ -48,7 +180,7 @@
       </div>
       <div class="meta-row">
         <span class="muted">Data</span>
-        <span class="meta-strong">{{ invoice.issue_date }}</span>
+        <span class="meta-strong">{{ invoice.issue_date|date:"d.m.Y" }}</span>
       </div>
       {% if invoice.booking %}
       <div class="meta-row">
@@ -59,7 +191,7 @@
       {% if invoice.due_date %}
       <div class="meta-row">
         <span class="muted">Scadență</span>
-        <span class="meta-strong">{{ invoice.due_date }}</span>
+        <span class="meta-strong">{{ invoice.due_date|date:"d.m.Y" }}</span>
       </div>
       {% endif %}
       <div class="meta-row">
@@ -91,28 +223,28 @@
     <table class="invoice-table">
       <thead>
         <tr>
-          <th style="width:44px">Nr.</th>
+          <th style="width: 44px">Nr.</th>
           <th>Descriere</th>
-          <th style="width:64px">UM</th>
-          <th class="right" style="width:92px">Cant.</th>
-          <th class="right" style="width:110px">Preț (RON)</th>
-          <th class="right" style="width:120px">Valoare (RON)</th>
-          <th class="right" style="width:70px">TVA</th>
+          <th style="width: 64px">UM</th>
+          <th class="right" style="width: 92px">Cant.</th>
+          <th class="right" style="width: 110px">Preț (RON)</th>
+          <th class="right" style="width: 120px">Valoare (RON)</th>
+          <th class="right" style="width: 70px">TVA</th>
         </tr>
       </thead>
       <tbody>
         {% for l in invoice.lines.all %}
-          <tr>
-            <td class="center">{{ forloop.counter }}</td>
-            <td>{{ l.description }}</td>
-            <td class="center">buc</td>
-            <td class="right">{{ l.quantity }}</td>
-            <td class="right">{{ l.unit_price }}</td>
-            <td class="right">{{ l.line_total }}</td>
-            <td class="right">0%</td>
-          </tr>
+        <tr>
+          <td class="center">{{ forloop.counter }}</td>
+          <td>{{ l.description }}</td>
+          <td class="center">buc</td>
+          <td class="right">{{ l.quantity }}</td>
+          <td class="right">{{ l.unit_price }}</td>
+          <td class="right">{{ l.line_total }}</td>
+          <td class="right">0%</td>
+        </tr>
         {% empty %}
-          <tr><td colspan="7" class="muted">Nicio linie.</td></tr>
+        <tr><td colspan="7" class="muted">Nicio linie.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -153,77 +285,4 @@
     </div>
   </footer>
 </div>
-
-<style>
-  /* Factură "de firmă" (A4) – arată ok și pe Print */
-  .invoice-page{
-    max-width: 210mm;
-    margin: 0 auto 28px;
-    background: #fff;
-    color: #111;
-    border: 1px solid #e6e6e6;
-    border-radius: 14px;
-    padding: 18mm 16mm;
-    box-shadow: 0 10px 30px rgba(0,0,0,.12);
-  }
-  .invoice-header{
-    display:flex;
-    justify-content:space-between;
-    gap: 16px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #111;
-  }
-  .invoice-supplier-name{ font-size: 18px; font-weight: 800; letter-spacing:.2px; }
-  .invoice-title{ font-size: 24px; font-weight: 900; letter-spacing: .6px; text-align:right; }
-  .invoice-meta{ min-width: 240px; text-align:right; }
-  .meta-row{ display:flex; justify-content:space-between; gap: 12px; }
-  .meta-strong{ font-weight: 800; }
-  .muted{ color:#555; font-size: 12px; }
-  .strong{ font-weight: 800; }
-
-  .invoice-parties{
-    display:grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 14px;
-  }
-  .party-box{ border: 1px solid #e6e6e6; border-radius: 12px; padding: 10px 12px; }
-  .party-title{ font-size: 12px; color:#555; text-transform: uppercase; letter-spacing: .6px; }
-  .party-name{ font-weight: 800; margin-top: 2px; }
-
-  .invoice-lines{ margin-top: 14px; }
-  .invoice-table{ width:100%; border-collapse: collapse; font-size: 12px; }
-  .invoice-table th, .invoice-table td{ border: 1px solid #e6e6e6; padding: 8px 8px; vertical-align: top; }
-  .invoice-table thead th{ background:#f6f6f6; font-weight: 800; }
-  .right{ text-align:right; }
-  .center{ text-align:center; }
-
-  .invoice-totals{ display:flex; justify-content:flex-end; margin-top: 12px; }
-  .totals-box{ width: 320px; border: 1px solid #e6e6e6; border-radius: 12px; padding: 10px 12px; }
-  .tot-row{ display:flex; justify-content:space-between; padding: 4px 0; }
-  .tot-row.grand{ margin-top: 8px; padding-top: 10px; border-top: 2px solid #111; font-weight: 900; }
-
-  .invoice-notes{ margin-top: 14px; border: 1px dashed #d6d6d6; border-radius: 12px; padding: 10px 12px; }
-  .notes-title{ font-weight: 900; margin-bottom: 6px; }
-  .notes-body{ font-size: 12px; color:#222; }
-
-  .invoice-footer{ display:flex; justify-content:space-between; gap: 14px; margin-top: 18px; }
-  .sig{ flex:1; }
-  .sig-title{ font-size: 12px; color:#555; margin-bottom: 8px; }
-  .sig-line{ border-bottom: 1px solid #111; height: 34px; }
-
-  /* Print */
-  @page { size: A4; margin: 12mm; }
-  @media print {
-    .no-print, .navbar, .navbar-autohub, footer, .btn, .badge { display:none !important; }
-    body{ background:#fff !important; color:#111 !important; }
-    .invoice-page{ box-shadow:none !important; border:none !important; border-radius: 0 !important; padding: 0 !important; max-width: none !important; }
-  }
-
-  @media (max-width: 768px){
-    .invoice-page{ padding: 14px; border-radius: 12px; }
-    .invoice-parties{ grid-template-columns: 1fr; }
-    .invoice-meta{ min-width: 0; }
-  }
-</style>
 {% endblock %}

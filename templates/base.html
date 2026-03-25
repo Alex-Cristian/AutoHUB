@@ -46,11 +46,78 @@
     .navbar-brand span.accent { color: var(--ah-red); }
     .navbar-autohub .nav-link { color: var(--ah-text-soft) !important; font-weight: 500; font-size: 0.92rem; padding: 0.4rem 0.8rem !important; border-radius: 10px; border: 1px solid transparent; transition: color 0.2s, background 0.2s, border-color 0.2s; }
     .navbar-autohub .nav-link:hover, .navbar-autohub .nav-link.active { color: var(--ah-text) !important; background: var(--ah-dark4); border-color: rgba(255,255,255,0.06); }
-    .service-owner-nav { display:flex; flex-wrap:nowrap; gap:.22rem; align-items:center; min-width:0; overflow-x:auto; scrollbar-width:none; }
-    .service-owner-nav::-webkit-scrollbar { display:none; }
+    .navbar-scroll-shell {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-behavior: smooth;
+      scrollbar-width: thin;
+      scrollbar-color: var(--ah-dark4) transparent;
+      -webkit-overflow-scrolling: touch;
+    }
+    .navbar-scroll-shell.is-scrollable {
+      cursor: grab;
+    }
+    .navbar-scroll-shell.is-dragging {
+      cursor: grabbing;
+      scroll-behavior: auto;
+      user-select: none;
+    }
+    .navbar-scroll-shell::-webkit-scrollbar {
+      height: 6px;
+    }
+    .navbar-scroll-shell::-webkit-scrollbar-thumb {
+      background: var(--ah-dark4);
+      border-radius: 999px;
+    }
+    .navbar-scroll-shell::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .navbar-scroll-shell .navbar-nav {
+      flex-wrap: nowrap;
+      width: max-content;
+      min-width: 100%;
+      padding-bottom: .2rem;
+    }
+    .service-owner-nav { display:flex; flex-wrap:nowrap; gap:.45rem; align-items:center; min-width:0; }
     .service-owner-nav .nav-item { display:flex; }
-    .service-owner-nav .nav-link { display:flex; align-items:center; gap:.34rem; white-space:nowrap; padding:0.42rem 0.58rem !important; font-size:0.84rem; line-height:1.2; }
+    .service-owner-nav .nav-link {
+      display:flex;
+      align-items:center;
+      gap:.45rem;
+      white-space:nowrap;
+      padding:0.62rem 0.92rem !important;
+      font-size:0.92rem;
+      line-height:1.2;
+      min-height: 44px;
+      border-radius: 12px;
+    }
     .service-owner-nav .nav-link i { flex:0 0 auto; }
+    .service-navbar-collapse {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 1rem;
+      min-width: 0;
+      width: 100%;
+    }
+    .service-navbar-collapse > .navbar-scroll-shell {
+      flex: 1 1 auto;
+      min-width: 0;
+      margin: 0;
+    }
+    .service-navbar-meta {
+      flex: 0 0 auto;
+      margin-left: auto;
+      flex-wrap: nowrap;
+      align-items: center;
+      white-space: nowrap;
+      gap: .5rem;
+    }
+    .service-navbar-meta .nav-item {
+      flex: 0 0 auto;
+    }
     .btn-nav-cta { background: var(--ah-red); color: #fff !important; font-weight: 600; border-radius: 8px; padding: 0.4rem 1rem !important; font-size: 0.9rem; transition: background 0.2s, transform 0.1s; }
     .btn-nav-cta:hover { background: var(--ah-red-dark); transform: translateY(-1px); }
     .navbar-search { max-width: 340px; flex: 1; }
@@ -123,6 +190,197 @@
       color: var(--ah-muted);
     }
     .ah-empty-state strong { display:block; color:var(--ah-text); margin-bottom:.35rem; }
+    .ah-section-card {
+      background: var(--ah-dark2);
+      border: 1px solid var(--ah-border);
+      border-radius: 22px;
+      padding: 1.25rem;
+      box-shadow: 0 16px 42px rgba(0,0,0,0.16);
+    }
+    .ah-section-card-muted {
+      background: linear-gradient(180deg, var(--ah-dark2), var(--ah-dark3));
+    }
+    .ah-section-title-row {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:1rem;
+      margin-bottom:1rem;
+    }
+    .ah-section-title-row h2,
+    .ah-section-title-row h3,
+    .ah-section-title-row h4 {
+      margin:0;
+    }
+    .ah-section-lead {
+      color: var(--ah-muted);
+      font-size: .92rem;
+      margin: .3rem 0 0;
+    }
+    .ah-stat-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+      gap:1rem;
+    }
+    .ah-stat-card {
+      background: var(--ah-dark2);
+      border: 1px solid var(--ah-border);
+      border-radius: 20px;
+      padding: 1rem;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.12);
+    }
+    .ah-stat-value {
+      font: 800 2rem 'Barlow Condensed', sans-serif;
+      line-height: 1;
+      color: var(--ah-text);
+    }
+    .ah-stat-label {
+      margin-top: .35rem;
+      color: var(--ah-muted);
+      font-size: .8rem;
+    }
+    .ah-chip-list {
+      display:flex;
+      flex-wrap:wrap;
+      gap:.55rem;
+    }
+    .ah-chip {
+      display:inline-flex;
+      align-items:center;
+      gap:.42rem;
+      padding:.42rem .78rem;
+      border-radius:999px;
+      border:1px solid var(--ah-border);
+      background:var(--ah-dark3);
+      color:var(--ah-text-soft);
+      font-size:.82rem;
+      font-weight:600;
+    }
+    .ah-kv-list {
+      display:grid;
+      gap:.85rem;
+    }
+    .ah-kv-item {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:1rem;
+      padding:.85rem 0;
+      border-bottom:1px solid rgba(255,255,255,0.06);
+    }
+    .ah-kv-item:last-child {
+      border-bottom:none;
+      padding-bottom:0;
+    }
+    .ah-kv-label {
+      color:var(--ah-muted);
+      font-size:.82rem;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      font-weight:700;
+    }
+    .ah-kv-value {
+      color:var(--ah-text);
+      text-align:right;
+      font-weight:600;
+    }
+    .ah-info-list {
+      display:grid;
+      gap:.75rem;
+    }
+    .ah-info-item {
+      display:flex;
+      gap:.75rem;
+      align-items:flex-start;
+      padding:.9rem 1rem;
+      border-radius:18px;
+      background:var(--ah-dark3);
+      border:1px solid var(--ah-border);
+    }
+    .ah-info-item i,
+    .ah-icon-circle {
+      flex:0 0 auto;
+    }
+    .ah-icon-circle {
+      width:2.5rem;
+      height:2.5rem;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:14px;
+      background:rgba(230,57,70,0.12);
+      border:1px solid rgba(230,57,70,0.22);
+      color:var(--ah-red);
+    }
+    .ah-status-pill {
+      display:inline-flex;
+      align-items:center;
+      gap:.38rem;
+      padding:.38rem .72rem;
+      border-radius:999px;
+      font-size:.78rem;
+      font-weight:700;
+      border:1px solid transparent;
+      white-space:nowrap;
+    }
+    .ah-status-pill.pending,
+    .ah-status-pill.waiting_parts {
+      background:rgba(234,179,8,0.14);
+      color:#fde68a;
+      border-color:rgba(234,179,8,0.28);
+    }
+    .ah-status-pill.quoted {
+      background:rgba(148,163,184,0.16);
+      color:#d7dee7;
+      border-color:rgba(148,163,184,0.26);
+    }
+    .ah-status-pill.confirmed {
+      background:rgba(34,197,94,0.14);
+      color:#86efac;
+      border-color:rgba(34,197,94,0.28);
+    }
+    .ah-status-pill.in_progress {
+      background:rgba(249,115,22,0.14);
+      color:#fdba74;
+      border-color:rgba(249,115,22,0.28);
+    }
+    .ah-status-pill.done {
+      background:rgba(99,102,241,0.14);
+      color:#c7d2fe;
+      border-color:rgba(99,102,241,0.28);
+    }
+    .ah-status-pill.cancelled {
+      background:rgba(239,68,68,0.14);
+      color:#fda4af;
+      border-color:rgba(239,68,68,0.28);
+    }
+    .ah-action-strip {
+      display:flex;
+      flex-wrap:wrap;
+      gap:.75rem;
+      align-items:center;
+    }
+    .ah-table-shell {
+      background: var(--ah-dark2);
+      border: 1px solid var(--ah-border);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 18px 44px rgba(0,0,0,0.18);
+    }
+    .ah-table-shell .table-responsive {
+      overflow-x:auto;
+    }
+    .ah-mobile-card-list {
+      display:grid;
+      gap:.85rem;
+    }
+    .ah-mobile-card {
+      background: var(--ah-dark2);
+      border: 1px solid var(--ah-border);
+      border-radius: 20px;
+      padding: 1rem;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.12);
+    }
     .ah-badge-soft {
       display:inline-flex; align-items:center; gap:.38rem; border-radius:999px; padding:.38rem .72rem;
       background:rgba(230,57,70,0.10); border:1px solid rgba(230,57,70,0.22); color:#ffb4ae; font-size:.8rem; font-weight:700;
@@ -162,6 +420,16 @@
     }
     html[data-theme='light'] .ah-surface-card { box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05); }
     html[data-theme='light'] .ah-empty-state { background: linear-gradient(180deg, #ffffff, #f6f8fa); }
+    html[data-theme='light'] .ah-section-card,
+    html[data-theme='light'] .ah-stat-card,
+    html[data-theme='light'] .ah-mobile-card,
+    html[data-theme='light'] .ah-table-shell {
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+    }
+    html[data-theme='light'] .ah-info-item,
+    html[data-theme='light'] .ah-chip {
+      background: #f8fafc;
+    }
     html[data-theme='light'] .navbar-autohub .nav-link {
       color: var(--ah-text-soft) !important;
       background: transparent;
@@ -210,9 +478,7 @@
         align-items:center;
         gap:.75rem;
       }
-      .navbar-autohub .service-owner-nav {
-        flex:1 1 auto;
-      }
+      .navbar-autohub .navbar-scroll-shell { display:block; }
       .navbar-autohub .navbar-nav.align-items-center {
         flex:0 0 auto;
         display:flex;
@@ -353,6 +619,72 @@
     a, button, .btn { transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease; touch-action: manipulation; }
     input, select, textarea { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
     button, [type='button'], [type='submit'], a { touch-action: manipulation; }
+    main { min-height: calc(100vh - 210px); }
+    @media (max-width: 991.98px) {
+      .ah-page-header {
+        border-radius: 20px;
+        padding: 1.15rem 1.1rem;
+      }
+      .section-title {
+        font-size: 1.95rem;
+      }
+      .navbar-scroll-shell {
+        width: 100%;
+        margin: .45rem 0;
+      }
+      .navbar-scroll-shell .navbar-nav {
+        min-width: max-content;
+      }
+      .service-navbar-collapse {
+        flex-wrap: wrap;
+      }
+      .service-navbar-collapse > .navbar-scroll-shell {
+        flex-basis: 100%;
+        order: 2;
+      }
+      .service-navbar-meta {
+        order: 1;
+        width: 100%;
+        margin-left: 0;
+        justify-content: space-between;
+      }
+      .service-owner-nav { margin: .5rem 0; }
+      .service-owner-nav .nav-link {
+        padding: .58rem .86rem !important;
+        font-size: .9rem;
+      }
+      .navbar-search {
+        max-width: none;
+      }
+      .btn-theme-toggle {
+        padding: .35rem .55rem;
+      }
+      #themeToggleLabel {
+        display: none;
+      }
+    }
+    @media (max-width: 767.98px) {
+      .ah-page-shell {
+        padding-top: 1rem;
+        padding-bottom: 1.35rem;
+      }
+      .toast-container-custom {
+        right: 12px;
+        left: 12px;
+        width: auto;
+      }
+      footer {
+        margin-top: 3rem;
+        padding-top: 2rem;
+      }
+      .ah-kv-item {
+        flex-direction: column;
+        gap: .35rem;
+      }
+      .ah-kv-value {
+        text-align: left;
+      }
+    }
   </style>
 
   {% block extra_css %}{% endblock %}
@@ -384,9 +716,10 @@
       <i class="bi bi-list text-white fs-4"></i>
     </button>
 
-    <div class="collapse navbar-collapse" id="navMain">
+    <div class="collapse navbar-collapse {% if has_service_center %}service-navbar-collapse{% endif %}" id="navMain">
       {% if not has_service_center %}
-      <ul class="navbar-nav me-auto ms-lg-2">
+      <div class="navbar-scroll-shell me-auto ms-lg-2">
+      <ul class="navbar-nav">
         <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'categories' %}active{% endif %}" href="{% url 'services:categories' %}">
             <i class="bi bi-grid-3x3-gap me-1"></i>Categorii
@@ -408,13 +741,15 @@
         </li>
         {% endif %}
       </ul>
+      </div>
       <form class="d-lg-none mb-2 mt-2 input-group" action="{% url 'services:list' %}" method="get">
         <input type="text" name="q" class="form-control" placeholder="Caută service..." value="{{ request.GET.q }}">
         <button class="btn btn-search" type="submit"><i class="bi bi-search"></i></button>
       </form>
       {% else %}
       {# ── Navbar service owner ── #}
-      <ul class="navbar-nav me-auto ms-lg-2 service-owner-nav">
+      <div class="navbar-scroll-shell me-auto ms-lg-2">
+      <ul class="navbar-nav service-owner-nav">
         <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'services:dashboard' %}">
             <i class="bi bi-speedometer2 me-1"></i>Dashboard
@@ -451,14 +786,22 @@
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'invoices:clients' %}">
+          <a class="nav-link {% if request.resolver_match.app_name == 'invoices' %}active{% endif %}" href="{% url 'invoices:clients' %}">
             <i class="bi bi-receipt me-1"></i>Facturi
           </a>
         </li>
+        {% if centers %}
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'manage_profile' %}active{% endif %}" href="{% url 'services:manage_profile' centers.0.pk %}">
+            <i class="bi bi-sliders me-1"></i>Setări
+          </a>
+        </li>
+        {% endif %}
       </ul>
+      </div>
       {% endif %}
 
-      <ul class="navbar-nav align-items-center gap-1">
+      <ul class="navbar-nav align-items-center gap-1 {% if has_service_center %}service-navbar-meta{% endif %}">
         <li class="nav-item me-1">
           <button type="button" class="btn btn-theme-toggle" id="themeToggle" aria-label="Schimbă tema">
             <span class="theme-toggle-icon"><i class="bi bi-sun-fill"></i></span>
@@ -559,6 +902,86 @@
         applyTheme(current === 'dark' ? 'light' : 'dark');
       });
     }
+
+    document.querySelectorAll('.navbar-scroll-shell').forEach(function (shell) {
+      if (!shell.querySelector('.service-owner-nav')) {
+        return;
+      }
+
+      function hasOverflow() {
+        return shell.scrollWidth > shell.clientWidth + 4;
+      }
+
+      function syncScrollableState() {
+        shell.classList.toggle('is-scrollable', hasOverflow());
+      }
+
+      syncScrollableState();
+      window.addEventListener('resize', syncScrollableState);
+
+      shell.addEventListener('wheel', function (event) {
+        if (!hasOverflow()) {
+          return;
+        }
+
+        const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+        if (!delta) {
+          return;
+        }
+
+        const nextLeft = shell.scrollLeft + delta;
+        const canScrollLeft = delta < 0 && shell.scrollLeft > 0;
+        const canScrollRight = delta > 0 && shell.scrollLeft + shell.clientWidth < shell.scrollWidth;
+        if (!canScrollLeft && !canScrollRight) {
+          return;
+        }
+
+        event.preventDefault();
+        shell.scrollLeft = nextLeft;
+      }, { passive: false });
+
+      let isDragging = false;
+      let startX = 0;
+      let startScrollLeft = 0;
+      let pointerMoved = false;
+
+      shell.addEventListener('mousedown', function (event) {
+        if (!hasOverflow() || event.button !== 0) {
+          return;
+        }
+
+        isDragging = true;
+        pointerMoved = false;
+        startX = event.clientX;
+        startScrollLeft = shell.scrollLeft;
+        shell.classList.add('is-dragging');
+      });
+
+      window.addEventListener('mousemove', function (event) {
+        if (!isDragging) {
+          return;
+        }
+
+        const delta = event.clientX - startX;
+        if (Math.abs(delta) > 4) {
+          pointerMoved = true;
+        }
+        if (!pointerMoved) {
+          return;
+        }
+
+        shell.scrollLeft = startScrollLeft - delta;
+      });
+
+      window.addEventListener('mouseup', function () {
+        if (!isDragging) {
+          return;
+        }
+
+        isDragging = false;
+        shell.classList.remove('is-dragging');
+      });
+    });
 
   });
 </script>

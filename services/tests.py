@@ -9,7 +9,18 @@ from django.utils import timezone
 
 from accounts.models import LegalAcceptance
 from bookings.models import Booking, BookingActivityLog
-from services.models import ServiceCategory, ServiceCenter, ServiceGarage, ServicePart
+from services.forms import AvailabilityBlockForm
+from services.models import (
+    JobCard,
+    JobOperation,
+    JobPartUsage,
+    ServiceAvailabilityBlock,
+    ServiceCategory,
+    ServiceCenter,
+    ServiceGarage,
+    ServiceItem,
+    ServicePart,
+)
 
 
 User = get_user_model()
@@ -101,6 +112,53 @@ class ServiceBookingPermissionTests(TestCase):
         response = self.client.get(reverse('services:booking_detail', args=[self.booking.pk]))
 
         self.assertEqual(response.status_code, 200)
+
+    def test_booking_print_fills_services_from_selected_service_and_problem(self):
+        self.client.force_login(self.owner)
+        self.booking.service_item = ServiceItem.objects.create(
+            center=self.center,
+            name='Schimb ulei si filtre',
+            description='Revizie periodica',
+            price_from='250.00',
+            duration_minutes=90,
+        )
+        self.booking.problem_description = 'Revizie de primavara'
+        self.booking.save(update_fields=['service_item', 'problem_description', 'updated_at'])
+
+        response = self.client.get(reverse('services:booking_print', args=[self.booking.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Servicii de efectuat / piese folosite')
+        self.assertContains(response, 'Schimb ulei si filtre')
+        self.assertContains(response, 'Solicitare client: Revizie de primavara')
+
+    def test_booking_print_fills_services_from_job_card_operations_and_parts(self):
+        self.client.force_login(self.owner)
+        job_card = JobCard.objects.create(
+            booking=self.booking,
+            center=self.center,
+            status=JobCard.STATUS_IN_PROGRESS,
+        )
+        JobOperation.objects.create(
+            job_card=job_card,
+            title='Diagnoza electronica',
+            description='Citire erori si verificare parametri',
+            position=1,
+        )
+        JobPartUsage.objects.create(
+            job_card=job_card,
+            description='Filtru aer',
+            quantity=1,
+            unit_label='buc',
+            status=JobPartUsage.STATUS_CONSUMED,
+            notes='inlocuire recomandata',
+        )
+
+        response = self.client.get(reverse('services:booking_print', args=[self.booking.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Diagnoza electronica - Citire erori si verificare parametri')
+        self.assertContains(response, 'Filtru aer (1 buc) - inlocuire recomandata')
 
 
 class ServiceCalendarTests(TestCase):
@@ -198,6 +256,30 @@ class ServiceCalendarTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
 
+    def test_calendar_sidebar_shows_latest_created_blocks_first(self):
+        self.client.force_login(self.owner)
+        base_day = timezone.localdate() + timezone.timedelta(days=5)
+        for index in range(9):
+            starts_at = timezone.make_aware(datetime.combine(base_day + timezone.timedelta(days=index), time(9, 0)))
+            ends_at = timezone.make_aware(datetime.combine(base_day + timezone.timedelta(days=index), time(10, 0)))
+            ServiceAvailabilityBlock.objects.create(
+                center=self.center,
+                garage=self.booking.garage,
+                title=f'Bloc test {index}',
+                block_type=ServiceAvailabilityBlock.BLOCK_BREAK,
+                starts_at=starts_at,
+                ends_at=ends_at,
+                created_by=self.owner,
+            )
+
+        response = self.client.get(reverse('services:calendar'))
+
+        self.assertEqual(response.status_code, 200)
+        recent_titles = [block.title for block in response.context['recent_blocks']]
+        self.assertEqual(len(recent_titles), 8)
+        self.assertEqual(recent_titles[0], 'Bloc test 8')
+        self.assertNotIn('Bloc test 0', recent_titles)
+
 
 class ServiceDashboardAnalyticsTests(TestCase):
     def setUp(self):
@@ -228,7 +310,7 @@ class ServiceDashboardAnalyticsTests(TestCase):
         response = self.client.get(reverse('services:dashboard'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Today Board')
+        self.assertContains(response, 'Planul de azi')
         self.assertContains(response, 'Stoc și atenționări')
         self.assertContains(response, 'Filtru ulei')
 
@@ -329,3 +411,35 @@ class ServiceReportsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'].split(';')[0], 'text/csv')
         self.assertIn('raport_appointments', response['Content-Disposition'])
+
+
+class AvailabilityBlockFormTests(TestCase):
+    def test_form_accepts_garage_from_selected_center(self):
+        owner = User.objects.create_user(username='owner-block-form', password='pass12345')
+        grant_legal_acceptance(owner)
+        center = create_center(owner, 'Block Form Service')
+        garage = ServiceGarage.objects.create(
+            center=center,
+            name='Post form',
+            category=center.category,
+            open_time=time(8, 0),
+            close_time=time(18, 0),
+            slot_minutes=60,
+        )
+        start = (timezone.localtime() + timezone.timedelta(days=2)).replace(hour=12, minute=0, second=0, microsecond=0).strftime('%Y-%m-%dT%H:%M')
+        end = (timezone.localtime() + timezone.timedelta(days=2)).replace(hour=13, minute=0, second=0, microsecond=0).strftime('%Y-%m-%dT%H:%M')
+
+        form = AvailabilityBlockForm(
+            {
+                'garage': str(garage.pk),
+                'mechanic': '',
+                'block_type': ServiceAvailabilityBlock.BLOCK_BREAK,
+                'title': 'Bloc valid',
+                'notes': '',
+                'starts_at': start,
+                'ends_at': end,
+            },
+            center=center,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)

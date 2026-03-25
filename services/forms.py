@@ -21,6 +21,7 @@ from .models import (
     ServicePart,
     StockMovement,
 )
+from .business import validate_job_card_status_transition
 from .reporting import REPORT_CHOICES, PRESET_CHOICES, MONTH_CHOICES
 from bookings.forms import BookingForm
 from bookings.models import Booking
@@ -614,16 +615,16 @@ class JobCardForm(forms.ModelForm):
             'next_service_date', 'next_service_km',
         ]
         widgets = {
-            'status': forms.Select(attrs={'class': 'form-select'}),
+            'status': forms.Select(attrs={'class': 'form-select', 'data-testid': 'job-card-status'}),
             'mechanic': forms.Select(attrs={'class': 'form-select'}),
             'mileage': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'estimated_hours': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.25'}),
             'actual_hours': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.25'}),
             'estimated_cost': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01'}),
-            'final_cost': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01'}),
+            'final_cost': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01', 'data-testid': 'job-card-final-cost'}),
             'diagnostic_summary': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'work_performed': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
-            'customer_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'customer_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'data-testid': 'job-card-customer-notes'}),
             'internal_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'next_service_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'next_service_km': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
@@ -635,6 +636,16 @@ class JobCardForm(forms.ModelForm):
         if center:
             self.fields['mechanic'].queryset = center.mechanics.filter(is_active=True).order_by('name')
         self.fields['mechanic'].required = False
+
+    def clean(self):
+        cleaned = super().clean()
+        new_status = cleaned.get('status')
+        if new_status and getattr(self.instance, 'pk', None):
+            try:
+                validate_job_card_status_transition(self.instance.status, new_status)
+            except ValidationError as exc:
+                self.add_error('status', exc.message)
+        return cleaned
 
 
 class JobOperationForm(forms.ModelForm):
@@ -691,6 +702,15 @@ class JobPartUsageForm(forms.Form):
         if center:
             self.fields['part'].queryset = center.parts.filter(is_active=True).order_by('name')
 
+    def clean(self):
+        cleaned = super().clean()
+        part = cleaned.get('part')
+        quantity = cleaned.get('quantity') or 0
+        status = cleaned.get('status')
+        if part and quantity and status in {JobPartUsage.STATUS_RESERVED, JobPartUsage.STATUS_CONSUMED} and part.stock < quantity:
+            self.add_error('quantity', f'Sunt disponibile doar {part.stock} {part.unit} pentru piesa selectata.')
+        return cleaned
+
 
 class StockMovementForm(forms.Form):
     part_id = forms.IntegerField(widget=forms.HiddenInput())
@@ -728,6 +748,8 @@ class AvailabilityBlockForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         center = kwargs.pop('center', None)
         super().__init__(*args, **kwargs)
+        if center:
+            self.instance.center = center
         if center:
             self.fields['garage'].queryset = center.garages.order_by('name')
             self.fields['mechanic'].queryset = center.mechanics.order_by('name')

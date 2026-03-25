@@ -14,7 +14,7 @@ class Invoice(models.Model):
     STATUS_CANCELLED = 'cancelled'
 
     STATUS_CHOICES = [
-        (STATUS_DRAFT, 'Draft'),
+        (STATUS_DRAFT, 'Ciornita'),
         (STATUS_FINAL, 'Emisa'),
         (STATUS_PAID, 'Achitata'),
         (STATUS_CANCELLED, 'Anulata'),

@@ -4,7 +4,7 @@ Platformă Django pentru relația dintre clienți și service-uri auto: căutare
 
 ## Ce problemă rezolvă
 
-AutoHub transformă interacțiunea clasică dintre client și service într-un flux clar și urmărit:
+AutoEMG transformă interacțiunea clasică dintre client și service într-un flux clar și urmărit:
 
 - clientul găsește un service potrivit, rezervă online și vede statusul lucrării;
 - service-ul își organizează programările, lucrările, mecanicii, piesele și documentele dintr-un singur loc;
@@ -74,7 +74,7 @@ AutoHub transformă interacțiunea clasică dintre client și service într-un f
 ### Zone importante în cod
 
 - `services/business.py`:
-  logică de business pentru fișe de lucru, consum piese și dosar auto
+  logică de business pentru tranziții de status, fișe de lucru, consum piese, sincronizare booking/job card/factură și dosar auto
 - `services/reporting.py`:
   dashboard și rapoarte
 - `templates/services/`:
@@ -83,6 +83,13 @@ AutoHub transformă interacțiunea clasică dintre client și service într-un f
   experiența clientului pentru programări
 - `services/management/commands/seed_autohub.py`:
   seed demo pentru prezentare și testare
+
+## Convenții de status
+
+- `Booking` și `JobCard` nu mai schimbă statusuri prin reguli separate în fiecare view; tranzițiile și sincronizarea lor sunt centralizate în `services/business.py`.
+- `JobCard.STATUS_WAITING_CUSTOMER` se aliniază explicit cu `Booking.STATUS_QUOTED`, nu cu `confirmed`.
+- finalizarea facturii legate de o programare verifică mai întâi că booking-ul este `done` și că fișa lucrării este deja într-o stare finalizabilă.
+- tag-ul operațional `waiting_part` este normalizat automat când booking-ul intră sau iese din `waiting_parts`.
 
 ## Stack tehnologic
 
@@ -218,6 +225,167 @@ python manage.py send_booking_reminders
 python manage.py notify_stale_pending_bookings
 python manage.py send_expiry_email_reminders
 ```
+
+Pentru verificare rapidă după refactor pe zonele operaționale critice:
+
+```bash
+python manage.py test services.test_business_logic invoices.test_invoice_more_flows bookings.tests services.test_notifications_and_actions
+```
+
+## Testare automata
+
+Proiectul foloseste in prezent `Django TestCase` si test runner-ul standard Django. Am ales aceasta varianta pentru a pastra configuratia simpla, stabila si usor de rulat local, fara dependinte suplimentare obligatorii.
+
+### Structura testelor
+
+Testele sunt impartite pe module si responsabilitati:
+
+- `accounts/tests.py` + `accounts/test_*.py`
+  auth, acceptare legala, masini si restrictii pe cont
+- `bookings/tests.py` + `bookings/test_*.py`
+  booking flow, validari, quote flow si reguli critice de programare
+- `services/tests.py` + `services/test_*.py`
+  dashboard, calendar, business logic pentru job cards, inventar, rapoarte, pagini publice, API si fluxuri cap-coada HTTP
+- `invoices/test_*.py`
+  totaluri, permisiuni si PDF-uri pentru facturi
+- `autohub_testutils/factories.py`
+  helperi/factories pentru utilizatori, service-uri, masini, booking-uri, job cards, piese, facturi, review-uri si notificari
+
+### Ce tipuri de teste exista acum
+
+- backend critical tests:
+  validari booking, sloturi/disponibilitate, sync booking <-> job card, consum/rollback stoc, dosar auto, KPI, raportare si totaluri facturi
+- permissions/security tests:
+  izolare intre clienti, service-uri si admin; protectie pe masini, booking-uri, dashboard si facturi
+- integration tests:
+  register/login/verify email, creare booking, recenzii, favorite, API public, PDF-uri, remindere, scanare documente si fluxuri service
+- end-to-end HTTP tests:
+  scenariu cap-coada client -> service -> client, la nivel de request/response Django
+- end-to-end browser tests:
+  infrastructura Playwright pregatita pentru fluxul principal prin UI, cu date E2E dedicate
+
+### Rulare teste
+
+Toata suita:
+
+```bash
+python manage.py test -v 2
+```
+
+Doar o aplicatie:
+
+```bash
+python manage.py test bookings -v 2
+python manage.py test services -v 2
+python manage.py test accounts -v 2
+python manage.py test invoices -v 2
+```
+
+Doar un fisier sau o clasa:
+
+```bash
+python manage.py test services.test_business_logic -v 2
+python manage.py test bookings.tests.BookingIntegratedPlatformTests -v 2
+python manage.py test services.test_end_to_end_http.EndToEndHttpFlowTests -v 2
+```
+
+La `-v 2`, fiecare test afiseaza descrierea lui prin docstring, ca sa vezi rapid ce verifica.
+
+### Teste E2E cu Playwright
+
+Exista acum infrastructura pregatita pentru browser E2E real:
+
+- `package.json`
+- `playwright.config.js`
+- `e2e/autohub-main-flow.spec.js`
+- `core/management/commands/prepare_e2e_data.py`
+
+Datele E2E sunt separate de seed-ul demo general. Comanda de pregatire creeaza:
+
+- `client_e2e / client12345`
+- `service_e2e / service12345`
+- service-ul `autohub-e2e-service`
+
+Rulare recomandata:
+
+```bash
+npm install
+npm run e2e:install
+npm run e2e:test
+```
+
+Rulare cu browser vizibil:
+
+```bash
+npm run e2e:headed
+```
+
+Daca vrei doar pregatirea datelor E2E:
+
+```bash
+python manage.py prepare_e2e_data
+```
+
+Configul Playwright porneste automat Django pe un port separat si ruleaza comanda de pregatire a datelor inainte de scenarii.
+
+Scenariile pregatite acum acopera:
+
+- clientul se autentifica si creeaza o programare noua
+- service-ul cauta bookingul, completeaza fisa si marcheaza lucrarea ca finalizata
+- clientul revine si vede statusul si costul final actualizat
+- clientul cere oferta, service-ul trimite oferta, iar clientul o accepta
+- clientul cere oferta, service-ul trimite oferta, iar clientul o refuza
+- service-ul finalizeaza bookingul si emite factura din browser
+- clientul adauga si elimina service-ul din favorite
+- clientul lasa recenzie dupa o programare finalizata
+- service-ul blocheaza un interval din calendar si verifica filtrele UI
+- service-ul inregistreaza miscari de stoc direct din inventar
+
+### Coverage
+
+Exista configuratie de coverage in `.coveragerc`.
+
+Daca ai pachetul `coverage` instalat in mediul local, poti rula:
+
+```bash
+coverage run manage.py test
+coverage report
+coverage html
+```
+
+Zonele cu acoperire prioritara sunt:
+
+- auth si roluri
+- bookings si quote flow
+- calendar si disponibilitate
+- mutare programari din calendar si intervale blocate
+- job cards / inventory / stock movements
+- rapoarte service si export CSV
+- invoices si PDF response
+- dosar auto
+- scanare documente si confirmare manuala
+- notificari interne service
+- validari de upload pentru imagini, documente si media booking
+- permisiuni si izolare date
+
+### Servicii externe mock-uite in teste
+
+Testele nu trimit emailuri sau SMS-uri reale si nu depind de servicii externe active.
+
+Sunt mock-uite sau evitate in mod controlat:
+
+- emailurile tranzactionale
+- SMS-urile Twilio
+- callback-urile `transaction.on_commit` pentru notificari
+- generatoarele PDF unde este suficient sa verificam raspunsul si payload-ul
+- serviciile externe reale nu sunt necesare pentru scenariile Playwright pregatite acum
+
+### Limitari cunoscute pentru testare
+
+- Playwright este pregatit in proiect, dar necesita instalarea locala a dependintelor Node si a browserului Chromium;
+- scenariile browser E2E actuale sunt concentrate pe fluxul principal si nu acopera inca toate modulele interne;
+- integrarea AI pentru scanare documente si integrari externe reale necesita mocking suplimentar sau chei externe pentru o acoperire completa;
+- coverage nu este dependinta obligatorie in `requirements.txt`, dar configuratia este pregatita prin `.coveragerc`.
 
 ## Media și Cloudinary
 

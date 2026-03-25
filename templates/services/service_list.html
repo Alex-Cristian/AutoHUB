@@ -98,6 +98,245 @@
     color: var(--ah-muted);
     margin-bottom: 0.6rem;
   }
+  .services-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .service-filter-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: .85rem;
+  }
+  .service-filter-summary .ah-chip {
+    background: rgba(230,57,70,0.1);
+    border-color: rgba(230,57,70,0.18);
+  }
+  .services-results-grid {
+    display: grid;
+    gap: 1rem;
+  }
+  .service-result-card {
+    display: grid;
+    grid-template-columns: 176px minmax(0, 1fr);
+    gap: 0;
+    background: var(--ah-dark2);
+    border: 1px solid var(--ah-border);
+    border-radius: 24px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.14);
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .service-result-card:hover {
+    color: inherit;
+    border-color: rgba(230,57,70,0.3);
+    box-shadow: 0 24px 54px rgba(0,0,0,0.18);
+    transform: translateY(-3px);
+  }
+  .service-result-media {
+    min-height: 100%;
+    background: linear-gradient(160deg, rgba(230,57,70,0.18), rgba(244,162,97,0.08) 52%, var(--ah-dark3));
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    padding: 1rem;
+  }
+  .service-result-media img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .service-result-media::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(10,10,10,0.08), rgba(10,10,10,0.56));
+  }
+  .service-result-media-badge {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .52rem .8rem;
+    border-radius: 999px;
+    background: rgba(15,15,15,0.78);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #fff;
+    font-weight: 700;
+    font-size: .84rem;
+  }
+  .service-result-body {
+    padding: 1.1rem 1.15rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .95rem;
+    min-width: 0;
+  }
+  .service-result-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .service-result-title {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+    margin-bottom: .35rem;
+  }
+  .service-result-title h3 {
+    margin: 0;
+    font-size: 1.35rem;
+    line-height: 1;
+  }
+  .service-result-description {
+    color: var(--ah-text-soft);
+    font-size: .94rem;
+    line-height: 1.55;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .service-result-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+  }
+  .service-result-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75rem;
+  }
+  .service-result-summary .summary-box {
+    background: var(--ah-dark3);
+    border: 1px solid var(--ah-border);
+    border-radius: 16px;
+    padding: .8rem .85rem;
+  }
+  .service-result-summary .summary-label {
+    color: var(--ah-muted);
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: .18rem;
+  }
+  .service-result-summary .summary-value {
+    color: var(--ah-text);
+    font-size: .92rem;
+    font-weight: 700;
+  }
+  .service-result-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .85rem;
+    flex-wrap: wrap;
+    padding-top: .15rem;
+  }
+  .service-result-actions .btn {
+    min-height: 42px;
+  }
+  .service-empty {
+    padding: 2.5rem 1.5rem;
+  }
+  #servicesContainer .service-card {
+    border-radius: 24px;
+    min-height: 100%;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.14);
+    border-color: rgba(255,255,255,0.05);
+  }
+  #servicesContainer .service-card .card-img-placeholder {
+    width: 156px !important;
+    min-height: 100% !important;
+    border-radius: 24px 0 0 24px !important;
+    background:
+      linear-gradient(180deg, rgba(8,8,8,0.18), rgba(8,8,8,0.42)),
+      linear-gradient(150deg, rgba(230,57,70,0.18), rgba(244,162,97,0.08) 50%, var(--ah-dark3));
+  }
+  #servicesContainer .service-card .p-3 {
+    padding: 1.1rem 1.15rem 1rem !important;
+    gap: .9rem;
+  }
+  #servicesContainer .service-card h6 {
+    font-size: 1.1rem;
+  }
+  #servicesContainer .service-card .badge {
+    border-radius: 999px;
+    padding: .45rem .72rem;
+    font-size: .72rem;
+    font-weight: 700;
+  }
+  #servicesContainer .service-card .btn {
+    min-height: 42px;
+    border-radius: 12px;
+  }
+  #servicesContainer .service-card .text-orange.fw-bold {
+    font-size: 1rem;
+  }
+  @media (max-width: 991.98px) {
+    .service-result-summary {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 767.98px) {
+    #servicesContainer .service-card {
+      flex-direction: column;
+    }
+    #servicesContainer .service-card .card-img-placeholder {
+      width: 100% !important;
+      min-height: 180px !important;
+      border-radius: 24px 24px 0 0 !important;
+    }
+    #servicesContainer .service-card .p-3,
+    #servicesContainer .service-card .d-flex.justify-content-between.align-items-center.mt-2.flex-wrap.gap-2,
+    #servicesContainer .service-card .d-flex.justify-content-between.align-items-start.gap-2 {
+      flex-direction: column;
+      align-items: stretch !important;
+    }
+    #servicesContainer .service-card .d-flex.align-items-center.gap-3,
+    #servicesContainer .service-card .d-flex.gap-2 {
+      width: 100%;
+      justify-content: space-between;
+    }
+    #servicesContainer .service-card .d-flex.gap-2 .btn,
+    #servicesContainer .service-card .d-flex.gap-2 span.btn {
+      flex: 1 1 0;
+      text-align: center;
+    }
+    .service-result-card {
+      grid-template-columns: 1fr;
+    }
+    .service-result-media {
+      min-height: 180px;
+    }
+    .service-result-head,
+    .service-result-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .service-result-actions .btn {
+      width: 100%;
+    }
+    .services-toolbar > div:last-child {
+      width: 100%;
+    }
+    .services-toolbar select,
+    #btnOpenFiltre {
+      flex: 1 1 0;
+    }
+  }
 </style>
 {% endblock extra_css %}
 
@@ -240,6 +479,21 @@
   </div>
 </div>
 
+<section class="ah-page-header mx-3 mx-xl-0 mb-4">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+    <div>
+      <div class="ah-page-eyebrow"><i class="bi bi-search-heart"></i>Găsește service-ul potrivit</div>
+      <h1 class="section-title mb-1">Service-uri auto</h1>
+      <p class="ah-page-subtitle">Compară rapid service-uri după rating, specializări, preț de pornire și disponibilitate, apoi programează-te direct din profilul lor.</p>
+    </div>
+    <div class="ah-chip-list">
+      <span class="ah-chip"><i class="bi bi-buildings"></i>{{ total_count }} opțiuni disponibile</span>
+      {% if selected_city %}<span class="ah-chip"><i class="bi bi-geo-alt"></i>{{ selected_city }}</span>{% endif %}
+      {% if search_q %}<span class="ah-chip"><i class="bi bi-search"></i>{{ search_q }}</span>{% endif %}
+    </div>
+  </div>
+</section>
+
 <!-- ===== PAGINA PRINCIPALA ===== -->
 <div class="container-fluid py-4" style="max-width: 1400px">
 
@@ -254,7 +508,8 @@
     <!-- HEADER + BUTON FILTRE -->
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
       <div>
-        <h1 class="section-title mb-1">Service-uri auto</h1>
+        <h2 class="h4 mb-1">Rezultate și filtre</h2>
+        <p class="text-muted-custom mb-0">Filtrează clar după nevoie, locație și buget.</p>
       </div>
 
       <div class="d-flex gap-2 align-items-center">
@@ -291,6 +546,16 @@
         </select>
       </div>
     </div>
+
+    <div class="service-filter-summary">
+      {% if search_q %}<span class="ah-chip"><i class="bi bi-search"></i>Căutare: {{ search_q }}</span>{% endif %}
+      {% if selected_category %}<span class="ah-chip"><i class="bi bi-grid"></i>Categorie: {{ selected_category }}</span>{% endif %}
+      {% if selected_city %}<span class="ah-chip"><i class="bi bi-geo-alt"></i>Oraș: {{ selected_city }}</span>{% endif %}
+      {% if selected_min_rating %}<span class="ah-chip"><i class="bi bi-star-fill"></i>Minim {{ selected_min_rating }} stele</span>{% endif %}
+      {% if selected_price_min or selected_price_max %}
+      <span class="ah-chip"><i class="bi bi-cash-coin"></i>Buget: {{ selected_price_min|default:"0" }} - {{ selected_price_max|default:"nelimitat" }} RON</span>
+      {% endif %}
+    </div>
   </div>
 
   <div class="row g-3">
@@ -301,6 +566,7 @@
         <div class="row g-3" id="servicesContainer">
           {% for center in centers %}
             <div class="col-12"
+                 data-testid="service-list-card"
                  data-lat="{{ center.latitude|default:0|stringformat:'f' }}"
                  data-lng="{{ center.longitude|default:0|stringformat:'f' }}"
                  data-slug="{{ center.slug }}">
@@ -344,6 +610,7 @@
                       </div>
                       {% if user.is_authenticated %}
                         <span class="flex-shrink-0"
+                              data-testid="service-list-favorite-button"
                               onclick="event.preventDefault(); window.location='{% url 'services:toggle_favorite' center.slug %}'">
                           <i class="bi bi-heart{% if user in center.favorites.all %}-fill text-red{% endif %} fs-5"></i>
                         </span>

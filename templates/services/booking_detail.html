@@ -3,49 +3,76 @@
 
 {% block extra_css %}
 <style>
-  .booking-shell { display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(320px, .95fr); gap:1.25rem; }
-  .booking-card {
-    background: var(--ah-dark2);
-    border: 1px solid var(--ah-border);
-    border-radius: 22px;
-    box-shadow: 0 16px 42px rgba(0,0,0,.18);
-    padding: 1.2rem;
-  }
-  .booking-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.9rem; }
-  .booking-box { background: var(--ah-dark3); border-radius: 18px; padding: .95rem; }
-  .booking-label { color: var(--ah-muted); font-size: .77rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .3rem; }
-  .booking-value { font-weight: 700; color: var(--ah-text); }
+  .booking-header-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: end; }
+  .booking-header-copy { min-width: 0; }
+  .booking-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.9fr); gap: 1rem; }
+  .booking-main, .booking-side { display: grid; gap: 1rem; align-self: start; min-width: 0; }
+  .booking-side { position: sticky; top: 88px; }
+  .booking-panel, .booking-disclosure { background: var(--ah-dark2); border: 1px solid var(--ah-border); border-radius: 22px; box-shadow: 0 16px 42px rgba(0, 0, 0, .18); min-width: 0; }
+  .booking-panel { padding: 1.1rem; }
+  .booking-panel-accent { border-color: rgba(230, 57, 70, .22); background: linear-gradient(180deg, rgba(230, 57, 70, .08), rgba(230, 57, 70, .02)); }
+  .booking-panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: .8rem; }
+  .booking-panel-header > * { min-width: 0; }
+  .booking-panel-header h3 { margin: 0; font-size: 1.18rem; }
+  .booking-copy { color: var(--ah-muted); font-size: .92rem; line-height: 1.55; margin: 0; }
+  .booking-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; margin-bottom: 1rem; }
+  .booking-summary-card { background: var(--ah-dark2); border: 1px solid var(--ah-border); border-radius: 20px; padding: 1rem; min-width: 0; }
+  .booking-summary-card.full { grid-column: 1 / -1; }
+  .booking-label { color: var(--ah-muted); font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .35rem; }
+  .booking-value { color: var(--ah-text); font-weight: 700; }
   .booking-muted { color: var(--ah-muted); font-size: .9rem; }
-  .booking-section-title { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
-  .booking-section-title h3 { margin:0; font-size:1.4rem; }
-  .booking-timeline { display:grid; gap:.85rem; }
-  .booking-timeline-item { border:1px solid var(--ah-border); border-radius:18px; padding:.9rem; background:var(--ah-dark3); }
-  .booking-list { display:grid; gap:.8rem; }
-  .booking-inline-form { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.9rem; }
-  .booking-inline-form .full { grid-column:1 / -1; }
-  .booking-badges { display:flex; flex-wrap:wrap; gap:.45rem; }
-  .booking-pill {
-    display:inline-flex; align-items:center; gap:.35rem;
-    padding:.4rem .75rem; border-radius:999px;
-    background:rgba(230,57,70,.10); border:1px solid rgba(230,57,70,.22);
-    color:#ffb4ae; font-size:.82rem; font-weight:700;
+  .booking-chip-row { display: flex; flex-wrap: wrap; gap: .45rem; }
+  .booking-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .38rem .7rem; border-radius: 999px; border: 1px solid var(--ah-border); background: var(--ah-dark3); color: var(--ah-text); font-size: .82rem; font-weight: 600; max-width: 100%; white-space: normal; }
+  .booking-chip.alert { background: rgba(230, 57, 70, .10); border-color: rgba(230, 57, 70, .22); color: #ffb4ae; }
+  .booking-actions-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+  .booking-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+  .booking-form-grid.compact-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .booking-form-grid .full { grid-column: 1 / -1; }
+  .booking-cta-row { display: flex; flex-wrap: wrap; gap: .65rem; justify-content: flex-end; align-items: stretch; min-width: 0; }
+  .booking-cta-row > * { max-width: 100%; white-space: normal; }
+  .booking-cta-row .btn,
+  .booking-cta-row .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
-  .booking-part-row,
-  .booking-op-row,
-  .booking-rec-row {
-    border:1px solid var(--ah-border);
-    border-radius:18px;
-    padding:.95rem;
-    background:var(--ah-dark3);
+  .booking-list, .booking-stacked, .booking-timeline { display: grid; gap: .75rem; }
+  .booking-item { background: var(--ah-dark3); border: 1px solid var(--ah-border); border-radius: 18px; padding: .95rem; }
+  .booking-item-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+  .booking-item-head > * { min-width: 0; }
+  .booking-item-meta { color: var(--ah-muted); font-size: .88rem; margin-top: .35rem; line-height: 1.5; }
+  .booking-disclosure { overflow: hidden; }
+  .booking-disclosure summary { list-style: none; cursor: pointer; padding: 1rem 1.1rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+  .booking-disclosure summary > * { min-width: 0; }
+  .booking-disclosure summary::-webkit-details-marker { display: none; }
+  .booking-disclosure-body { padding: 0 1.1rem 1.1rem; border-top: 1px solid var(--ah-border); }
+  .booking-mini-grid, .booking-media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+  .booking-media-card { background: var(--ah-dark3); border: 1px solid var(--ah-border); border-radius: 18px; padding: .85rem; }
+  .booking-inline { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+  .booking-note { background: rgba(255, 255, 255, .03); border: 1px dashed var(--ah-border); border-radius: 16px; padding: .9rem; }
+  .booking-timeline-item { border-left: 3px solid rgba(255, 255, 255, .14); padding-left: .8rem; }
+  .section-title,
+  .ah-page-subtitle,
+  .booking-copy,
+  .booking-value,
+  .booking-muted,
+  .booking-item-meta {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
-  .booking-split { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:1rem; }
-  @media (max-width: 1199px) {
-    .booking-shell { grid-template-columns: 1fr; }
+  @media (max-width: 1199px) { .booking-layout { grid-template-columns: 1fr; } .booking-side { position: static; } .booking-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 991px) {
+    .booking-header-row { grid-template-columns: 1fr; align-items: stretch; }
+    .booking-cta-row { justify-content: stretch; width: 100%; }
+    .booking-cta-row > * { flex: 1 1 100%; width: 100%; }
   }
   @media (max-width: 767px) {
-    .booking-grid,
-    .booking-inline-form,
-    .booking-split { grid-template-columns: 1fr; }
+    .booking-summary-grid, .booking-actions-grid, .booking-form-grid, .booking-form-grid.compact-4, .booking-mini-grid, .booking-media-grid { grid-template-columns: 1fr; }
+    .booking-item-head, .booking-panel-header, .booking-disclosure summary { flex-direction: column; align-items: stretch; }
+    .booking-cta-row > * { width: 100%; }
   }
 </style>
 {% endblock %}
@@ -53,8 +80,8 @@
 {% block content %}
 <div class="container py-4 py-lg-5">
   <section class="ah-page-header">
-    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
-      <div>
+    <div class="booking-header-row">
+      <div class="booking-header-copy">
         <div class="ah-page-eyebrow"><i class="bi bi-tools"></i>Fisa operationala</div>
         <h1 class="section-title mb-1">Programare #{{ booking.pk }}</h1>
         <p class="ah-page-subtitle">
@@ -62,186 +89,327 @@
           · {{ booking.car_brand }} {{ booking.car_model }} · {{ booking.car_plate }}
         </p>
       </div>
-      <div class="d-flex gap-2 flex-wrap">
-        <span class="badge bg-{{ booking.get_status_badge }}">{{ booking.get_status_icon }} {{ booking.get_status_display }}</span>
+      <div class="booking-cta-row">
+        <span class="badge bg-{{ booking.get_status_badge }}" data-testid="service-booking-status-badge">{{ booking.get_status_icon }} {{ booking.get_status_display }}</span>
         <a href="{% url 'services:bookings_list' %}" class="btn btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Programari</a>
-        <a href="{% url 'invoices:create' %}?booking={{ booking.pk }}" class="btn btn-nav-cta"><i class="bi bi-receipt me-1"></i>Factura / deviz</a>
+        <a href="{% url 'services:booking_print' booking.pk %}" class="btn btn-outline-light"><i class="bi bi-printer me-1"></i>Fisa comanda</a>
+        <a href="{% url 'invoices:create' %}?booking={{ booking.pk }}" data-testid="open-invoice-create" class="btn btn-nav-cta"><i class="bi bi-receipt me-1"></i>Factura / deviz</a>
       </div>
     </div>
   </section>
 
-  <div class="booking-shell">
-    <div class="d-grid gap-3">
-      <section class="booking-card">
-        <div class="booking-section-title">
-          <h3>Date esentiale</h3>
-          <div class="booking-badges">
-            {% if booking.wants_offer %}<span class="booking-pill"><i class="bi bi-currency-exchange"></i>Cere oferta</span>{% endif %}
-            {% for label in booking.operational_tag_labels %}<span class="booking-pill"><i class="bi bi-bookmark-check"></i>{{ label }}</span>{% endfor %}
+  {% if booking.status == 'pending' %}
+  <section class="booking-panel booking-panel-accent mb-3">
+    <div class="booking-panel-header">
+      <div>
+        <h3>Programare noua, asteapta raspuns</h3>
+        <p class="booking-copy">Trimite rapid oferta sau respinge programarea. Am lasat doar campurile strict necesare pentru acest pas.</p>
+      </div>
+      <span class="booking-chip alert"><i class="bi bi-hourglass-split"></i>Necesita actiune</span>
+    </div>
+    <div class="booking-actions-grid">
+      <form method="post" action="{% url 'services:booking_accept' booking.pk %}" class="booking-stacked">
+        {% csrf_token %}
+        <label class="form-label mb-0">Pret estimat</label>
+        <input type="number" name="estimated_price" min="0" step="0.01" data-testid="service-quote-price-input" class="form-control" placeholder="Ex: 350" required>
+        <label class="form-label mb-0">Durata estimata</label>
+        <select name="duration_minutes" data-testid="service-quote-duration-select" class="form-select" required>
+          <option value="">Selecteaza durata</option>
+          <option value="30">30 min</option>
+          <option value="60">1 ora</option>
+          <option value="90">1:30</option>
+          <option value="120">2 ore</option>
+          <option value="150">2:30</option>
+          <option value="180">3 ore</option>
+          <option value="210">3:30</option>
+          <option value="240">4 ore</option>
+        </select>
+        <button class="btn btn-success" data-testid="service-send-quote-button" type="submit">Trimite oferta</button>
+      </form>
+      <form method="post" action="{% url 'services:booking_reject' booking.pk %}" class="d-grid">
+        {% csrf_token %}
+        <div class="booking-note">
+          <div class="booking-value mb-2">Nu poti prelua lucrarea?</div>
+          <div class="booking-muted">Respinge cererea ca sa nu ramana blocata in asteptare.</div>
+        </div>
+        <button class="btn btn-outline-danger mt-3" data-testid="service-reject-booking-button" type="submit">Respinge programarea</button>
+      </form>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="booking-summary-grid">
+    <article class="booking-summary-card">
+      <div class="booking-label">Client</div>
+      <div class="booking-value">{{ booking.client_name }}</div>
+      <div class="booking-muted">{{ booking.client_phone }}</div>
+      <div class="booking-muted">{{ booking.client_email|default:"Fara email" }}</div>
+    </article>
+    <article class="booking-summary-card">
+      <div class="booking-label">Masina</div>
+      <div class="booking-value">{{ booking.car_brand }} {{ booking.car_model }}</div>
+      <div class="booking-muted">{{ booking.car_year }} · {{ booking.get_car_fuel_display }}</div>
+      <div class="booking-muted">{{ booking.car_plate }}{% if booking.car_vin %} · VIN {{ booking.car_vin }}{% endif %}</div>
+    </article>
+    <article class="booking-summary-card">
+      <div class="booking-label">Programare</div>
+      <div class="booking-value">{% if booking.service_item %}{{ booking.service_item.name }}{% else %}Fara serviciu selectat{% endif %}</div>
+      <div class="booking-muted">{% if booking.garage %}{{ booking.garage.name }}{% else %}Fara garaj alocat{% endif %}</div>
+      <div class="booking-muted">Durata {{ booking.get_duration_display }}</div>
+    </article>
+    <article class="booking-summary-card">
+      <div class="booking-label">Situatie</div>
+      <div class="booking-value">{{ job_card.get_status_display }}</div>
+      <div class="booking-muted">Mecanic: {% if booking.mechanic %}{{ booking.mechanic.name }}{% else %}nealocat{% endif %}</div>
+      <div class="booking-muted">Cost final: {{ job_card.final_cost|default:"-" }} RON</div>
+    </article>
+    <article class="booking-summary-card full">
+      <div class="booking-panel-header mb-0">
+        <div>
+          <div class="booking-label">Cererea clientului</div>
+          <div class="booking-value" style="font-size:1rem; font-weight:600;">{{ booking.problem_description|linebreaksbr }}</div>
+        </div>
+        <div class="booking-chip-row">
+          {% if booking.wants_offer %}<span class="booking-chip alert"><i class="bi bi-currency-exchange"></i>Cere oferta</span>{% endif %}
+          {% for label in booking.operational_tag_labels %}<span class="booking-chip"><i class="bi bi-bookmark-check"></i>{{ label }}</span>{% endfor %}
+          <span class="booking-chip"><i class="bi bi-list-check"></i>{{ job_card.operations.count }} operatiuni</span>
+          <span class="booking-chip"><i class="bi bi-box-seam"></i>{{ job_card.part_usages.count }} piese</span>
+          <span class="booking-chip"><i class="bi bi-paperclip"></i>{{ booking.attachments.count }} fisiere</span>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <div class="booking-layout">
+    <main class="booking-main">
+      <section class="booking-panel">
+        <div class="booking-panel-header">
+          <div>
+            <h3>Actiuni rapide</h3>
+            <p class="booking-copy">Aici faci schimbarile zilnice: aloci mecanicul, actualizezi statusul si deschizi documentele de lucru.</p>
           </div>
         </div>
-        <div class="booking-grid">
-          <div class="booking-box">
-            <div class="booking-label">Client</div>
-            <div class="booking-value">{{ booking.client_name }}</div>
-            <div class="booking-muted">{{ booking.client_phone }}<br>{{ booking.client_email }}</div>
-          </div>
-          <div class="booking-box">
-            <div class="booking-label">Masina</div>
-            <div class="booking-value">{{ booking.car_brand }} {{ booking.car_model }} ({{ booking.car_year }})</div>
-            <div class="booking-muted">{{ booking.car_plate }} · VIN {{ booking.car_vin }}</div>
-          </div>
-          <div class="booking-box">
-            <div class="booking-label">Serviciu / post</div>
-            <div class="booking-value">{{ booking.service_item.name|default:"Fara serviciu selectat" }}</div>
-            <div class="booking-muted">{{ booking.garage.name|default:"Fara garaj alocat" }} · durata {{ booking.get_duration_display }}</div>
-          </div>
-          <div class="booking-box">
-            <div class="booking-label">Costuri</div>
-            <div class="booking-value">
-              Estimat: {{ booking.estimated_price|default:job_card.estimated_cost|default:"-" }} RON
-            </div>
-            <div class="booking-muted">Final: {{ job_card.final_cost|default:"-" }} RON</div>
-          </div>
-          <div class="booking-box" style="grid-column:1 / -1;">
-            <div class="booking-label">Cererea clientului</div>
-            <div class="booking-value" style="font-size:1rem;font-weight:600;">{{ booking.problem_description|linebreaksbr }}</div>
-          </div>
+        <div class="booking-actions-grid">
+          <form method="post" class="booking-stacked">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="assign_mechanic">
+            <label class="form-label mb-0">Mecanic responsabil</label>
+            <select name="mechanic" class="form-select" data-testid="assign-mechanic-select">
+              <option value="">Fara alocare</option>
+              {% for mechanic in mechanics %}
+              <option value="{{ mechanic.pk }}" {% if booking.mechanic_id == mechanic.pk %}selected{% endif %}>{{ mechanic.name }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn btn-outline-light" type="submit" data-testid="assign-mechanic-submit">Salveaza mecanicul</button>
+          </form>
+
+          <form id="form-status" method="post" class="booking-stacked">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_status">
+            <label class="form-label mb-0">Status programare</label>
+            <select name="status" class="form-select" data-testid="booking-status-select">
+              {% for value, label in status_choices %}
+              <option value="{{ value }}" {% if booking.status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn btn-nav-cta" type="submit" data-testid="booking-status-submit">Actualizeaza statusul</button>
+          </form>
         </div>
       </section>
 
-      <section class="booking-card">
-        <div class="booking-section-title">
-          <h3>Fisa lucrarii</h3>
-          <span class="booking-pill"><i class="bi bi-clipboard-check"></i>{{ job_card.get_status_display }}</span>
+      <section class="booking-panel">
+        <div class="booking-panel-header">
+          <div>
+            <h3>Fisa lucrarii</h3>
+            <p class="booking-copy">Am pastrat la vedere doar campurile utile in executie. Restul detaliilor sunt mai jos, intr-o zona optionala.</p>
+          </div>
+          <span class="booking-chip"><i class="bi bi-clipboard-check"></i>{{ job_card.get_status_display }}</span>
         </div>
-        <form method="post" class="booking-inline-form">
+        <form method="post" class="booking-stacked">
           {% csrf_token %}
           <input type="hidden" name="action" value="save_job_card">
-          {% for field in job_card_form %}
-            <div class="{% if field.name in 'diagnostic_summary work_performed customer_notes internal_notes' or field.name == 'next_service_date' or field.name == 'next_service_km' %}full{% endif %}">
-              <label class="form-label">{{ field.label }}</label>
-              {{ field }}
-              {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors|join:", " }}</div>{% endif %}
+
+          <div class="booking-form-grid compact-4">
+            <div>
+              <label class="form-label">{{ job_card_form.status.label }}</label>
+              {{ job_card_form.status }}
+              {% if job_card_form.status.errors %}<div class="text-danger small mt-1">{{ job_card_form.status.errors|join:", " }}</div>{% endif %}
             </div>
-          {% endfor %}
-          <div class="full d-flex justify-content-end">
-            <button class="btn btn-nav-cta" type="submit"><i class="bi bi-save me-1"></i>Salveaza fisa</button>
+            <div>
+              <label class="form-label">{{ job_card_form.mechanic.label }}</label>
+              {{ job_card_form.mechanic }}
+              {% if job_card_form.mechanic.errors %}<div class="text-danger small mt-1">{{ job_card_form.mechanic.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label class="form-label">{{ job_card_form.mileage.label }}</label>
+              {{ job_card_form.mileage }}
+              {% if job_card_form.mileage.errors %}<div class="text-danger small mt-1">{{ job_card_form.mileage.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label class="form-label">{{ job_card_form.final_cost.label }}</label>
+              {{ job_card_form.final_cost }}
+              {% if job_card_form.final_cost.errors %}<div class="text-danger small mt-1">{{ job_card_form.final_cost.errors|join:", " }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="booking-form-grid">
+            <div>
+              <label class="form-label">{{ job_card_form.estimated_hours.label }}</label>
+              {{ job_card_form.estimated_hours }}
+            </div>
+            <div>
+              <label class="form-label">{{ job_card_form.actual_hours.label }}</label>
+              {{ job_card_form.actual_hours }}
+            </div>
+            <div>
+              <label class="form-label">{{ job_card_form.estimated_cost.label }}</label>
+              {{ job_card_form.estimated_cost }}
+            </div>
+          </div>
+
+          <div class="booking-form-grid">
+            <div class="full">
+              <label class="form-label">{{ job_card_form.diagnostic_summary.label }}</label>
+              {{ job_card_form.diagnostic_summary }}
+            </div>
+            <div class="full">
+              <label class="form-label">{{ job_card_form.work_performed.label }}</label>
+              {{ job_card_form.work_performed }}
+            </div>
+          </div>
+
+          <details class="booking-disclosure" data-testid="job-card-optional-details">
+            <summary data-testid="job-card-optional-details-toggle">
+              <div>
+                <div class="booking-value">Detalii optionale</div>
+                <div class="booking-muted">Note pentru client, note interne si urmatoarea revizie.</div>
+              </div>
+              <span class="booking-chip"><i class="bi bi-chevron-down"></i>Extinde</span>
+            </summary>
+            <div class="booking-disclosure-body">
+              <div class="booking-form-grid">
+                <div class="full">
+                  <label class="form-label">{{ job_card_form.customer_notes.label }}</label>
+                  {{ job_card_form.customer_notes }}
+                </div>
+                <div class="full">
+                  <label class="form-label">{{ job_card_form.internal_notes.label }}</label>
+                  {{ job_card_form.internal_notes }}
+                </div>
+                <div>
+                  <label class="form-label">{{ job_card_form.next_service_date.label }}</label>
+                  {{ job_card_form.next_service_date }}
+                </div>
+                <div>
+                  <label class="form-label">{{ job_card_form.next_service_km.label }}</label>
+                  {{ job_card_form.next_service_km }}
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <div class="d-flex justify-content-end">
+            <button class="btn btn-nav-cta" type="submit" data-testid="job-card-save-button"><i class="bi bi-save me-1"></i>Salveaza fisa</button>
           </div>
         </form>
       </section>
 
-      <section class="booking-card">
-        <div class="booking-split">
+      <section class="booking-panel">
+        <div class="booking-panel-header">
           <div>
-            <div class="booking-section-title">
-              <h3>Operatiuni</h3>
-              <span class="booking-muted">{{ job_card.operations.count }} inregistrate</span>
-            </div>
-            <div class="booking-list mb-3">
-              {% for operation in job_card.operations.all %}
-              <article class="booking-op-row">
-                <div class="d-flex justify-content-between gap-3">
-                  <div>
-                    <div class="booking-value">{{ operation.title }}</div>
-                    <div class="booking-muted">{{ operation.description|default:"Fara detalii" }}</div>
-                    <div class="small text-muted-custom mt-2">
-                      Estimat: {{ operation.estimated_cost|default:"-" }} RON · Final: {{ operation.final_cost|default:"-" }} RON
-                      {% if operation.is_visible_to_customer %}· vizibil clientului{% endif %}
-                    </div>
-                  </div>
-                  <form method="post">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="delete_operation">
-                    <input type="hidden" name="operation_id" value="{{ operation.pk }}">
-                    <button class="btn btn-sm btn-outline-danger" type="submit">Sterge</button>
-                  </form>
+            <h3>Operatiuni</h3>
+            <p class="booking-copy">Fiecare manopera se salveaza separat ca sa ajunga clar in deviz, factura si istoric.</p>
+          </div>
+          <span class="booking-chip"><i class="bi bi-list-task"></i>{{ job_card.operations.count }} inregistrate</span>
+        </div>
+
+        <div class="booking-list mb-3">
+          {% for operation in job_card.operations.all %}
+          <article class="booking-item">
+            <div class="booking-item-head">
+              <div>
+                <div class="booking-value">{{ operation.title }}</div>
+                <div class="booking-item-meta">{{ operation.description|default:"Fara detalii suplimentare." }}</div>
+                <div class="booking-item-meta">
+                  Estimat: {{ operation.estimated_cost|default:"-" }} RON · Final: {{ operation.final_cost|default:"-" }} RON
+                  {% if operation.is_visible_to_customer %}· vizibila clientului{% endif %}
                 </div>
-              </article>
-              {% empty %}
-              <div class="ah-empty-state"><strong>Nicio operatiune inca</strong>Adauga pasii reali ai lucrarii pentru echipa si pentru client.</div>
-              {% endfor %}
+              </div>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_operation">
+                <input type="hidden" name="operation_id" value="{{ operation.pk }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Sterge</button>
+              </form>
             </div>
-            <form method="post" class="booking-inline-form">
+          </article>
+          {% empty %}
+          <div class="ah-empty-state"><strong>Nicio operatiune inca</strong>Adauga doar pasii relevanti ai lucrarii.</div>
+          {% endfor %}
+        </div>
+
+        <details class="booking-disclosure">
+          <summary>
+            <div>
+              <div class="booking-value">Adauga operatiune</div>
+              <div class="booking-muted">Titlu, detalii scurte si cost.</div>
+            </div>
+            <span class="booking-chip"><i class="bi bi-plus-circle"></i>Deschide</span>
+          </summary>
+          <div class="booking-disclosure-body">
+            <form method="post" class="booking-form-grid">
               {% csrf_token %}
               <input type="hidden" name="action" value="add_operation">
-              {% for field in operation_form %}
-              <div class="{% if field.name == 'description' %}full{% endif %}">
-                <label class="form-label">{{ field.label }}</label>
-                {{ field }}
+              <div>
+                <label class="form-label">{{ operation_form.title.label }}</label>
+                {{ operation_form.title }}
               </div>
-              {% endfor %}
+              <div>
+                <label class="form-label">{{ operation_form.estimated_cost.label }}</label>
+                {{ operation_form.estimated_cost }}
+              </div>
+              <div>
+                <label class="form-label">{{ operation_form.final_cost.label }}</label>
+                {{ operation_form.final_cost }}
+              </div>
+              <div class="d-flex align-items-end">
+                <div class="form-check">
+                  {{ operation_form.is_visible_to_customer }}
+                  <label class="form-check-label ms-2">{{ operation_form.is_visible_to_customer.label }}</label>
+                </div>
+              </div>
+              <div class="full">
+                <label class="form-label">{{ operation_form.description.label }}</label>
+                {{ operation_form.description }}
+              </div>
               <div class="full d-flex justify-content-end">
                 <button class="btn btn-outline-light" type="submit"><i class="bi bi-plus-circle me-1"></i>Adauga operatiune</button>
               </div>
             </form>
           </div>
-
-          <div>
-            <div class="booking-section-title">
-              <h3>Recomandari</h3>
-              <span class="booking-muted">{{ dossier.open_recommendations|length }} deschise</span>
-            </div>
-            <div class="booking-list mb-3">
-              {% for recommendation in job_card.recommendations.all %}
-              <article class="booking-rec-row">
-                <div class="d-flex justify-content-between gap-3">
-                  <div>
-                    <div class="booking-value">{{ recommendation.title }}</div>
-                    <div class="booking-muted">{{ recommendation.details|default:"Fara detalii suplimentare." }}</div>
-                    <div class="small text-muted-custom mt-2">
-                      Prioritate {{ recommendation.get_priority_display|lower }}
-                      {% if recommendation.due_date %}· recomandat pana la {{ recommendation.due_date|date:"d.m.Y" }}{% endif %}
-                      {% if recommendation.is_visible_to_customer %}· vizibil clientului{% endif %}
-                    </div>
-                  </div>
-                  <form method="post">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="toggle_recommendation">
-                    <input type="hidden" name="recommendation_id" value="{{ recommendation.pk }}">
-                    <button class="btn btn-sm {% if recommendation.is_resolved %}btn-outline-light{% else %}btn-outline-success{% endif %}" type="submit">
-                      {% if recommendation.is_resolved %}Redeschide{% else %}Rezolvata{% endif %}
-                    </button>
-                  </form>
-                </div>
-              </article>
-              {% empty %}
-              <div class="ah-empty-state"><strong>Nicio recomandare inca</strong>Foloseste recomandarile pentru follow-up tehnic si transparenta.</div>
-              {% endfor %}
-            </div>
-            <form method="post" class="booking-inline-form">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="add_recommendation">
-              {% for field in recommendation_form %}
-              <div class="{% if field.name in 'details' %}full{% endif %}">
-                <label class="form-label">{{ field.label }}</label>
-                {{ field }}
-              </div>
-              {% endfor %}
-              <div class="full d-flex justify-content-end">
-                <button class="btn btn-outline-light" type="submit"><i class="bi bi-plus-circle me-1"></i>Adauga recomandare</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        </details>
       </section>
 
-      <section class="booking-card">
-        <div class="booking-section-title">
-          <h3>Piese si stoc</h3>
-          <span class="booking-muted">{{ job_card.part_usages.count }} miscari</span>
+      <section class="booking-panel">
+        <div class="booking-panel-header">
+          <div>
+            <h3>Piese si stoc</h3>
+            <p class="booking-copy">Piesele adaugate aici actualizeaza stocul si se pot prelua automat in factura.</p>
+          </div>
+          <span class="booking-chip"><i class="bi bi-box-seam"></i>{{ job_card.part_usages.count }} miscari</span>
         </div>
+
         <div class="booking-list mb-3">
           {% for usage in job_card.part_usages.all %}
-          <article class="booking-part-row">
-            <div class="d-flex justify-content-between gap-3">
+          <article class="booking-item">
+            <div class="booking-item-head">
               <div>
                 <div class="booking-value">{{ usage.description }} · x{{ usage.quantity }}</div>
-                <div class="booking-muted">
+                <div class="booking-item-meta">
                   {{ usage.get_status_display }}
                   {% if usage.part %}· stoc ramas {{ usage.part.stock }} {{ usage.part.unit }}{% endif %}
                 </div>
-                <div class="small text-muted-custom mt-2">
+                <div class="booking-item-meta">
                   Cost: {{ usage.unit_cost|default:"-" }} RON · Pret client: {{ usage.unit_price|default:"-" }} RON
                   {% if usage.notes %}· {{ usage.notes }}{% endif %}
                 </div>
@@ -255,52 +423,84 @@
             </div>
           </article>
           {% empty %}
-          <div class="ah-empty-state"><strong>Nicio piesa folosita inca</strong>Rezerva sau consuma piesele direct din fisa lucrarii.</div>
+          <div class="ah-empty-state"><strong>Nicio piesa inca</strong>Inregistreaza doar ce ai rezervat sau consumat pentru aceasta lucrare.</div>
           {% endfor %}
         </div>
-        <form method="post" class="booking-inline-form">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="add_job_part">
-          {% for field in part_usage_form %}
-          <div class="{% if field.name == 'note' %}full{% endif %}">
-            <label class="form-label">{{ field.label }}</label>
-            {{ field }}
+
+        <details class="booking-disclosure">
+          <summary>
+            <div>
+              <div class="booking-value">Adauga piesa</div>
+              <div class="booking-muted">Selectezi piesa, cantitatea si tipul miscarii.</div>
+            </div>
+            <span class="booking-chip"><i class="bi bi-plus-circle"></i>Deschide</span>
+          </summary>
+          <div class="booking-disclosure-body">
+            <form method="post" class="booking-form-grid">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="add_job_part">
+              <div class="full">
+                <label class="form-label">{{ part_usage_form.part.label }}</label>
+                {{ part_usage_form.part }}
+              </div>
+              <div>
+                <label class="form-label">{{ part_usage_form.quantity.label }}</label>
+                {{ part_usage_form.quantity }}
+              </div>
+              <div>
+                <label class="form-label">{{ part_usage_form.status.label }}</label>
+                {{ part_usage_form.status }}
+              </div>
+              <div class="full">
+                <label class="form-label">{{ part_usage_form.note.label }}</label>
+                {{ part_usage_form.note }}
+              </div>
+              <div class="full d-flex justify-content-end">
+                <button class="btn btn-outline-light" type="submit"><i class="bi bi-box-seam me-1"></i>Inregistreaza piesa</button>
+              </div>
+            </form>
           </div>
-          {% endfor %}
-          <div class="full d-flex justify-content-end">
-            <button class="btn btn-outline-light" type="submit"><i class="bi bi-box-seam me-1"></i>Inregistreaza piesa</button>
-          </div>
-        </form>
+        </details>
       </section>
 
-      <section class="booking-card">
-        <div class="booking-section-title">
-          <h3>Poze si documente</h3>
-          <a href="{% url 'services:booking_rar_pdf' booking.pk %}" class="btn btn-sm btn-outline-warning" target="_blank"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
-        </div>
-        <form method="post" enctype="multipart/form-data" class="booking-inline-form mb-3">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="add_attachments">
-          <div class="full">
-            <label class="form-label">Adauga imagini sau video</label>
-            <input type="file" name="attachments" class="form-control" accept="image/*,video/*" multiple>
+      <details class="booking-disclosure">
+        <summary>
+          <div>
+            <div class="booking-value">Poze si documente</div>
+            <div class="booking-muted">Media, dovezi vizuale si export PDF.</div>
           </div>
-          <div class="full d-flex justify-content-end">
-            <button class="btn btn-outline-light" type="submit"><i class="bi bi-camera me-1"></i>Incarca</button>
+          <span class="booking-chip"><i class="bi bi-paperclip"></i>{{ booking.attachments.count }} fisiere</span>
+        </summary>
+        <div class="booking-disclosure-body">
+          <div class="booking-panel-header">
+            <div>
+              <h3>Poze si documente</h3>
+              <p class="booking-copy">Am mutat aceasta zona intr-o sectiune separata ca sa nu incarce partea de lucru zilnic.</p>
+            </div>
+            <a href="{% url 'services:booking_rar_pdf' booking.pk %}" class="btn btn-sm btn-outline-warning" target="_blank"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
           </div>
-        </form>
-        <div class="row g-3">
-          {% for attachment in booking.attachments.all %}
-          <div class="col-md-4">
-            <div class="booking-box h-100">
+          <form method="post" enctype="multipart/form-data" class="booking-form-grid mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_attachments">
+            <div class="full">
+              <label class="form-label">Adauga imagini sau video</label>
+              <input type="file" name="attachments" class="form-control" accept="image/*,video/*" multiple>
+            </div>
+            <div class="full d-flex justify-content-end">
+              <button class="btn btn-outline-light" type="submit"><i class="bi bi-camera me-1"></i>Incarca fisiere</button>
+            </div>
+          </form>
+          <div class="booking-media-grid">
+            {% for attachment in booking.attachments.all %}
+            <article class="booking-media-card">
               {% if attachment.is_image %}
-              <img src="{{ attachment.file.url }}" alt="Atasament booking {{ booking.pk }}" style="width:100%;height:180px;object-fit:cover;border-radius:14px;cursor:zoom-in;" onclick="openLightbox('{{ attachment.file.url }}')">
+              <img src="{{ attachment.file.url }}" alt="Atasament booking {{ booking.pk }}" style="width:100%;height:190px;object-fit:cover;border-radius:14px;cursor:zoom-in;" onclick="openLightbox('{{ attachment.file.url }}')">
               {% else %}
-              <video controls style="width:100%;height:180px;object-fit:cover;border-radius:14px;background:#000;">
+              <video controls style="width:100%;height:190px;object-fit:cover;border-radius:14px;background:#000;">
                 <source src="{{ attachment.file.url }}">
               </video>
               {% endif %}
-              <div class="d-flex justify-content-between align-items-center gap-2 mt-3">
+              <div class="booking-inline mt-3 justify-content-between">
                 <div class="small text-muted-custom">{{ attachment.uploaded_at|date:"d.m.Y H:i" }}</div>
                 <form method="post">
                   {% csrf_token %}
@@ -309,176 +509,211 @@
                   <button class="btn btn-sm btn-outline-danger" type="submit">Sterge</button>
                 </form>
               </div>
-            </div>
-          </div>
-          {% empty %}
-          <div class="col-12"><div class="ah-empty-state"><strong>Fara media inca</strong>Adauga poze inainte/dupa, documente si alte dovezi utile pentru client.</div></div>
-          {% endfor %}
-        </div>
-      </section>
-    </div>
-
-    <aside class="d-grid gap-3">
-      <section class="booking-card">
-        <div class="booking-section-title">
-          <h3>Control rapid</h3>
-          <span class="booking-muted">Flux principal</span>
-        </div>
-        <form method="post" class="mb-3">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="assign_mechanic">
-          <label class="form-label">Mecanic responsabil</label>
-          <select name="mechanic" class="form-select mb-3">
-            <option value="">Fara alocare</option>
-            {% for mechanic in mechanics %}
-            <option value="{{ mechanic.pk }}" {% if booking.mechanic_id == mechanic.pk %}selected{% endif %}>{{ mechanic.name }}</option>
-            {% endfor %}
-          </select>
-          <button class="btn btn-outline-light w-100" type="submit">Salveaza mecanicul</button>
-        </form>
-
-        <form id="form-status" method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_status">
-          <label class="form-label">Status booking</label>
-          <div class="d-flex gap-2">
-            <select name="status" class="form-select">
-              {% for value, label in status_choices %}
-              <option value="{{ value }}" {% if booking.status == value %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <button class="btn btn-nav-cta" type="submit">Salveaza</button>
-          </div>
-        </form>
-
-        {% if booking.status == 'pending' %}
-        <hr class="border-secondary">
-        <div class="small text-muted-custom mb-2">Programarea asteapta oferta service-ului.</div>
-        <form method="post" action="{% url 'services:booking_accept' booking.pk %}" class="d-grid gap-2">
-          {% csrf_token %}
-          <input type="number" name="estimated_price" min="0" step="0.01" class="form-control" placeholder="Pret estimat (RON)" required>
-          <select name="duration_minutes" class="form-select" required>
-            <option value="">Selecteaza durata</option>
-            <option value="30">30 min</option>
-            <option value="60">1 ora</option>
-            <option value="90">1:30</option>
-            <option value="120">2 ore</option>
-            <option value="150">2:30</option>
-            <option value="180">3 ore</option>
-            <option value="210">3:30</option>
-            <option value="240">4 ore</option>
-          </select>
-          <button class="btn btn-success" type="submit">Trimite oferta</button>
-        </form>
-        <form method="post" action="{% url 'services:booking_reject' booking.pk %}" class="mt-2">
-          {% csrf_token %}
-          <button class="btn btn-outline-danger w-100" type="submit">Respinge programarea</button>
-        </form>
-        {% endif %}
-      </section>
-
-      <section class="booking-card">
-        <div class="booking-section-title">
-          <h3>Tag-uri si checklist</h3>
-          <span class="booking-muted">{{ checklist_items|length }} pasi</span>
-        </div>
-        <form method="post" class="mb-3">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_tags">
-          <div class="booking-badges mb-3">
-            {% for value, label in operational_tag_choices %}
-            <label class="booking-pill" style="cursor:pointer;">
-              <input type="checkbox" name="operational_tags" value="{{ value }}" class="form-check-input me-2" {% if value in booking.operational_tags %}checked{% endif %}>
-              {{ label }}
-            </label>
+            </article>
+            {% empty %}
+            <div class="ah-empty-state"><strong>Fara fisiere inca</strong>Adauga doar ce ajuta lucrarea sau predarea catre client.</div>
             {% endfor %}
           </div>
-          <button class="btn btn-outline-light w-100" type="submit">Salveaza tag-urile</button>
-        </form>
-
-        <form method="post" class="d-flex gap-2 mb-3">
+        </div>
+      </details>
+    </main>
+    <aside class="booking-side">
+      <section class="booking-panel">
+        <div class="booking-panel-header">
+          <div>
+            <h3>Pentru print si factura</h3>
+            <p class="booking-copy">Aici pregatesti ce apare in fisa de comanda si deschizi rapid documentele comerciale.</p>
+          </div>
+        </div>
+        <div class="booking-cta-row mb-3">
+          <a href="{% url 'services:booking_print' booking.pk %}" class="btn btn-outline-light w-100"><i class="bi bi-printer me-1"></i>Deschide fisa comanda</a>
+          <a href="{% url 'services:booking_rar_pdf' booking.pk %}" class="btn btn-outline-light w-100" target="_blank"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+          <a href="{% url 'invoices:create' %}?booking={{ booking.pk }}" class="btn btn-nav-cta w-100"><i class="bi bi-receipt me-1"></i>Factura / deviz</a>
+        </div>
+        <form method="post" class="booking-stacked">
           {% csrf_token %}
-          <input type="hidden" name="action" value="add_checklist_item">
-          <input type="text" name="label" class="form-control" placeholder="Ex: test final, poze iesire, explicat devizul">
-          <button class="btn btn-outline-light" type="submit">Adauga</button>
+          <input type="hidden" name="action" value="save_work_order_info">
+          <label class="form-label">Servicii / piese pentru print</label>
+          <textarea name="used_services" rows="4" class="form-control">{{ booking.used_services }}</textarea>
+          <div class="booking-muted">Daca lasi campul gol, fisa de comanda completeaza automat serviciile, operatiunile si piesele disponibile.</div>
+          <label class="form-label">Descriere suplimentara</label>
+          <textarea name="additional_description" rows="4" class="form-control">{{ booking.additional_description }}</textarea>
+          <button class="btn btn-outline-light w-100" type="submit">Salveaza pentru print</button>
         </form>
-        <div class="booking-list">
-          {% for item in checklist_items %}
-          <form method="post" class="booking-box d-flex justify-content-between align-items-center gap-3">
+      </section>
+
+      <details class="booking-disclosure">
+        <summary>
+          <div>
+            <div class="booking-value">Checklist si tag-uri</div>
+            <div class="booking-muted">Zona optionala pentru organizare interna.</div>
+          </div>
+          <span class="booking-chip"><i class="bi bi-check2-square"></i>{{ checklist_items|length }} pasi</span>
+        </summary>
+        <div class="booking-disclosure-body">
+          <form method="post" class="mb-3">
             {% csrf_token %}
-            <input type="hidden" name="action" value="toggle_checklist_item">
-            <input type="hidden" name="item_id" value="{{ item.pk }}">
-            <div class="{% if item.is_done %}text-decoration-line-through text-muted-custom{% else %}booking-value{% endif %}">{{ item.label }}</div>
-            <button class="btn btn-sm {% if item.is_done %}btn-outline-light{% else %}btn-success{% endif %}" type="submit">
-              {% if item.is_done %}Redeschide{% else %}Bifeaza{% endif %}
-            </button>
+            <input type="hidden" name="action" value="update_tags">
+            <div class="booking-chip-row mb-3">
+              {% for value, label in operational_tag_choices %}
+              <label class="booking-chip" style="cursor:pointer;">
+                <input type="checkbox" name="operational_tags" value="{{ value }}" class="form-check-input me-2" {% if value in booking.operational_tags %}checked{% endif %}>
+                {{ label }}
+              </label>
+              {% endfor %}
+            </div>
+            <button class="btn btn-outline-light w-100" type="submit">Salveaza tag-urile</button>
           </form>
-          {% empty %}
-          <div class="ah-empty-state"><strong>Niciun pas inca</strong>Checklist-ul te ajuta sa standardizezi predarea lucrarii.</div>
-          {% endfor %}
-        </div>
-      </section>
 
-      <section class="booking-card">
-        <div class="booking-section-title">
-          <h3>Dosar auto</h3>
-          <span class="booking-muted">{{ dossier.summary.interventions_count }} interventii</span>
+          <form method="post" class="booking-inline mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_checklist_item">
+            <input type="text" name="label" class="form-control" placeholder="Ex: test final sau explicat costurile">
+            <button class="btn btn-outline-light" type="submit">Adauga</button>
+          </form>
+
+          <div class="booking-list">
+            {% for item in checklist_items %}
+            <form method="post" class="booking-item booking-inline justify-content-between">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="toggle_checklist_item">
+              <input type="hidden" name="item_id" value="{{ item.pk }}">
+              <div class="{% if item.is_done %}text-decoration-line-through text-muted-custom{% else %}booking-value{% endif %}">{{ item.label }}</div>
+              <button class="btn btn-sm {% if item.is_done %}btn-outline-light{% else %}btn-success{% endif %}" type="submit">
+                {% if item.is_done %}Redeschide{% else %}Bifeaza{% endif %}
+              </button>
+            </form>
+            {% empty %}
+            <div class="ah-empty-state"><strong>Niciun pas inca</strong>Foloseste checklist-ul doar daca te ajuta in predare.</div>
+            {% endfor %}
+          </div>
         </div>
-        <div class="booking-list">
-          <div class="booking-box">
+      </details>
+
+      <details class="booking-disclosure">
+        <summary>
+          <div>
+            <div class="booking-value">Recomandari</div>
+            <div class="booking-muted">Le-am mutat separat ca sa nu mai incarce zona principala.</div>
+          </div>
+          <span class="booking-chip"><i class="bi bi-lightbulb"></i>{{ dossier.open_recommendations|length }} deschise</span>
+        </summary>
+        <div class="booking-disclosure-body">
+          <div class="booking-list mb-3">
+            {% for recommendation in job_card.recommendations.all %}
+            <article class="booking-item">
+              <div class="booking-item-head">
+                <div>
+                  <div class="booking-value">{{ recommendation.title }}</div>
+                  <div class="booking-item-meta">{{ recommendation.details|default:"Fara detalii suplimentare." }}</div>
+                  <div class="booking-item-meta">
+                    Prioritate {{ recommendation.get_priority_display|lower }}
+                    {% if recommendation.due_date %}· recomandat pana la {{ recommendation.due_date|date:"d.m.Y" }}{% endif %}
+                    {% if recommendation.is_visible_to_customer %}· vizibila clientului{% endif %}
+                  </div>
+                </div>
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="toggle_recommendation">
+                  <input type="hidden" name="recommendation_id" value="{{ recommendation.pk }}">
+                  <button class="btn btn-sm {% if recommendation.is_resolved %}btn-outline-light{% else %}btn-outline-success{% endif %}" type="submit">
+                    {% if recommendation.is_resolved %}Redeschide{% else %}Rezolvata{% endif %}
+                  </button>
+                </form>
+              </div>
+            </article>
+            {% empty %}
+            <div class="ah-empty-state"><strong>Nicio recomandare inca</strong>Adauga doar ce merita urmarit dupa aceasta lucrare.</div>
+            {% endfor %}
+          </div>
+
+          <form method="post" class="booking-form-grid">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_recommendation">
+            <div class="full">
+              <label class="form-label">{{ recommendation_form.title.label }}</label>
+              {{ recommendation_form.title }}
+            </div>
+            <div>
+              <label class="form-label">{{ recommendation_form.priority.label }}</label>
+              {{ recommendation_form.priority }}
+            </div>
+            <div>
+              <label class="form-label">{{ recommendation_form.due_date.label }}</label>
+              {{ recommendation_form.due_date }}
+            </div>
+            <div class="full">
+              <label class="form-label">{{ recommendation_form.details.label }}</label>
+              {{ recommendation_form.details }}
+            </div>
+            <div class="full">
+              <div class="form-check">
+                {{ recommendation_form.is_visible_to_customer }}
+                <label class="form-check-label ms-2">{{ recommendation_form.is_visible_to_customer.label }}</label>
+              </div>
+            </div>
+            <div class="full d-flex justify-content-end">
+              <button class="btn btn-outline-light" type="submit"><i class="bi bi-plus-circle me-1"></i>Adauga recomandare</button>
+            </div>
+          </form>
+        </div>
+      </details>
+
+      <section class="booking-panel">
+        <div class="booking-panel-header">
+          <div>
+            <h3>Dosar auto</h3>
+            <p class="booking-copy">Un rezumat scurt, usor de scanat, fara sa ocupe prea mult loc.</p>
+          </div>
+          <span class="booking-chip"><i class="bi bi-car-front"></i>{{ dossier.summary.interventions_count }} interventii</span>
+        </div>
+        <div class="booking-mini-grid">
+          <div class="booking-item">
             <div class="booking-label">Cost total istoric</div>
             <div class="booking-value">{{ dossier.summary.total_cost|default:"0" }} RON</div>
           </div>
-          <div class="booking-box">
+          <div class="booking-item">
             <div class="booking-label">Ultima vizita</div>
-            <div class="booking-value">
-              {% if dossier.summary.last_visit %}{{ dossier.summary.last_visit.booking_date|date:"d.m.Y" }}{% else %}-{% endif %}
-            </div>
+            <div class="booking-value">{% if dossier.summary.last_visit %}{{ dossier.summary.last_visit.booking_date|date:"d.m.Y" }}{% else %}-{% endif %}</div>
           </div>
-          <div class="booking-box">
+          <div class="booking-item">
             <div class="booking-label">Urmatoarea revizie</div>
-            <div class="booking-value">
-              {% if dossier.summary.next_service_date %}{{ dossier.summary.next_service_date|date:"d.m.Y" }}{% else %}-{% endif %}
-            </div>
+            <div class="booking-value">{% if dossier.summary.next_service_date %}{{ dossier.summary.next_service_date|date:"d.m.Y" }}{% else %}-{% endif %}</div>
           </div>
-          <div class="booking-box">
+          <div class="booking-item">
             <div class="booking-label">Recomandari deschise</div>
             <div class="booking-value">{{ dossier.summary.open_recommendations_count }}</div>
           </div>
         </div>
         <div class="booking-list mt-3">
-          {% for item in history_entries|slice:":4" %}
-          <article class="booking-timeline-item">
+          {% for item in history_entries|slice:":3" %}
+          <article class="booking-item">
             <div class="booking-value">{{ item.booking_date|date:"d.m.Y" }} · {{ item.center.name }}</div>
-            <div class="booking-muted mt-1">{{ item.used_services|default:item.problem_description|linebreaksbr }}</div>
+            <div class="booking-item-meta">{{ item.used_services|default:item.problem_description|linebreaksbr }}</div>
           </article>
           {% empty %}
-          <div class="ah-empty-state"><strong>Nu exista alte lucrari finalizate</strong>Istoricul complet apare aici pe masura ce masina revine in platforma.</div>
+          <div class="ah-empty-state"><strong>Nu exista alte lucrari finalizate</strong>Istoricul va aparea aici pe masura ce masina revine.</div>
           {% endfor %}
         </div>
       </section>
 
-      <section class="booking-card">
-        <div class="booking-section-title">
-          <h3>Note si activitate</h3>
-          <span class="booking-muted">{{ activity_logs|length }} actualizari</span>
+      <section class="booking-panel">
+        <div class="booking-panel-header">
+          <div>
+            <h3>Note si activitate</h3>
+            <p class="booking-copy">Notele interne au ramas separate, iar istoricul este afisat compact, doar cu ultimele actualizari.</p>
+          </div>
+          <span class="booking-chip"><i class="bi bi-clock-history"></i>{{ activity_logs|length }} actualizari</span>
         </div>
-        <form method="post" class="mb-3">
+
+        <form method="post" class="booking-stacked mb-3">
           {% csrf_token %}
           <input type="hidden" name="action" value="save_internal_notes">
           <label class="form-label">Note interne</label>
-          <textarea name="notes" rows="4" class="form-control mb-3" placeholder="Detalii interne pentru echipa">{{ booking.notes }}</textarea>
-          <button class="btn btn-outline-light w-100" type="submit">Salveaza nota</button>
+          <textarea name="notes" rows="4" class="form-control" placeholder="Detalii interne pentru echipa">{{ booking.notes }}</textarea>
+          <button class="btn btn-outline-light w-100" type="submit">Salveaza nota interna</button>
         </form>
-        <form method="post" class="mb-3">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="save_work_order_info">
-          <label class="form-label">Servicii / piese folosite</label>
-          <textarea name="used_services" rows="3" class="form-control mb-2">{{ booking.used_services }}</textarea>
-          <label class="form-label">Descriere suplimentara pentru print</label>
-          <textarea name="additional_description" rows="3" class="form-control mb-3">{{ booking.additional_description }}</textarea>
-          <button class="btn btn-outline-light w-100" type="submit">Salveaza pentru print</button>
-        </form>
+
         <div class="booking-timeline">
           {% for item in activity_logs %}
           <article class="booking-timeline-item">

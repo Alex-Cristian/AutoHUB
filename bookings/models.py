@@ -25,13 +25,13 @@ class Booking(models.Model):
     TAG_BLOCKED = 'blocked'
 
     STATUS_CHOICES = [
-        (STATUS_PENDING, 'In asteptare'),
-        (STATUS_QUOTED, 'Oferta trimisa'),
-        (STATUS_CONFIRMED, 'Confirmata'),
-        (STATUS_IN_PROGRESS, 'In lucru'),
-        (STATUS_WAITING_PARTS, 'Asteapta piese'),
-        (STATUS_DONE, 'Finalizata'),
-        (STATUS_CANCELLED, 'Anulata'),
+        (STATUS_PENDING, 'În așteptare'),
+        (STATUS_QUOTED, 'Ofertă trimisă'),
+        (STATUS_CONFIRMED, 'Confirmată'),
+        (STATUS_IN_PROGRESS, 'În lucru'),
+        (STATUS_WAITING_PARTS, 'Așteaptă piese'),
+        (STATUS_DONE, 'Finalizată'),
+        (STATUS_CANCELLED, 'Anulată'),
     ]
     TAG_CHOICES = [
         (TAG_URGENT, 'Urgent'),

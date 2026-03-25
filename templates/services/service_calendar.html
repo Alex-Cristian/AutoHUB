@@ -178,26 +178,26 @@
         </div>
         <div class="calendar-list mb-3" id="calendarStatusFilters">
           {% for key, item in calendar_statuses.items %}
-          <button type="button" class="calendar-pill" data-status="{{ key }}">
+          <button type="button" class="calendar-pill" data-status="{{ key }}" data-testid="calendar-status-pill">
             <span class="calendar-dot" style="background:{{ item.color }}"></span>{{ item.label }}
           </button>
           {% endfor %}
         </div>
         <div class="calendar-filter-hint">Statusurile nu sunt selectate implicit. Daca nu alegi nimic, vezi toate programarile.</div>
         <div class="d-grid gap-2">
-          <select id="calendarGarageFilter" class="form-select">
+          <select id="calendarGarageFilter" class="form-select" data-testid="calendar-garage-filter">
             <option value="">Toate posturile de lucru</option>
             {% for garage in calendar_garages %}
             <option value="{{ garage.pk }}">{{ garage.center.name }} · {{ garage.name }}</option>
             {% endfor %}
           </select>
-          <select id="calendarMechanicFilter" class="form-select">
+          <select id="calendarMechanicFilter" class="form-select" data-testid="calendar-mechanic-filter">
             <option value="">Toti mecanicii</option>
             {% for mechanic in calendar_mechanics %}
             <option value="{{ mechanic.pk }}">{{ mechanic.center.name }} · {{ mechanic.name }}</option>
             {% endfor %}
           </select>
-          <select id="calendarServiceFilter" class="form-select">
+          <select id="calendarServiceFilter" class="form-select" data-testid="calendar-service-filter">
             <option value="">Toate tipurile de lucrari</option>
             {% for service in calendar_services %}
             <option value="{{ service.pk }}">{{ service.center.name }} · {{ service.name }}</option>
@@ -219,7 +219,7 @@
             <p class="text-muted-custom small mb-0">Pauza, concediu, post indisponibil sau interval inchis.</p>
           </div>
         </div>
-        <form method="post" class="d-grid gap-2">
+        <form method="post" class="d-grid gap-2" data-testid="calendar-block-form">
           {% csrf_token %}
           <input type="hidden" name="center_id" value="{{ selected_center.pk }}">
           {% for field in availability_form %}
@@ -229,7 +229,7 @@
             {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors|join:", " }}</div>{% endif %}
           </div>
           {% endfor %}
-          <button class="btn btn-nav-cta" type="submit">Salveaza blocarea</button>
+          <button class="btn btn-nav-cta" type="submit" data-testid="calendar-block-submit">Salveaza blocarea</button>
         </form>
       </section>
 
@@ -242,10 +242,18 @@
         </div>
         <div class="calendar-list">
           {% for block in recent_blocks %}
-          <div class="booking-timeline-item">
+          <div class="booking-timeline-item" data-testid="calendar-block-item">
             <div class="fw-semibold">{{ block.title }}</div>
             <div class="text-muted-custom small">{{ block.starts_at|date:"d.m.Y H:i" }} → {{ block.ends_at|date:"d.m.Y H:i" }}</div>
-            <div class="small text-muted-custom mt-1">{{ block.garage.name|default:block.mechanic.name|default:block.center.name }}</div>
+            <div class="small text-muted-custom mt-1">
+              {% if block.garage %}
+                {{ block.garage.name }}
+              {% elif block.mechanic %}
+                {{ block.mechanic.name }}
+              {% else %}
+                {{ block.center.name }}
+              {% endif %}
+            </div>
           </div>
           {% empty %}
           <div class="ah-empty-state"><strong>Nicio blocare inca</strong>Calendarul este complet disponibil.</div>

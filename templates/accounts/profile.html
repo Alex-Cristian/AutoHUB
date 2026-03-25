@@ -138,7 +138,7 @@
         <div class="row g-2">
           {% for fav in favorites %}
           <div class="col-md-6">
-            <div class="p-3 rounded-3 d-flex align-items-center gap-3 ah-surface-card">
+            <div class="p-3 rounded-3 d-flex align-items-center gap-3 ah-surface-card" data-testid="profile-favorite-card">
               <span style="font-size:1.8rem;">{{ fav.center.category.icon }}</span>
               <div class="flex-grow-1 overflow-hidden">
                 <p class="fw-bold small mb-0 text-truncate">{{ fav.center.name }}</p>

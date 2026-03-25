@@ -1,0 +1,14 @@
+{
+  "name": "autohub-e2e",
+  "private": true,
+  "devDependencies": {
+    "@playwright/test": "^1.53.0"
+  },
+  "scripts": {
+    "e2e:prepare-data": "python manage.py prepare_e2e_data",
+    "e2e:install": "playwright install chromium",
+    "e2e:test": "playwright test",
+    "e2e:headed": "playwright test --headed"
+  }
+}
+

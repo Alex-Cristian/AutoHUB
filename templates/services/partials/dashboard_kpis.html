@@ -19,7 +19,7 @@
     <div class="d-flex justify-content-between gap-3"><div><div class="dc-label">Venit realizat luna aceasta</div><div class="dc-value">{{ dashboard.kpis.revenue_this_month|floatformat:0 }}</div></div><div class="dc-icon"><i class="bi bi-cash-stack"></i></div></div>
     <div class="dc-note mt-3">RON facturat în {{ current_date|date:'F Y' }}.</div>
   </div>
-  <a class="dc-card" href="/invoices/clienti/">
+  <a class="dc-card" href="{% url 'invoices:clients' %}">
     <div class="d-flex justify-content-between gap-3"><div><div class="dc-label">Clienți activi</div><div class="dc-value">{{ dashboard.kpis.active_clients }}</div></div><div class="dc-icon"><i class="bi bi-people"></i></div></div>
     <div class="dc-note mt-3">Cu programări în ultimele 6 luni.</div>
   </a>
