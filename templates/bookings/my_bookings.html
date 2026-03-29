@@ -183,7 +183,7 @@
           {% for attachment in booking.attachments.all %}
             {% if attachment.is_image %}
             <div style="position:relative;">
-              <img src="{{ attachment.file.url }}" alt="Atașament" onclick="openLightbox('{{ attachment.file.url }}')">
+              <img src="{% url 'bookings:attachment_file' attachment.pk %}" alt="Atașament" onclick="openLightbox('{% url 'bookings:attachment_file' attachment.pk %}')">
               <form method="post" action="{% url 'bookings:attachment_delete' attachment.pk %}" style="position:absolute;top:4px;right:4px;">
                 {% csrf_token %}
                 <button class="btn btn-sm btn-outline-danger" type="submit">×</button>

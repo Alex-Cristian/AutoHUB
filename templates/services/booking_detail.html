@@ -494,10 +494,10 @@
             {% for attachment in booking.attachments.all %}
             <article class="booking-media-card">
               {% if attachment.is_image %}
-              <img src="{{ attachment.file.url }}" alt="Atasament booking {{ booking.pk }}" style="width:100%;height:190px;object-fit:cover;border-radius:14px;cursor:zoom-in;" onclick="openLightbox('{{ attachment.file.url }}')">
+              <img src="{% url 'bookings:attachment_file' attachment.pk %}" alt="Atasament booking {{ booking.pk }}" style="width:100%;height:190px;object-fit:cover;border-radius:14px;cursor:zoom-in;" onclick="openLightbox('{% url 'bookings:attachment_file' attachment.pk %}')">
               {% else %}
               <video controls style="width:100%;height:190px;object-fit:cover;border-radius:14px;background:#000;">
-                <source src="{{ attachment.file.url }}">
+                <source src="{% url 'bookings:attachment_file' attachment.pk %}">
               </video>
               {% endif %}
               <div class="booking-inline mt-3 justify-content-between">

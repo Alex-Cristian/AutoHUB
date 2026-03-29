@@ -65,6 +65,7 @@ from .forms import (
     ReportFilterForm,
 )
 from bookings.activity import log_booking_activity
+from bookings.files import prepare_uploaded_file, sanitize_uploaded_filename
 from bookings.models import Booking, BookingNotification, BookingAttachment, BookingChecklistItem
 from invoices.models import Invoice
 from core.pdf_utils import build_work_order_pdf
@@ -1364,6 +1365,7 @@ def booking_detail(request, pk):
 
             added = 0
             for uploaded in files:
+                uploaded = prepare_uploaded_file(uploaded)
                 try:
                     validate_booking_media_file(uploaded)
                 except Exception:
@@ -1374,7 +1376,7 @@ def booking_detail(request, pk):
                 log_booking_activity(
                     booking,
                     'attachment_added',
-                    f'A fost adaugat un fisier: {uploaded.name}.',
+                    f'A fost adaugat un fisier: {sanitize_uploaded_filename(uploaded.name)}.',
                     actor=request.user,
                     metadata={'filename': uploaded.name, 'media_kind': media_kind},
                 )
@@ -1503,6 +1505,7 @@ def owner_booking_create(request, pk):
             )
 
             for uploaded in request.FILES.getlist('attachments'):
+                uploaded = prepare_uploaded_file(uploaded)
                 validate_booking_media_file(uploaded)
                 content_type = getattr(uploaded, 'content_type', '') or ''
                 media_kind = 'video' if content_type.startswith('video/') else 'image'
@@ -1510,7 +1513,7 @@ def owner_booking_create(request, pk):
                 log_booking_activity(
                     booking,
                     'attachment_added',
-                    f'A fost adaugat un fisier la creare: {uploaded.name}.',
+                    f'A fost adaugat un fisier la creare: {sanitize_uploaded_filename(uploaded.name)}.',
                     actor=request.user,
                     metadata={'filename': uploaded.name, 'media_kind': media_kind},
                 )

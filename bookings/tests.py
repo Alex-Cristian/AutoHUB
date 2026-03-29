@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from accounts.models import Car, LegalAcceptance
 from bookings.forms import BookingForm
+from bookings.files import build_attachment_summary, sanitize_uploaded_filename
 from bookings.models import Booking, BookingActivityLog, BookingNotification
 from invoices.models import Invoice, InvoiceLine
 from services.business import ensure_job_card
@@ -196,6 +197,26 @@ class BookingFormValidationTests(TestCase):
 
         with self.assertRaisesMessage(ValidationError, 'Mecanicul selectat este deja alocat'):
             overlapping.full_clean()
+
+
+class BookingFilesTests(TestCase):
+    def test_sanitize_uploaded_filename_keeps_only_basename(self):
+        """Elimina calea trimisa de unele browsere sau tool-uri de upload."""
+        self.assertEqual(
+            sanitize_uploaded_filename(r"C:\Users\client\Pictures\WhatsApp Image 2026-03-26 at 23.08.09.jpeg"),
+            "WhatsApp Image 2026-03-26 at 23.08.09.jpeg",
+        )
+        self.assertEqual(
+            sanitize_uploaded_filename("/tmp/uploads/poza-masina.png"),
+            "poza-masina.png",
+        )
+
+    def test_build_attachment_summary_uses_simple_plural_for_images(self):
+        """Mesajul din istoric ramane scurt si usor de citit pentru poze multiple."""
+        self.assertEqual(
+            build_attachment_summary(actor_label="Clientul", count=3, image_count=3, video_count=0),
+            "Clientul a adaugat 3 poze.",
+        )
 
 
 class BookingIntegratedPlatformTests(TestCase):

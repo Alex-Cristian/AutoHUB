@@ -2,7 +2,7 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
@@ -14,6 +14,12 @@ from .ai import estimate_booking_duration, normalize_duration_minutes
 from .forms import BookingForm
 from .models import Booking, BookingAttachment, BookingNotification
 from .activity import log_booking_activity
+from .files import (
+    attachment_content_type,
+    attachment_display_name,
+    build_attachment_summary,
+    prepare_uploaded_file,
+)
 from core.services.email_service import send_quote_accepted_to_service_email
 from core.upload_validators import validate_booking_media_file
 
@@ -116,17 +122,33 @@ def booking_create(request, slug):
             booking.save()
             log_booking_activity(booking, 'schedule_changed', 'Programarea a fost creata de client.', actor=request.user if request.user.is_authenticated else None)
 
+            added_count = 0
+            image_count = 0
+            video_count = 0
             for uploaded in request.FILES.getlist('attachments'):
+                uploaded = prepare_uploaded_file(uploaded)
                 validate_booking_media_file(uploaded)
                 content_type = getattr(uploaded, 'content_type', '') or ''
                 media_kind = 'video' if content_type.startswith('video/') else 'image'
                 BookingAttachment.objects.create(booking=booking, file=uploaded, media_kind=media_kind)
+                added_count += 1
+                if media_kind == 'image':
+                    image_count += 1
+                else:
+                    video_count += 1
+
+            if added_count:
                 log_booking_activity(
                     booking,
                     'attachment_added',
-                    f'Clientul a adaugat un fisier: {uploaded.name}.',
+                    build_attachment_summary(
+                        actor_label='Clientul',
+                        count=added_count,
+                        image_count=image_count,
+                        video_count=video_count,
+                    ),
                     actor=request.user if request.user.is_authenticated else None,
-                    metadata={'filename': uploaded.name, 'media_kind': media_kind},
+                    metadata={'count': added_count, 'image_count': image_count, 'video_count': video_count},
                 )
 
             if request.user.is_authenticated and request.POST.get('save_car') == '1':
@@ -230,6 +252,27 @@ def attachment_delete(request, pk):
     if booking.center.owner_id == request.user.id or request.user.is_staff:
         return redirect('services:booking_detail', pk=booking_pk)
     return redirect('bookings:my_bookings')
+
+
+@login_required
+def attachment_file(request, pk):
+    attachment = get_object_or_404(BookingAttachment.objects.select_related('booking', 'booking__center'), pk=pk)
+    booking = attachment.booking
+    if not (
+        request.user.is_staff
+        or booking.user_id == request.user.id
+        or booking.center.owner_id == request.user.id
+    ):
+        return redirect('core:home')
+
+    try:
+        attachment.file.open('rb')
+    except FileNotFoundError as exc:
+        raise Http404('Fisierul nu mai exista in stocare.') from exc
+
+    response = FileResponse(attachment.file, content_type=attachment_content_type(attachment))
+    response['Content-Disposition'] = f'inline; filename="{attachment_display_name(attachment)}"'
+    return response
 
 
 @require_GET

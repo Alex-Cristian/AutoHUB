@@ -5,7 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
-from bookings.models import Booking, BookingChecklistItem, BookingNotification
+from bookings.models import Booking, BookingActivityLog, BookingAttachment, BookingChecklistItem, BookingNotification
 from services.models import ServicePart
 from autohub_testutils.factories import make_booking, make_client_user, make_mechanic, make_notification, make_part, make_service_center, make_service_user
 
@@ -156,6 +156,40 @@ class ServiceBookingDetailActionTests(TestCase):
         self.assertEqual(delete_response.status_code, 302)
         self.assertFalse(self.booking.attachments.exists())
         mocked_validate_file.assert_called()
+
+    @patch("services.views.validate_booking_media_file", return_value=None)
+    def test_attachment_log_uses_basename_when_upload_name_contains_path(self, mocked_validate_file):
+        """Istoricul afiseaza doar numele fisierului, nu calea trimisa de client."""
+        self.client.force_login(self.owner)
+        upload = SimpleUploadedFile(r"C:\Users\client\Pictures\poza-masina.png", b"image-bytes", content_type="image/png")
+
+        response = self.client.post(
+            reverse("services:booking_detail", args=[self.booking.pk]),
+            {"action": "add_attachments", "attachments": [upload]},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        activity = BookingActivityLog.objects.filter(booking=self.booking, event_type="attachment_added").latest("created_at")
+        attachment = BookingAttachment.objects.get(booking=self.booking)
+        self.assertEqual(activity.metadata["filename"], "poza-masina.png")
+        self.assertIn("poza-masina.png", activity.message)
+        self.assertNotIn("C:\\Users\\client\\Pictures", activity.message)
+        self.assertTrue(attachment.file.name.endswith("poza-masina.png"))
+        mocked_validate_file.assert_called()
+
+    def test_attachment_file_view_streams_content_for_service_owner(self):
+        """Service-ul poate accesa atasamentul prin endpoint-ul aplicatiei, fara URL direct din storage."""
+        self.client.force_login(self.owner)
+        attachment = BookingAttachment.objects.create(
+            booking=self.booking,
+            file=SimpleUploadedFile("poza.png", b"image-bytes", content_type="image/png"),
+            media_kind="image",
+        )
+
+        response = self.client.get(reverse("bookings:attachment_file", args=[attachment.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
 
 
 class ServicePartsInventoryExtendedTests(TestCase):

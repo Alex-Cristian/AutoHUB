@@ -1,11 +1,13 @@
 from pathlib import Path
+import re
 
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse
+from django.views.static import serve
 
 from core.sitemaps import ServiceSitemap, StaticPagesSitemap
 
@@ -30,4 +32,12 @@ urlpatterns = [
     path('bookings/', include('bookings.urls', namespace='bookings')),
     path('facturi/', include('invoices.urls', namespace='invoices')),
     path('api/', include('services.api_urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+elif not getattr(settings, 'CLOUDINARY_STORAGE_ENABLED', False):
+    media_prefix = settings.MEDIA_URL.lstrip('/').rstrip('/') + '/'
+    urlpatterns += [
+        re_path(rf'^{re.escape(media_prefix)}(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    ]

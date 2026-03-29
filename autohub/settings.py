@@ -130,6 +130,11 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 USE_CLOUDINARY = os.getenv('USE_CLOUDINARY', 'True').lower() == 'true'
+CLOUDINARY_STORAGE_ENABLED = USE_CLOUDINARY and all([
+    os.getenv('CLOUDINARY_CLOUD_NAME'),
+    os.getenv('CLOUDINARY_API_KEY'),
+    os.getenv('CLOUDINARY_API_SECRET'),
+])
 
 if USE_CLOUDINARY:
     CLOUDINARY_STORAGE = {
@@ -159,11 +164,7 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
 MAX_IMAGE_UPLOAD_MB = int(os.getenv('MAX_IMAGE_UPLOAD_MB', '8'))
 MAX_VIDEO_UPLOAD_MB = int(os.getenv('MAX_VIDEO_UPLOAD_MB', '50'))
 MAX_DOCUMENT_UPLOAD_MB = int(os.getenv('MAX_DOCUMENT_UPLOAD_MB', '12'))
-if USE_CLOUDINARY and all([
-    os.getenv('CLOUDINARY_CLOUD_NAME'),
-    os.getenv('CLOUDINARY_API_KEY'),
-    os.getenv('CLOUDINARY_API_SECRET'),
-]):
+if CLOUDINARY_STORAGE_ENABLED:
     STORAGES = {
         'default': {
             'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
