@@ -466,10 +466,17 @@ Flux de bază:
 3. Render rulează `pip install`, `collectstatic` și `migrate`;
 4. aplicația pornește cu `gunicorn autohub.wsgi:application`.
 
+`render.yaml` creeaza baza Postgres `autohub-db` si seteaza automat `DATABASE_URL`
+pentru serviciul web si cron job. Daca folosesti o baza Render existenta in locul
+blueprint-ului, seteaza `DATABASE_URL` din conexiunea interna a bazei numai cand
+serviciul web si baza sunt in acelasi cont si aceeasi regiune Render. In caz
+contrar, foloseste External Database URL.
+
 Variabile importante pentru deploy:
 
 - `DJANGO_SECRET_KEY`
 - `DEBUG=False`
+- `DATABASE_URL`
 - `ALLOWED_HOSTS`
 - `CSRF_TRUSTED_ORIGINS`
 - `USE_CLOUDINARY`
