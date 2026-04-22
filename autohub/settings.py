@@ -2,6 +2,8 @@ from pathlib import Path
 import dj_database_url
 import os
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
+from urllib.parse import urlparse
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -93,10 +95,24 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'autohub.wsgi.application'
 
+DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
+if os.getenv('RENDER') and not DATABASE_URL:
+    raise ImproperlyConfigured('DATABASE_URL must be set on Render.')
+
+if DATABASE_URL:
+    parsed_database_url = urlparse(DATABASE_URL)
+    if not parsed_database_url.scheme or not parsed_database_url.hostname:
+        raise ImproperlyConfigured(
+            'DATABASE_URL must be a complete database URL. On Render, copy the '
+            'full Internal Database URL when the database is in the same region '
+            'as the web service, or the full External Database URL otherwise.'
+        )
+
 DATABASES = {
-    'default': dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600
+    'default': dj_database_url.parse(
+        DATABASE_URL or f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+        conn_health_checks=True,
     )
 }
 
