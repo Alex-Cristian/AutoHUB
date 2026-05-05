@@ -1,777 +1,114 @@
 {% extends 'base.html' %}
-{% block title %}Programări — AutoEMG{% endblock %}
-
-{% block extra_css %}
-<style>
-  .blist-shell {
-    background: none;
+{% block title %}Cereri si lucrari - AutoEMG{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const input = document.getElementById('service-bookings-search');
+  if (!input) return;
+  const cards = Array.from(document.querySelectorAll('[data-testid="service-booking-row"]'));
+  function filterCards() {
+    const term = input.value.trim().toLowerCase();
+    cards.forEach(card => {
+      const haystack = (card.dataset.search || '').toLowerCase();
+      card.style.display = !term || haystack.includes(term) | '' : 'none';
+    });
   }
-
-  /* ── Header hero ── */
-  .blist-hero {
-    background: linear-gradient(135deg, rgba(230,57,70,0.14), var(--ah-dark2) 50%, rgba(244,162,97,0.08));
-    border: 1px solid var(--ah-border);
-    border-radius: 24px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-  }
-  .blist-kicker {
-    display: inline-flex; align-items: center; gap:.5rem;
-    padding:.38rem .75rem; border-radius:999px;
-    background: var(--ah-dark4); color: var(--ah-text-soft); font-size:.82rem;
-    margin-bottom:.85rem;
-  }
-
-  /* ── Search bar ── */
-  .blist-search-wrap {
-    position: relative;
-  }
-  .blist-search-wrap i {
-    position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
-    color: var(--ah-muted); font-size: 1rem; pointer-events: none;
-  }
-  .blist-search-input {
-    width: 100%;
-    background: var(--ah-dark3);
-    border: 1px solid var(--ah-border);
-    border-radius: 14px;
-    color: var(--ah-text);
-    padding: .75rem 1rem .75rem 2.75rem;
-    font-size: .95rem;
-    transition: border-color .2s, background .2s;
-  }
-  .blist-search-input::placeholder { color: var(--ah-muted); }
-  .blist-search-input:focus {
-    outline: none;
-    border-color: rgba(230,57,70,0.55);
-    background: var(--ah-dark4);
-  }
-
-  /* ── Filtre status ── */
-  .blist-filters { display: flex; gap: .6rem; flex-wrap: wrap; }
-  .blist-filter-btn {
-    display: inline-flex; align-items: center; gap: .45rem;
-    padding: .5rem .9rem; border-radius: 999px;
-    border: 1px solid var(--ah-border);
-    background: var(--ah-dark3);
-    color: var(--ah-text-soft); font-size: .84rem; font-weight: 600;
-    cursor: pointer; transition: all .18s;
-    white-space: nowrap;
-  }
-  .blist-filter-btn:hover { border-color: rgba(230,57,70,0.4); color: var(--ah-text); background: rgba(230,57,70,0.1); }
-  .blist-filter-btn.active { background: rgba(230,57,70,0.18); border-color: rgba(230,57,70,0.6); color: var(--ah-text); }
-  .blist-filter-btn.active.all    { background: var(--ah-dark4); border-color: var(--ah-border); }
-  .blist-filter-btn.active.confirmed { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.5); color: #4ade80; }
-  .blist-filter-btn.active.done { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.5); color: #a5b4fc; }
-  .blist-filter-btn.active.pending   { background: rgba(234,179,8,0.15);  border-color: rgba(234,179,8,0.5);  color: #fde047; }
-  .blist-filter-btn.active.cancelled  { background: rgba(239,68,68,0.15);  border-color: rgba(239,68,68,0.5);  color: #fca5a5; }
-  .blist-count-badge {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 20px; height: 20px; border-radius: 999px;
-    background: var(--ah-dark4); color: var(--ah-text);
-    font-size: .72rem; font-weight: 700; padding: 0 .4rem;
-  }
-
-  /* ── Stats rapide ── */
-  .blist-stat-row {
-    display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .75rem;
-    margin-bottom: 1.25rem;
-  }
-  .blist-stat {
-    background: var(--ah-dark2);
-    border: 1px solid var(--ah-border);
-    border-radius: 18px; padding: 1rem;
-    display: flex; flex-direction: column; gap: .3rem;
-  }
-  .blist-stat-val { font-size: 1.8rem; font-weight: 800; font-family: 'Barlow Condensed', sans-serif; line-height: 1; }
-  .blist-stat-label { font-size: .8rem; color: var(--ah-muted); }
-
-  /* ── Tabel ── */
-  .blist-table-wrap {
-    background: var(--ah-dark2);
-    border: 1px solid var(--ah-border);
-    border-radius: 22px;
-    overflow: hidden;
-    box-shadow: 0 18px 44px rgba(0,0,0,0.22);
-  }
-  .blist-table {
-    width: 100%; border-collapse: collapse;
-  }
-  .blist-table thead tr {
-    background: var(--ah-dark3);
-    border-bottom: 1px solid var(--ah-border);
-  }
-  .blist-table th {
-    padding: .85rem 1rem;
-    font-size: .78rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .06em; color: var(--ah-muted);
-    white-space: nowrap;
-  }
-  .blist-table th.sortable { cursor: pointer; user-select: none; }
-  .blist-table th.sortable:hover { color: var(--ah-text); }
-  .blist-table td {
-    padding: .85rem 1rem;
-    border-bottom: 1px solid var(--ah-border);
-    vertical-align: middle;
-    font-size: .9rem;
-  }
-  .blist-table tbody tr {
-    transition: background .15s;
-    cursor: pointer;
-  }
-  .blist-table tbody tr:hover { background: var(--ah-dark3); }
-  .blist-table tbody tr:last-child td { border-bottom: none; }
-  .blist-table tbody tr.row-hidden { display: none; }
-
-  /* celule speciale */
-  .cell-id { color: var(--ah-muted); font-size: .82rem; font-weight: 600; }
-  .cell-client { font-weight: 700; color: var(--ah-text); }
-  .cell-client-sub { font-size: .78rem; color: var(--ah-muted); margin-top: .1rem; }
-  .cell-car { font-weight: 600; color: var(--ah-text-soft); }
-  .cell-car-plate {
-    display: inline-block; margin-top: .2rem;
-    background: var(--ah-dark4); border: 1px solid var(--ah-border);
-    border-radius: 6px; padding: .1rem .45rem;
-    font-size: .75rem; font-weight: 700; letter-spacing: .05em; color: var(--ah-text-soft);
-  }
-  .cell-date { font-weight: 600; color: var(--ah-text-soft); white-space: nowrap; }
-  .cell-time { font-size: .8rem; color: var(--ah-muted); }
-  .cell-mechanic { font-size: .88rem; color: var(--ah-text-soft); }
-  .cell-mechanic.unassigned { color: var(--ah-muted); font-style: italic; }
-
-  /* status pills */
-  .status-pill {
-    display: inline-flex; align-items: center; gap: .35rem;
-    padding: .32rem .7rem; border-radius: 999px;
-    font-size: .76rem; font-weight: 700; white-space: nowrap;
-  }
-  .status-pill.pending   { background: rgba(234,179,8,0.15);  color: #fde047; border: 1px solid rgba(234,179,8,0.3); }
-  .status-pill.confirmed { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
-  .status-pill.done { background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
-  .status-pill.cancelled  { background: rgba(239,68,68,0.15);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
-  .status-pill.in_progress { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); }
-
-  /* acțiuni */
-  .cell-actions { display: flex; gap: .4rem; justify-content: flex-end; }
-
-  /* no results */
-  .blist-empty {
-    padding: 3rem 1rem; text-align: center; color: var(--ah-muted);
-  }
-  .blist-empty-icon { font-size: 2.5rem; opacity: .3; margin-bottom: .75rem; }
-  .blist-mobile-list { display: none; }
-  .blist-mobile-card {
-    background: var(--ah-dark2);
-    border: 1px solid var(--ah-border);
-    border-radius: 20px;
-    padding: 1rem;
-    box-shadow: 0 14px 34px rgba(0,0,0,.14);
-  }
-
-  /* highlight match */
-  mark.search-hl {
-    background: rgba(230,57,70,0.35); color: var(--ah-text);
-    border-radius: 3px; padding: 0 .15rem;
-  }
-
-  @media (max-width: 991.98px) {
-    .blist-stat-row { grid-template-columns: repeat(2, 1fr); }
-    .col-mechanic, .col-actions-th { display: none; }
-    td.col-mechanic, td.col-actions { display: none; }
-  }
-  @media (max-width: 575.98px) {
-    .blist-stat-row { grid-template-columns: repeat(2, 1fr); }
-    .col-date { display: none; } td.col-date { display: none; }
-    .blist-table th, .blist-table td { padding: .7rem .6rem; }
-    .blist-table-wrap { display: none; }
-    .blist-mobile-list { display: grid; gap: .85rem; }
-  }
-</style>
+  input.addEventListener('input', filterCards);
+});
+</script>
 {% endblock %}
-
 {% block content %}
-<div class="container py-4 py-lg-5 blist-shell">
-
-  {# ── Hero ── #}
-  <div class="blist-hero">
-    <span class="blist-kicker"><i class="bi bi-calendar2-week"></i> Programări AutoEMG</span>
-    <div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3">
+<div class="container py-4 py-lg-5">
+  <section class="ah-page-header mb-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
       <div>
-        <h1 class="mb-1">Toate programările</h1>
-        <p class="text-muted-custom mb-0">Caută rapid după client, mașină sau număr de înmatriculare. Filtrează după status.</p>
+        <div class="ah-page-eyebrow"><i class="bi bi-kanban"></i>Flux operational</div>
+        <h1 class="section-title mb-1">Cereri si lucrari</h1>
+        <p class="ah-page-subtitle">AutoEMG ramane front-office pentru cereri si portal pentru documentarea lucrarii. Calendarul intern poate fi folosit separat, fara sa fie centrul experientei.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a href="{% url 'services:calendar' %}" class="btn btn-outline-light flex-shrink-0">
-          <i class="bi bi-calendar3 me-1"></i>Calendar
-        </a>
-        {% if centers %}
-        <a href="{% url 'services:owner_booking_create' centers.0.pk %}" class="btn btn-nav-cta flex-shrink-0">
-          <i class="bi bi-plus-circle me-1"></i>Programare nouă
-        </a>
-        {% endif %}
+        <a href="{% url 'services:calendar' %}" class="btn btn-outline-light">Calendar intern</a>
+        {% if centers %}<a href="{% url 'services:owner_booking_create' centers.0.pk %}" class="btn btn-nav-cta">Adauga cerere manual</a>{% endif %}
       </div>
     </div>
+  </section>
+
+  <div class="mb-4">
+    <input type="text" id="service-bookings-search" data-testid="service-bookings-search" class="form-control" placeholder="Cauta dupa client, masina, numar, telefon sau status">
   </div>
 
-  {# ── Stats ── #}
-  <div class="blist-stat-row">
-    <div class="blist-stat">
-      <div class="blist-stat-val" id="stat-total">{{ bookings|length }}</div>
-      <div class="blist-stat-label">Total programări</div>
-    </div>
-    <div class="blist-stat">
-      <div class="blist-stat-val" id="stat-pending" style="color:#fde047;">–</div>
-      <div class="blist-stat-label">În așteptare</div>
-    </div>
-    <div class="blist-stat">
-      <div class="blist-stat-val" id="stat-confirmed" style="color:#4ade80;">–</div>
-      <div class="blist-stat-label">Confirmate</div>
-    </div>
-    <div class="blist-stat">
-      <div class="blist-stat-val" id="stat-done" style="color:#a5b4fc;">–</div>
-      <div class="blist-stat-label">Finalizate</div>
-    </div>
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3"><div class="ah-stat-card"><div class="ah-stat-label">Cereri</div><div class="ah-stat-value">{{ request_bookings|length }}</div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="ah-stat-card"><div class="ah-stat-label">Lucrari active</div><div class="ah-stat-value">{{ active_work_bookings|length }}</div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="ah-stat-card"><div class="ah-stat-label">Finalizate</div><div class="ah-stat-value">{{ completed_bookings|length }}</div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="ah-stat-card"><div class="ah-stat-label">Total</div><div class="ah-stat-value">{{ bookings|length }}</div></div></div>
   </div>
 
-  {# ── Toolbar: search + filtre ── #}
-  <div class="d-flex flex-column flex-md-row gap-3 mb-3 align-items-md-center">
-    <div class="blist-search-wrap flex-grow-1">
-      <i class="bi bi-search"></i>
-      <input
-        type="text"
-        id="blist-search"
-        data-testid="service-bookings-search"
-        class="blist-search-input"
-        placeholder="Caută după client, mașină, număr înmatriculare, telefon..."
-        autocomplete="off"
-      >
-    </div>
-    <div class="blist-filters flex-shrink-0">
-      <button class="blist-filter-btn active all" data-filter="all">
-        <i class="bi bi-list-ul"></i>Toate
-        <span class="blist-count-badge" id="fc-all">{{ bookings|length }}</span>
-      </button>
-      <button class="blist-filter-btn pending" data-filter="pending">
-        <i class="bi bi-hourglass-split"></i>Așteptare
-        <span class="blist-count-badge" id="fc-pending">0</span>
-      </button>
-      <button class="blist-filter-btn confirmed" data-filter="confirmed">
-        <i class="bi bi-check-circle"></i>Confirmate
-        <span class="blist-count-badge" id="fc-confirmed">0</span>
-      </button>
-      <button class="blist-filter-btn done" data-filter="done">
-        <i class="bi bi-check2-all"></i>Finalizate
-        <span class="blist-count-badge" id="fc-done">0</span>
-      </button>
-      <button class="blist-filter-btn cancelled" data-filter="cancelled">
-        <i class="bi bi-x-circle"></i>Respinse
-        <span class="blist-count-badge" id="fc-cancelled">0</span>
-      </button>
-    </div>
-  </div>
-
-  {# ── Filtre avansate: dată + garaj + sortare ── #}
-  <div class="d-flex flex-wrap gap-2 mb-3 align-items-center" id="advanced-filters">
-
-    {# Calendar dată #}
-    <div style="position:relative;">
-      <button type="button" id="date-filter-btn"
-              class="btn btn-sm btn-outline-light d-flex align-items-center gap-2"
-              onclick="toggleDateFilter()">
-        <i class="bi bi-calendar2"></i>
-        <span id="date-filter-label">Toate datele</span>
-        <i class="bi bi-chevron-down" style="font-size:.7rem;"></i>
-      </button>
-      <div id="date-filter-popup" style="display:none;position:absolute;z-index:999;top:calc(100% + 4px);left:0;
-           background:var(--ah-dark2);border:1px solid var(--ah-border);border-radius:18px;
-           padding:1rem;box-shadow:0 16px 40px rgba(0,0,0,0.4);width:280px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <button type="button" class="btn btn-sm btn-outline-light px-2 py-1" onclick="calFilterPrev()">←</button>
-          <span id="cal-filter-label" style="font-weight:700;font-size:.9rem;"></span>
-          <button type="button" class="btn btn-sm btn-outline-light px-2 py-1" onclick="calFilterNext()">→</button>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px;">
-          {% for d in 'LuMaMiJoViSâDu'|make_list %}{% endfor %}
-          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Lu</div>
-          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Ma</div>
-          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Mi</div>
-          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Jo</div>
-          <div style="text-align:center;font-size:.68rem;color:var(--ah-muted);">Vi</div>
-          <div style="text-align:center;font-size:.68rem;color:#e63946;">Sâ</div>
-          <div style="text-align:center;font-size:.68rem;color:#e63946;">Du</div>
-        </div>
-        <div id="cal-filter-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
-        <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2" onclick="clearDateFilter()">
-          <i class="bi bi-x me-1"></i>Șterge filtrul de dată
-        </button>
-      </div>
-    </div>
-
-    {# Filtru garaj #}
-    <select id="garage-filter" class="form-select form-select-sm" style="width:auto;min-width:160px;"
-            onchange="applyAllFilters()">
-      <option value="">Toate garajele</option>
-      {% for b in bookings %}
-        {% if b.garage %}
-        <option value="{{ b.garage.pk }}">{{ b.garage.name }}</option>
-        {% endif %}
-      {% endfor %}
-    </select>
-
-    {# Sortare ore #}
-    <select id="sort-filter" class="form-select form-select-sm" style="width:auto;min-width:160px;"
-            onchange="applySort()">
-      <option value="default">Ordine implicită</option>
-      <option value="time-asc">Oră ↑ crescător</option>
-      <option value="time-desc">Oră ↓ descrescător</option>
-      <option value="date-asc">Dată ↑ crescător</option>
-      <option value="date-desc">Dată ↓ descrescător</option>
-    </select>
-
-    {# Buton reset filtre avansate #}
-    <button type="button" id="reset-advanced" class="btn btn-sm btn-outline-danger" style="display:none;"
-            onclick="resetAdvancedFilters()">
-      <i class="bi bi-x-circle me-1"></i>Reset filtre
-    </button>
-  </div>
-
-  {# ── Rezultate vizibile ── #}
-  <div class="d-flex justify-content-between align-items-center mb-2 px-1">
-    <span class="small text-muted-custom">
-      <span id="visible-count">{{ bookings|length }}</span> programări afișate
-    </span>
-    <span class="small text-muted-custom" id="search-hint" style="display:none;">
-      <i class="bi bi-search me-1"></i>Rezultate pentru: <strong id="search-term-display"></strong>
-      <button class="btn btn-link btn-sm text-muted-custom p-0 ms-2" onclick="clearSearch()">✕ Șterge</button>
-    </span>
-  </div>
-
-  {# ── Tabel ── #}
-  {% if bookings %}
-  <div class="blist-table-wrap">
-    <table class="blist-table" id="blist-table">
-      <thead>
-        <tr>
-          <th class="sortable" data-col="id">#ID</th>
-          <th>Client</th>
-          <th>Mașină</th>
-          <th class="sortable col-date" data-col="date">Data și ora</th>
-          <th>Status</th>
-          <th class="col-mechanic">Mecanic</th>
-          <th class="col-actions-th" style="text-align:right;">Acțiuni</th>
-        </tr>
-      </thead>
-      <tbody id="blist-tbody">
-        {% for b in bookings %}
-        <tr
-          class="blist-row"
-          data-testid="service-booking-row"
-          data-status="{{ b.status }}"
-          data-search="{{ b.pk }} {{ b.client_name|lower }} {{ b.client_phone }} {{ b.client_email|lower }} {{ b.car_brand|lower }} {{ b.car_model|lower }} {{ b.car_plate|lower }}"
-          data-id="{{ b.pk }}"
-          data-date="{{ b.booking_date|date:'Y-m-d' }}"
-          data-time="{{ b.booking_time|time:'H:i' }}"
-          data-datetime="{{ b.booking_date|date:'Y-m-d' }} {{ b.booking_time|time:'H:i' }}"
-          data-garage="{{ b.garage.pk|default:'' }}"
-          data-garage-name="{{ b.garage.name|default:'' }}"
-          onclick="window.location='{% url 'services:booking_detail' b.pk %}?back=programari'"
-        >
-          <td><span class="cell-id">#{{ b.pk }}</span></td>
-          <td>
-            <div class="cell-client">{{ b.client_name }}</div>
-            <div class="cell-client-sub">{{ b.client_phone }}</div>
-          </td>
-          <td>
-            <div class="cell-car">{{ b.car_brand }} {{ b.car_model }}</div>
-            <span class="cell-car-plate">{{ b.car_plate }}</span>
-          </td>
-          <td class="col-date">
-            <div class="cell-date">{{ b.booking_date|date:"d.m.Y" }}</div>
-            <div class="cell-time">{{ b.booking_time|time:"H:i" }}</div>
-          </td>
-          <td>
-            <span class="status-pill {{ b.status }}">
-              {{ b.get_status_icon }} {{ b.get_status_display }}
-            </span>
-            {% if b.wants_offer %}<br><span style="display:inline-flex;align-items:center;gap:.25rem;margin-top:3px;font-size:.7rem;padding:.2rem .5rem;border-radius:6px;background:rgba(234,179,8,0.15);color:#facc15;border:1px solid rgba(234,179,8,0.35);"><i class="bi bi-tag-fill"></i>Dorește ofertă</span>{% endif %}
-          </td>
-          <td class="col-mechanic">
-            {% if b.mechanic %}
-              <span class="cell-mechanic">{{ b.mechanic.name }}</span>
-            {% else %}
-              <span class="cell-mechanic unassigned">Nealocat</span>
-            {% endif %}
-          </td>
-          <td class="col-actions" onclick="event.stopPropagation()">
-            <div class="cell-actions">
-              <a href="{% url 'services:booking_detail' b.pk %}?back=programari" class="btn btn-sm btn-outline-light" title="Detalii">
-                <i class="bi bi-eye"></i>
-              </a>
-              <a href="{% url 'services:booking_print' b.pk %}" class="btn btn-sm btn-outline-secondary" title="Fișă comandă">
-                <i class="bi bi-printer"></i>
-              </a>
+  <div class="d-grid gap-4">
+    <section class="ah-section-card">
+      <div class="ah-section-title-row"><div><h2 class="h4 mb-1">Cereri</h2><p class="ah-section-lead">Inainte de sosirea masinii: analiza, confirmare, repropunere sau respingere.</p></div></div>
+      <div class="d-grid gap-3">
+        {% for b in request_bookings %}
+        <a href="{% url 'services:booking_detail' b.pk %}?back=programari" class="service-review-card text-decoration-none text-reset" data-testid="service-booking-row" data-search="{{ b.pk }} {{ b.client_name }} {{ b.client_phone }} {{ b.client_email }} {{ b.car_brand }} {{ b.car_model }} {{ b.car_plate }} {{ b.request_status_label }}">
+          <div class="d-flex justify-content-between gap-3 flex-wrap align-items-start">
+            <div>
+              <div class="fw-semibold">#{{ b.pk }} · {{ b.client_name }}</div>
+              <div class="small text-muted-custom">{{ b.car_brand }} {{ b.car_model }} · {{ b.car_plate }}</div>
+              <div class="small text-muted-custom mt-1">Preferinte: {% for slot in b.preferred_slots %}{{ slot.label }}{% if not forloop.last %} · {% endif %}{% empty %}-{% endfor %}</div>
             </div>
-          </td>
-        </tr>
+            <div class="text-lg-end">
+              <span class="ah-status-pill ah-status-pill-{{ b.status }}">{{ b.get_status_display }}</span>
+              <div class="small text-muted-custom mt-2">Faza cerere: {{ b.request_status_label }}</div>
+            </div>
+          </div>
+        </a>
+        {% empty %}
+        <div class="ah-empty-state"><strong>Nu exista cereri deschise</strong>Cererile noi vor aparea aici.</div>
         {% endfor %}
-      </tbody>
-    </table>
-
-    <div class="blist-empty" id="blist-no-results" style="display:none;">
-      <div class="blist-empty-icon"><i class="bi bi-search"></i></div>
-      <div class="fw-semibold text-white mb-1">Nicio programare găsită</div>
-      <div class="small">Încearcă un alt termen de căutare sau schimbă filtrul de status.</div>
-    </div>
-  </div>
-
-  <div class="blist-mobile-list">
-    {% for b in bookings %}
-    <article class="blist-mobile-card">
-      <div class="d-flex justify-content-between gap-3 align-items-start mb-2">
-        <div>
-          <div class="cell-client">{{ b.client_name }}</div>
-          <div class="cell-client-sub">#{{ b.pk }} · {{ b.client_phone }}</div>
-        </div>
-        <span class="status-pill {{ b.status }}">{{ b.get_status_icon }} {{ b.get_status_display }}</span>
       </div>
-      <div class="small text-muted-custom mb-2">{{ b.car_brand }} {{ b.car_model }} · {{ b.car_plate }}</div>
-      <div class="small text-muted-custom mb-3">{{ b.booking_date|date:"d.m.Y" }} · {{ b.booking_time|time:"H:i" }}</div>
-      <div class="d-flex gap-2">
-        <a href="{% url 'services:booking_detail' b.pk %}?back=programari" class="btn btn-sm btn-outline-light flex-grow-1">Detalii</a>
-        <a href="{% url 'services:booking_print' b.pk %}" class="btn btn-sm btn-outline-secondary">Print</a>
+    </section>
+
+    <section class="ah-section-card">
+      <div class="ah-section-title-row"><div><h2 class="h4 mb-1">Lucrari active</h2><p class="ah-section-lead">Dupa receptie: poze, statusuri, recomandari si transparenta pentru client.</p></div></div>
+      <div class="d-grid gap-3">
+        {% for b in active_work_bookings %}
+        <a href="{% url 'services:booking_detail' b.pk %}?back=programari" class="service-review-card text-decoration-none text-reset" data-testid="service-booking-row" data-search="{{ b.pk }} {{ b.client_name }} {{ b.client_phone }} {{ b.car_brand }} {{ b.car_model }} {{ b.car_plate }} {{ b.work_status_label }}">
+          <div class="d-flex justify-content-between gap-3 flex-wrap align-items-start">
+            <div>
+              <div class="fw-semibold">#{{ b.pk }} · {{ b.client_name }}</div>
+              <div class="small text-muted-custom">{{ b.car_brand }} {{ b.car_model }} · {{ b.car_plate }}</div>
+              <div class="small text-muted-custom mt-1">Atasamente: {{ b.attachments.count }} · Mecanic: {{ b.mechanic.name|default:'nealocat' }}</div>
+            </div>
+            <div class="text-lg-end">
+              <span class="ah-status-pill ah-status-pill-{{ b.status }}">{{ b.get_status_display }}</span>
+              <div class="small text-muted-custom mt-2">Faza lucrare: {{ b.work_status_label }}</div>
+            </div>
+          </div>
+        </a>
+        {% empty %}
+        <div class="ah-empty-state"><strong>Nu exista lucrari active</strong>Lucrarile incepute vor aparea aici.</div>
+        {% endfor %}
       </div>
-    </article>
-    {% endfor %}
-  </div>
+    </section>
 
-  {% else %}
-  <div class="blist-table-wrap">
-    <div class="blist-empty">
-      <div class="blist-empty-icon"><i class="bi bi-calendar-x"></i></div>
-      <div class="fw-semibold text-white mb-1">Nu există programări încă</div>
-      <div class="small">Programările noi vor apărea automat aici.</div>
-    </div>
+    <section class="ah-section-card">
+      <div class="ah-section-title-row"><div><h2 class="h4 mb-1">Finalizate</h2><p class="ah-section-lead">Istoric recent cu lucrari inchise.</p></div></div>
+      <div class="d-grid gap-3">
+        {% for b in completed_bookings|slice:':8' %}
+        <a href="{% url 'services:booking_detail' b.pk %}?back=programari" class="service-review-card text-decoration-none text-reset" data-testid="service-booking-row" data-search="{{ b.pk }} {{ b.client_name }} {{ b.car_brand }} {{ b.car_model }} {{ b.car_plate }} finalizat">
+          <div class="d-flex justify-content-between gap-3 flex-wrap align-items-start">
+            <div>
+              <div class="fw-semibold">#{{ b.pk }} · {{ b.client_name }}</div>
+              <div class="small text-muted-custom">{{ b.car_brand }} {{ b.car_model }} · {{ b.car_plate }}</div>
+            </div>
+            <span class="ah-status-pill ah-status-pill-{{ b.status }}">{{ b.get_status_display }}</span>
+          </div>
+        </a>
+        {% empty %}
+        <div class="ah-empty-state"><strong>Nu exista lucrari finalizate inca</strong>Istoricul va creste pe masura ce lucrarile sunt inchise.</div>
+        {% endfor %}
+      </div>
+    </section>
   </div>
-  {% endif %}
-
 </div>
-
-<script>
-// ── State ──
-const today = new Date();
-const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-let calFilterCur = new Date(today.getFullYear(), today.getMonth(), 1);
-let activeFilterDate = null;
-let currentPage = 1;
-const PAGE_SIZE = 10;
-
-// ── Calendar filter ──
-function toggleDateFilter() {
-  const popup = document.getElementById('date-filter-popup');
-  const isOpen = popup.style.display !== 'none';
-  popup.style.display = isOpen ? 'none' : 'block';
-  if (!isOpen) renderCalFilter();
-}
-
-function calFilterPrev() {
-  calFilterCur = new Date(calFilterCur.getFullYear(), calFilterCur.getMonth()-1, 1);
-  renderCalFilter();
-}
-function calFilterNext() {
-  calFilterCur = new Date(calFilterCur.getFullYear(), calFilterCur.getMonth()+1, 1);
-  renderCalFilter();
-}
-
-function renderCalFilter() {
-  const label = calFilterCur.toLocaleDateString('ro-RO', {month:'long', year:'numeric'});
-  document.getElementById('cal-filter-label').textContent = label.charAt(0).toUpperCase() + label.slice(1);
-  const grid = document.getElementById('cal-filter-grid');
-  grid.innerHTML = '';
-  const datesWithBookings = new Set(Array.from(document.querySelectorAll('.blist-row')).map(r => r.dataset.date));
-  let startDow = new Date(calFilterCur.getFullYear(), calFilterCur.getMonth(), 1).getDay();
-  startDow = startDow === 0 ? 6 : startDow - 1;
-  for (let i = 0; i < startDow; i++) grid.appendChild(document.createElement('div'));
-  const daysInMonth = new Date(calFilterCur.getFullYear(), calFilterCur.getMonth()+1, 0).getDate();
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${calFilterCur.getFullYear()}-${String(calFilterCur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isSel = activeFilterDate === dateStr;
-    const isToday = dateStr === todayStr;
-    const hasB = datesWithBookings.has(dateStr);
-    const cell = document.createElement('div');
-    cell.style.cssText = 'text-align:center;padding:4px 2px;border-radius:8px;font-size:12px;position:relative;cursor:pointer;';
-    if (isSel) { cell.style.background = 'var(--ah-red)'; cell.style.color = '#fff'; cell.style.fontWeight = '700'; }
-    else if (isToday) { cell.style.border = '1px solid var(--ah-red)'; cell.style.color = 'var(--ah-red)'; cell.style.fontWeight = '700'; }
-    else if (hasB) { cell.style.color = '#e8e8e8'; cell.style.fontWeight = '600'; }
-    else { cell.style.color = 'var(--ah-muted)'; }
-    const num = document.createElement('div');
-    num.textContent = d;
-    cell.appendChild(num);
-    if (hasB) {
-      const dot = document.createElement('div');
-      dot.style.cssText = `width:4px;height:4px;border-radius:50%;margin:1px auto 0;background:${isSel?'#fff':'var(--ah-red)'};`;
-      cell.appendChild(dot);
-    }
-    cell.onmouseover = () => { if (!isSel) cell.style.background = 'var(--ah-dark3)'; };
-    cell.onmouseout = () => { if (!isSel) cell.style.background = ''; };
-    cell.onclick = () => selectFilterDate(dateStr);
-    grid.appendChild(cell);
-  }
-}
-
-function selectFilterDate(dateStr) {
-  activeFilterDate = dateStr;
-  const d = new Date(dateStr+'T00:00:00');
-  const label = d.toLocaleDateString('ro-RO', {day:'numeric', month:'long', year:'numeric'});
-  document.getElementById('date-filter-label').textContent = label;
-  document.getElementById('date-filter-popup').style.display = 'none';
-  document.getElementById('reset-advanced').style.display = 'inline-flex';
-  currentPage = 1;
-  applyAllFilters();
-}
-
-function clearDateFilter() {
-  activeFilterDate = null;
-  document.getElementById('date-filter-label').textContent = 'Toate datele';
-  document.getElementById('date-filter-popup').style.display = 'none';
-  checkResetBtn();
-  currentPage = 1;
-  applyAllFilters();
-}
-
-function checkResetBtn() {
-  const garageVal = document.getElementById('garage-filter').value;
-  const sortVal = document.getElementById('sort-filter').value;
-  const show = activeFilterDate || garageVal || (sortVal && sortVal !== 'default');
-  document.getElementById('reset-advanced').style.display = show ? 'inline-flex' : 'none';
-}
-
-function resetAdvancedFilters() {
-  activeFilterDate = null;
-  document.getElementById('date-filter-label').textContent = 'Toate datele';
-  document.getElementById('garage-filter').value = '';
-  document.getElementById('sort-filter').value = 'default';
-  document.getElementById('reset-advanced').style.display = 'none';
-  currentPage = 1;
-  applyAllFilters();
-}
-
-// ── Sortare ──
-function applySort() {
-  const sortVal = document.getElementById('sort-filter').value;
-  const tbody = document.getElementById('blist-tbody');
-  const rows = Array.from(document.querySelectorAll('.blist-row'));
-  rows.sort((a, b) => {
-    if (sortVal === 'time-asc')  return (a.dataset.time||'').localeCompare(b.dataset.time||'');
-    if (sortVal === 'time-desc') return (b.dataset.time||'').localeCompare(a.dataset.time||'');
-    if (sortVal === 'date-asc')  return ((a.dataset.date||'')+(a.dataset.time||'')).localeCompare((b.dataset.date||'')+(b.dataset.time||''));
-    if (sortVal === 'date-desc') return ((b.dataset.date||'')+(b.dataset.time||'')).localeCompare((a.dataset.date||'')+(a.dataset.time||''));
-    return parseInt(b.dataset.id) - parseInt(a.dataset.id);
-  });
-  rows.forEach(r => tbody.appendChild(r));
-  checkResetBtn();
-  currentPage = 1;
-  applyAllFilters();
-}
-
-// ── Aplică toate filtrele + paginare ──
-function applyAllFilters() {
-  const rows = Array.from(document.querySelectorAll('.blist-row'));
-  const searchEl = document.getElementById('blist-search');
-  const activeSearch = searchEl ? searchEl.value.trim().toLowerCase() : '';
-  const activeStatus = document.querySelector('.blist-filter-btn.active')?.dataset.filter || 'all';
-  const garageVal = document.getElementById('garage-filter').value;
-
-  // Filtrează — finalizate (done/completed) se ascund din "Toate", apar doar la filtrul lor
-  const matchedRows = [];
-  rows.forEach(row => {
-    const status = row.dataset.status;
-    const isDone = status === 'done';
-    let statusMatch;
-    if (activeStatus === 'all') {
-      statusMatch = !isDone;  // exclude finalizate din "Toate"
-    } else {
-      statusMatch = status === activeStatus;
-    }
-    const searchMatch = !activeSearch || row.dataset.search.includes(activeSearch);
-    const dateMatch   = !activeFilterDate || row.dataset.date === activeFilterDate;
-    const garageMatch = !garageVal || row.dataset.garage === garageVal;
-    const show = statusMatch && searchMatch && dateMatch && garageMatch;
-    row.classList.toggle('row-hidden', true); // ascunde toate inițial
-    if (show) matchedRows.push(row);
-  });
-
-  // Paginare
-  const total = matchedRows.length;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  if (currentPage > totalPages) currentPage = totalPages;
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const end = start + PAGE_SIZE;
-
-  matchedRows.forEach((row, i) => {
-    row.classList.toggle('row-hidden', i < start || i >= end);
-  });
-
-  // Actualizează UI
-  const visCount = document.getElementById('visible-count');
-  if (visCount) visCount.textContent = total;
-  const noResults = document.getElementById('blist-no-results');
-  if (noResults) noResults.style.display = total === 0 ? 'block' : 'none';
-
-  renderPagination(total, totalPages);
-  checkResetBtn();
-}
-
-// ── Paginare ──
-function renderPagination(total, totalPages) {
-  let pag = document.getElementById('blist-pagination');
-  if (!pag) {
-    pag = document.createElement('div');
-    pag.id = 'blist-pagination';
-    pag.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:6px;margin-top:1rem;flex-wrap:wrap;';
-    const tableWrap = document.querySelector('.blist-table-wrap');
-    if (tableWrap) tableWrap.after(pag);
-  }
-  pag.innerHTML = '';
-  if (totalPages <= 1) return;
-
-  const info = document.createElement('span');
-  info.style.cssText = 'font-size:.82rem;color:var(--ah-muted);margin-right:6px;';
-  info.textContent = `Pagina ${currentPage} din ${totalPages}`;
-  pag.appendChild(info);
-
-  const prevBtn = document.createElement('button');
-  prevBtn.type = 'button';
-  prevBtn.className = 'btn btn-sm btn-outline-light';
-  prevBtn.innerHTML = '<i class="bi bi-chevron-left"></i>';
-  prevBtn.disabled = currentPage === 1;
-  prevBtn.onclick = () => { currentPage--; applyAllFilters(); };
-  pag.appendChild(prevBtn);
-
-  // Pagini numerice
-  for (let p = 1; p <= totalPages; p++) {
-    if (totalPages > 7 && Math.abs(p - currentPage) > 2 && p !== 1 && p !== totalPages) {
-      if (p === currentPage - 3 || p === currentPage + 3) {
-        const dots = document.createElement('span');
-        dots.style.cssText = 'color:var(--ah-muted);padding:0 4px;';
-        dots.textContent = '…';
-        pag.appendChild(dots);
-      }
-      continue;
-    }
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn btn-sm ' + (p === currentPage ? 'btn-nav-cta' : 'btn-outline-light');
-    btn.textContent = p;
-    btn.onclick = (pg => () => { currentPage = pg; applyAllFilters(); })(p);
-    pag.appendChild(btn);
-  }
-
-  const nextBtn = document.createElement('button');
-  nextBtn.type = 'button';
-  nextBtn.className = 'btn btn-sm btn-outline-light';
-  nextBtn.innerHTML = '<i class="bi bi-chevron-right"></i>';
-  nextBtn.disabled = currentPage === totalPages;
-  nextBtn.onclick = () => { currentPage++; applyAllFilters(); };
-  pag.appendChild(nextBtn);
-}
-
-(function () {
-  const rows = Array.from(document.querySelectorAll('.blist-row'));
-  const searchEl = document.getElementById('blist-search');
-  const searchHint = document.getElementById('search-hint');
-  const searchTermDisplay = document.getElementById('search-term-display');
-
-  // Contoare status
-  const counts = { all: 0, pending:0, confirmed:0, done:0, cancelled:0, in_progress:0 };
-  rows.forEach(r => {
-    const s = r.dataset.status;
-    if (s !== 'done') counts.all++;
-    if (counts[s] !== undefined) counts[s]++;
-  });
-  const el_all = document.getElementById('fc-all');
-  if (el_all) el_all.textContent = counts.all;
-  ['pending','confirmed','done','cancelled'].forEach(k => {
-    const el = document.getElementById('fc-' + k);
-    if (el) el.textContent = counts[k];
-  });
-  ['pending','confirmed','done'].forEach(k => {
-    const el = document.getElementById('stat-' + k);
-    if (el) el.textContent = counts[k];
-  });
-
-  // Dedup garaj options
-  const garageSelect = document.getElementById('garage-filter');
-  if (garageSelect) {
-    const seen = new Set();
-    Array.from(garageSelect.options).forEach(opt => {
-      if (opt.value && seen.has(opt.value)) opt.remove();
-      else seen.add(opt.value);
-    });
-  }
-
-  const dateLabel = document.getElementById('date-filter-label');
-  if (dateLabel) dateLabel.textContent = 'Toate datele';
-  document.getElementById('reset-advanced').style.display = 'none';
-
-  // Filtre status
-  document.querySelectorAll('.blist-filter-btn').forEach(btn => {
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('.blist-filter-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      currentPage = 1;
-      applyAllFilters();
-    });
-  });
-
-  // Search
-  if (searchEl) {
-    searchEl.addEventListener('input', function () {
-      if (searchHint) {
-        searchHint.style.display = this.value.trim() ? 'inline-flex' : 'none';
-        if (searchTermDisplay) searchTermDisplay.textContent = this.value.trim();
-      }
-      currentPage = 1;
-      applyAllFilters();
-    });
-  }
-
-  window.clearSearch = function () {
-    if (searchEl) searchEl.value = '';
-    if (searchHint) searchHint.style.display = 'none';
-    currentPage = 1;
-    applyAllFilters();
-  };
-
-  // Sortare coloane header
-  document.querySelectorAll('th.sortable').forEach(th => {
-    let asc = true;
-    th.addEventListener('click', function () {
-      const col = this.dataset.col;
-      const tbody = document.getElementById('blist-tbody');
-      const sorted = rows.slice().sort((a, b) => {
-        let va = a.dataset[col] || '', vb = b.dataset[col] || '';
-        return asc ? va.localeCompare(vb) : vb.localeCompare(va);
-      });
-      asc = !asc;
-      sorted.forEach(r => tbody.appendChild(r));
-      document.querySelectorAll('th.sortable').forEach(t => t.innerHTML = t.innerHTML.replace(/ [↑↓]/, ''));
-      this.innerHTML += asc ? ' ↓' : ' ↑';
-      currentPage = 1;
-      applyAllFilters();
-    });
-  });
-
-  // Închide calendar la click afară
-  document.addEventListener('click', function(e) {
-    const popup = document.getElementById('date-filter-popup');
-    const btn = document.getElementById('date-filter-btn');
-    if (popup && !popup.contains(e.target) && btn && !btn.contains(e.target)) {
-      popup.style.display = 'none';
-    }
-  });
-
-  // Inițializare cu data de azi și filtrele active
-  applyAllFilters();
-})();
-</script>
 {% endblock %}

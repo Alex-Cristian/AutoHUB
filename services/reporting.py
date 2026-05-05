@@ -172,9 +172,13 @@ def build_dashboard_metrics(centers):
     ).values('client_email').exclude(client_email='').distinct().count()
 
     kpis = {
+        'requests_new': bookings.filter(status=Booking.STATUS_PENDING).count(),
+        'requests_waiting': bookings.filter(status__in=[Booking.STATUS_PENDING, Booking.STATUS_QUOTED]).count(),
+        'requests_confirmed': bookings.filter(status=Booking.STATUS_CONFIRMED).count(),
         'appointments_today': bookings.filter(booking_date=today).count(),
         'appointments_pending': bookings.filter(status=Booking.STATUS_PENDING).count(),
         'cars_in_work': bookings.filter(status__in=[Booking.STATUS_IN_PROGRESS, Booking.STATUS_WAITING_PARTS]).count(),
+        'works_completed': bookings.filter(status=Booking.STATUS_DONE).count(),
         'overdue_bookings': overdue_bookings,
         'completed_this_month': bookings.filter(status=Booking.STATUS_DONE, booking_date__range=(month_start, today)).count(),
         'revenue_this_month': invoices.filter(status=Invoice.STATUS_FINAL, issue_date__range=(month_start, today)).aggregate(

@@ -6,6 +6,7 @@ asttokens==3.0.1
 brotli==1.2.0
 certifi==2026.2.25
 cffi==2.0.0
+cryptography==46.0.3
 charset-normalizer==3.4.5
 colorama==0.4.6
 comm==0.2.3
@@ -42,6 +43,7 @@ psutil==7.2.2
 psycopg2==2.9.11
 psycopg2-binary==2.9.11
 pure_eval==0.2.3
+PyJWT[crypto]==2.10.1
 pycparser==2.23
 pydantic==2.12.5
 pydantic_core==2.41.5

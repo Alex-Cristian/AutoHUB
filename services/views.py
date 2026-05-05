@@ -65,6 +65,7 @@ from .forms import (
     ReportFilterForm,
 )
 from bookings.activity import log_booking_activity
+from bookings.availability import booking_interval_overlaps
 from bookings.files import prepare_uploaded_file, sanitize_uploaded_filename
 from bookings.models import Booking, BookingNotification, BookingAttachment, BookingChecklistItem
 from invoices.models import Invoice
@@ -756,6 +757,9 @@ def bookings_list(request):
 
     return render(request, 'services/bookings_list.html', {
         'bookings': bookings,
+        'request_bookings': [b for b in bookings if b.status in {Booking.STATUS_PENDING, Booking.STATUS_QUOTED, Booking.STATUS_CONFIRMED}],
+        'active_work_bookings': [b for b in bookings if b.status in {Booking.STATUS_IN_PROGRESS, Booking.STATUS_WAITING_PARTS}],
+        'completed_bookings': [b for b in bookings if b.status == Booking.STATUS_DONE],
         'centers': centers,
     })
 
@@ -1651,12 +1655,24 @@ def booking_accept(request, pk):
             messages.error(request, 'Prețul aproximativ nu poate fi negativ.')
             return _post_redirect(request, 'services:dashboard')
 
+        ai_estimated_duration = booking.effective_duration_minutes()
+        requires_reschedule = False
+        if duration_minutes > ai_estimated_duration and booking.booking_date and booking.booking_time:
+            requires_reschedule = booking_interval_overlaps(
+                booking.center_id,
+                datetime.combine(booking.booking_date, booking.booking_time),
+                duration_minutes,
+                appointment_id=booking.pk,
+            )
+
         booking.duration_minutes = duration_minutes
         booking.estimated_price = estimated_price
+        booking.needs_client_reschedule = requires_reschedule
         try:
-            booking.full_clean()
+            if not requires_reschedule:
+                booking.full_clean()
             old_status, _, _ = transition_booking_status(booking, Booking.STATUS_QUOTED, actor=request.user)
-            booking.save(update_fields=['duration_minutes', 'estimated_price', 'updated_at'])
+            booking.save(update_fields=['duration_minutes', 'estimated_price', 'needs_client_reschedule', 'updated_at'])
         except ValidationError as exc:
             messages.error(request, '; '.join(exc.messages))
             return _post_redirect(request, 'services:dashboard')
@@ -1665,7 +1681,14 @@ def booking_accept(request, pk):
             'offer_updated',
             f'A fost trimisa o oferta de {estimated_price:.2f} RON cu durata {booking.get_duration_display()}.',
             actor=request.user,
-            metadata={'old': old_status, 'new': booking.status, 'estimated_price': estimated_price, 'duration_minutes': duration_minutes},
+            metadata={
+                'old': old_status,
+                'new': booking.status,
+                'estimated_price': estimated_price,
+                'duration_minutes': duration_minutes,
+                'ai_estimated_duration': ai_estimated_duration,
+                'needs_client_reschedule': requires_reschedule,
+            },
         )
         if booking.user:
             BookingNotification.objects.create(

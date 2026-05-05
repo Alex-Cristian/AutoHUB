@@ -1,111 +1,19 @@
 {% extends 'base.html' %}
-{% block title %}Programare confirmată — AutoEMG{% endblock %}
-
+{% block title %}Cerere trimisa - AutoEMG{% endblock %}
 {% block content %}
-<div class="container py-4 py-lg-5">
-  <div class="mx-auto" style="max-width: 760px;">
-    <section class="ah-page-header text-center">
-      <div class="ah-page-eyebrow justify-content-center"><i class="bi bi-check2-circle"></i>Programare trimisă</div>
-      <h1 class="section-title mb-2">Cererea ta a fost înregistrată</h1>
-      <p class="ah-page-subtitle mx-auto">Ai toate detaliile mai jos. Service-ul va confirma intervalul și, dacă este nevoie, îți poate trimite și o ofertă înainte de acceptare.</p>
-    </section>
-
-    <div class="ah-stat-grid mb-4">
-      <div class="ah-stat-card">
-        <div class="ah-stat-label">Service</div>
-        <div class="ah-stat-value" style="font-size:1.45rem;">{{ booking.center.name }}</div>
-      </div>
-      <div class="ah-stat-card">
-        <div class="ah-stat-label">Data și ora</div>
-        <div class="ah-stat-value" style="font-size:1.35rem;">{{ booking.booking_date|date:"d.m.Y" }}</div>
-        <div class="small text-muted-custom mt-1">{{ booking.booking_time|time:"H:i" }}</div>
-      </div>
-      <div class="ah-stat-card">
-        <div class="ah-stat-label">Mașina</div>
-        <div class="ah-stat-value" style="font-size:1.35rem;">{{ booking.car_brand }} {{ booking.car_model }}</div>
-        <div class="small text-muted-custom mt-1">{{ booking.car_plate }}</div>
-      </div>
+<div class="container py-5" style="max-width: 760px;">
+  <div class="ah-section-card text-center">
+    <div class="ah-page-eyebrow mb-2"><i class="bi bi-send-check"></i>Cerere trimisa</div>
+    <h1 class="section-title mb-2">Service-ul a primit solicitarea ta</h1>
+    <p class="ah-page-subtitle mb-4">Aceasta nu este o confirmare instant in calendar. {{ booking.center.name }} poate confirma, propune alt interval sau respinge cererea dupa analiza.</p>
+    <div class="row g-3 text-start mb-4">
+      <div class="col-md-4"><div class="ah-stat-card"><div class="ah-stat-label">Service</div><div class="ah-stat-value" style="font-size:1.2rem;">{{ booking.center.name }}</div></div></div>
+      <div class="col-md-4"><div class="ah-stat-card"><div class="ah-stat-label">Prima preferinta</div><div class="ah-stat-value" style="font-size:1.2rem;">{{ booking.booking_date|date:'d.m.Y' }} {{ booking.booking_time|time:'H:i' }}</div></div></div>
+      <div class="col-md-4"><div class="ah-stat-card"><div class="ah-stat-label">Status</div><div class="ah-stat-value" style="font-size:1.2rem;">{{ booking.get_status_display }}</div></div></div>
     </div>
-
-    <section class="ah-section-card mb-4">
-      <div class="ah-section-title-row">
-        <div>
-          <h2 class="h4 mb-1">Detalii programare #{{ booking.pk }}</h2>
-          <p class="ah-section-lead">Tot ce trebuie să știi acum, fără informații inutile.</p>
-        </div>
-        <span class="ah-status-pill {{ booking.status }}">{{ booking.get_status_icon }} {{ booking.get_status_display }}</span>
-      </div>
-
-      <div class="ah-kv-list">
-        <div class="ah-kv-item">
-          <span class="ah-kv-label">Service</span>
-          <span class="ah-kv-value">{{ booking.center.name }}</span>
-        </div>
-        <div class="ah-kv-item">
-          <span class="ah-kv-label">Data și ora</span>
-          <span class="ah-kv-value">{{ booking.booking_date|date:"d M Y" }} · {{ booking.booking_time|time:"H:i" }}</span>
-        </div>
-        {% if booking.garage %}
-        <div class="ah-kv-item">
-          <span class="ah-kv-label">Post de lucru</span>
-          <span class="ah-kv-value">{{ booking.garage.name }}</span>
-        </div>
-        {% endif %}
-        <div class="ah-kv-item">
-          <span class="ah-kv-label">Client</span>
-          <span class="ah-kv-value">{{ booking.client_name }}</span>
-        </div>
-        <div class="ah-kv-item">
-          <span class="ah-kv-label">Mașina</span>
-          <span class="ah-kv-value">{{ booking.car_brand }} {{ booking.car_model }} ({{ booking.car_year }})</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="ah-section-card ah-section-card-muted mb-4">
-      <div class="ah-section-title-row">
-        <div>
-          <h2 class="h4 mb-1">Ce urmează</h2>
-          <p class="ah-section-lead">Pașii de după trimiterea cererii.</p>
-        </div>
-      </div>
-      <div class="ah-info-list">
-        <div class="ah-info-item">
-          <span class="ah-icon-circle"><i class="bi bi-envelope-check"></i></span>
-          <div>
-            <div class="fw-semibold">Primești actualizări de status</div>
-            <div class="small text-muted-custom">Poți vedea oricând ce s-a schimbat în pagina „Programările mele”.</div>
-          </div>
-        </div>
-        <div class="ah-info-item">
-          <span class="ah-icon-circle"><i class="bi bi-chat-left-text"></i></span>
-          <div>
-            <div class="fw-semibold">Service-ul poate reveni cu o ofertă</div>
-            <div class="small text-muted-custom">Dacă ai cerut ofertă, o poți accepta sau refuza direct din cont.</div>
-          </div>
-        </div>
-        <div class="ah-info-item">
-          <span class="ah-icon-circle"><i class="bi bi-tools"></i></span>
-          <div>
-            <div class="fw-semibold">Dosarul mașinii se completează automat</div>
-            <div class="small text-muted-custom">Istoricul, recomandările și documentele apar ulterior în contul tău.</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div class="ah-action-strip justify-content-center">
-      <a href="{{ booking.center.get_absolute_url }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Înapoi la service
-      </a>
-      {% if user.is_authenticated %}
-      <a href="{% url 'bookings:my_bookings' %}" class="btn btn-primary">
-        <i class="bi bi-calendar-check me-1"></i>Programările mele
-      </a>
-      {% endif %}
-      <a href="{% url 'core:home' %}" class="btn btn-outline-primary">
-        <i class="bi bi-house me-1"></i>Acasă
-      </a>
+    <div class="d-flex flex-wrap gap-2 justify-content-center">
+      <a href="{% url 'bookings:my_bookings' %}" class="btn btn-nav-cta">Vezi cererile si lucrarile mele</a>
+      <a href="{{ booking.center.get_absolute_url }}" class="btn btn-outline-light">Inapoi la service</a>
     </div>
   </div>
 </div>

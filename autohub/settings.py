@@ -95,13 +95,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'autohub.wsgi.application'
 
-DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
-if os.getenv('RENDER') and not DATABASE_URL:
+RUNNING_ON_RENDER = env_bool('RENDER', False)
+USE_LOCAL_SQLITE = env_bool('USE_LOCAL_SQLITE', False) and not RUNNING_ON_RENDER
+
+DATABASE_URL = '' if USE_LOCAL_SQLITE else os.getenv('DATABASE_URL', '').strip()
+if RUNNING_ON_RENDER and not DATABASE_URL:
     raise ImproperlyConfigured('DATABASE_URL must be set on Render.')
 
 if DATABASE_URL:
     parsed_database_url = urlparse(DATABASE_URL)
-    if not parsed_database_url.scheme or not parsed_database_url.hostname:
+    if not parsed_database_url.scheme or (parsed_database_url.scheme != 'sqlite' and not parsed_database_url.hostname):
         raise ImproperlyConfigured(
             'DATABASE_URL must be a complete database URL. On Render, copy the '
             'full Internal Database URL when the database is in the same region '
@@ -130,6 +133,8 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+
+SESSION_ENGINE = os.getenv('SESSION_ENGINE', 'django.contrib.sessions.backends.db')
 
 LANGUAGE_CODE = 'ro'
 TIME_ZONE = 'Europe/Bucharest'
@@ -214,6 +219,18 @@ EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() == 'true'
 EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '20'))
 ACCOUNT_VERIFICATION_EXPIRY_HOURS = int(os.getenv('ACCOUNT_VERIFICATION_EXPIRY_HOURS', '24'))
+
+APP_URL = os.getenv('APP_URL', SITE_BASE_URL)
+AUTH_SECRET = os.getenv('AUTH_SECRET', SECRET_KEY)
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
+GOOGLE_REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI', '')
+GOOGLE_AUTHORIZATION_URL = os.getenv('GOOGLE_AUTHORIZATION_URL', 'https://accounts.google.com/o/oauth2/v2/auth')
+GOOGLE_TOKEN_URL = os.getenv('GOOGLE_TOKEN_URL', 'https://oauth2.googleapis.com/token')
+GOOGLE_USERINFO_URL = os.getenv('GOOGLE_USERINFO_URL', 'https://openidconnect.googleapis.com/v1/userinfo')
+GOOGLE_JWKS_URL = os.getenv('GOOGLE_JWKS_URL', 'https://www.googleapis.com/oauth2/v3/certs')
+GOOGLE_DISCOVERY_URL = os.getenv('GOOGLE_DISCOVERY_URL', 'https://accounts.google.com/.well-known/openid-configuration')
+OAUTH_DEBUG_ERRORS = env_bool('OAUTH_DEBUG_ERRORS', DEBUG)
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = os.getenv('X_FRAME_OPTIONS', 'DENY')

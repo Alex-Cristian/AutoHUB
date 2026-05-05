@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Programare #{{ booking.pk }} | AutoHub{% endblock %}
+{% block title %}Cerere / lucrare #{{ booking.pk }} | AutoEMG{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -82,8 +82,8 @@
   <section class="ah-page-header">
     <div class="booking-header-row">
       <div class="booking-header-copy">
-        <div class="ah-page-eyebrow"><i class="bi bi-tools"></i>Fisa operationala</div>
-        <h1 class="section-title mb-1">Programare #{{ booking.pk }}</h1>
+        <div class="ah-page-eyebrow"><i class="bi bi-tools"></i>Cerere si lucrare</div>
+        <h1 class="section-title mb-1">Cerere #{{ booking.pk }}</h1>
         <p class="ah-page-subtitle">
           {{ booking.center.name }} · {{ booking.booking_date|date:"d.m.Y" }} la {{ booking.booking_time|time:"H:i" }}
           · {{ booking.car_brand }} {{ booking.car_model }} · {{ booking.car_plate }}
@@ -91,7 +91,7 @@
       </div>
       <div class="booking-cta-row">
         <span class="badge bg-{{ booking.get_status_badge }}" data-testid="service-booking-status-badge">{{ booking.get_status_icon }} {{ booking.get_status_display }}</span>
-        <a href="{% url 'services:bookings_list' %}" class="btn btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Programari</a>
+        <a href="{% url 'services:bookings_list' %}" class="btn btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Cereri si lucrari</a>
         <a href="{% url 'services:booking_print' booking.pk %}" class="btn btn-outline-light"><i class="bi bi-printer me-1"></i>Fisa comanda</a>
         <a href="{% url 'invoices:create' %}?booking={{ booking.pk }}" data-testid="open-invoice-create" class="btn btn-nav-cta"><i class="bi bi-receipt me-1"></i>Factura / deviz</a>
       </div>
