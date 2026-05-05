@@ -80,6 +80,10 @@ def send_transactional_email(
     text_template: str,
     context: dict,
 ) -> bool:
+    if getattr(settings, "DISABLE_TRANSACTIONAL_EMAILS", False):
+        logger.info("Email dezactivat prin setare pentru subiectul '%s'.", subject)
+        return False
+
     if not to_email:
         logger.warning("Email netrimis: lipseste destinatarul pentru subiectul '%s'.", subject)
         return False

@@ -48,6 +48,15 @@ class Booking(models.Model):
         ('electric', 'Electric'),
         ('gpl', 'GPL'),
     ]
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Cerere trimisa'),
+        (STATUS_QUOTED, 'Propunere trimisa'),
+        (STATUS_CONFIRMED, 'Confirmata'),
+        (STATUS_IN_PROGRESS, 'In lucru'),
+        (STATUS_WAITING_PARTS, 'Asteapta aprobare client'),
+        (STATUS_DONE, 'Finalizata'),
+        (STATUS_CANCELLED, 'Respinsa'),
+    ]
 
     user = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL,
@@ -87,10 +96,26 @@ class Booking(models.Model):
         verbose_name='Descriere problema / serviciu dorit'
     )
 
-    booking_date = models.DateField(verbose_name='Data programarii')
-    booking_time = models.TimeField(verbose_name='Ora programarii')
+    booking_date = models.DateField(verbose_name='Prima preferinta - data')
+    booking_time = models.TimeField(verbose_name='Prima preferinta - ora')
+    preferred_date_2 = models.DateField(null=True, blank=True, verbose_name='A doua preferinta - data')
+    preferred_time_2 = models.TimeField(null=True, blank=True, verbose_name='A doua preferinta - ora')
+    preferred_date_3 = models.DateField(null=True, blank=True, verbose_name='A treia preferinta - data')
+    preferred_time_3 = models.TimeField(null=True, blank=True, verbose_name='A treia preferinta - ora')
     duration_minutes = models.PositiveIntegerField(
-        null=True, blank=True, verbose_name='Durata blocare garaj (minute)'
+        null=True, blank=True, verbose_name='Durata estimata (minute)'
+    )
+    estimated_operation_slug = models.CharField(
+        max_length=80, blank=True, default='', verbose_name='Operatie estimata (slug)'
+    )
+    estimated_operation_label = models.CharField(
+        max_length=120, blank=True, default='', verbose_name='Operatie estimata'
+    )
+    duration_estimate_source = models.CharField(
+        max_length=24, blank=True, default='', verbose_name='Sursa estimarii duratei'
+    )
+    duration_estimate_confidence = models.FloatField(
+        null=True, blank=True, verbose_name='Incredere estimare durata'
     )
     estimated_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Pret aproximativ (RON)'
@@ -107,11 +132,12 @@ class Booking(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     reminder_sent_1d = models.BooleanField(default=False, verbose_name='Reminder SMS trimis cu o zi inainte')
     wants_offer = models.BooleanField(default=False, verbose_name='Client doreste oferta inainte de confirmare')
+    needs_client_reschedule = models.BooleanField(default=False, verbose_name='Clientul trebuie sa aleaga un nou interval')
     operational_tags = models.JSONField(default=list, blank=True, verbose_name='Tag-uri operationale')
 
     class Meta:
-        verbose_name = 'Programare'
-        verbose_name_plural = 'Programari'
+        verbose_name = 'Cerere service'
+        verbose_name_plural = 'Cereri service'
         ordering = ['-created_at']
 
     def __str__(self):
@@ -131,6 +157,55 @@ class Booking(models.Model):
             return self.garage.slot_minutes
         return 60
 
+    @property
+    def is_request_phase(self):
+        return self.status in {self.STATUS_PENDING, self.STATUS_QUOTED, self.STATUS_CONFIRMED}
+
+    @property
+    def is_work_phase(self):
+        return self.status in {self.STATUS_IN_PROGRESS, self.STATUS_WAITING_PARTS, self.STATUS_DONE}
+
+    @property
+    def request_status_label(self):
+        labels = {
+            self.STATUS_PENDING: 'In analiza',
+            self.STATUS_QUOTED: 'Reprogramare / oferta propusa',
+            self.STATUS_CONFIRMED: 'Confirmata',
+            self.STATUS_IN_PROGRESS: 'Confirmata',
+            self.STATUS_WAITING_PARTS: 'Confirmata',
+            self.STATUS_DONE: 'Confirmata',
+            self.STATUS_CANCELLED: 'Respinsa',
+        }
+        return labels.get(self.status, self.get_status_display())
+
+    @property
+    def work_status_label(self):
+        labels = {
+            self.STATUS_PENDING: 'Nu a inceput',
+            self.STATUS_QUOTED: 'Asteapta acceptul clientului',
+            self.STATUS_CONFIRMED: 'In asteptarea receptiei',
+            self.STATUS_IN_PROGRESS: 'In lucru',
+            self.STATUS_WAITING_PARTS: 'Asteapta aprobare client',
+            self.STATUS_DONE: 'Finalizat',
+            self.STATUS_CANCELLED: 'Nu s-a deschis',
+        }
+        return labels.get(self.status, self.get_status_display())
+
+    def preferred_slots(self):
+        slots = []
+        for date_value, time_value in (
+            (self.booking_date, self.booking_time),
+            (self.preferred_date_2, self.preferred_time_2),
+            (self.preferred_date_3, self.preferred_time_3),
+        ):
+            if date_value and time_value:
+                slots.append({
+                    'date': date_value,
+                    'time': time_value,
+                    'label': f"{date_value.strftime('%d.%m.%Y')} · {time_value.strftime('%H:%M')}",
+                })
+        return slots
+
     def get_start_datetime(self):
         if not self.booking_date or not self.booking_time:
             return None
@@ -145,8 +220,14 @@ class Booking(models.Model):
     def clean(self):
         if self.booking_date and self.booking_date < timezone.localdate():
             raise ValidationError({
-                'booking_date': 'Data programarii nu poate fi in trecut.'
+                'booking_date': 'Prima preferinta nu poate fi in trecut.'
             })
+        for field_name in ('preferred_date_2', 'preferred_date_3'):
+            preferred_date = getattr(self, field_name)
+            if preferred_date and preferred_date < timezone.localdate():
+                raise ValidationError({
+                    field_name: 'Preferinta nu poate fi in trecut.'
+                })
         current_year = timezone.now().year
         if self.car_year and (self.car_year < 1950 or self.car_year > current_year + 1):
             raise ValidationError({
@@ -177,7 +258,7 @@ class Booking(models.Model):
             garage_open = datetime.combine(self.booking_date, self.garage.open_time)
             garage_close = datetime.combine(self.booking_date, self.garage.close_time)
             if start_dt < garage_open or end_dt > garage_close:
-                raise ValidationError({'booking_time': 'Programarea trebuie sa fie in intervalul de lucru al garajului.'})
+                raise ValidationError({'booking_time': 'Preferinta aleasa trebuie sa fie in intervalul de lucru al garajului.'})
             if not self.garage.is_time_available(
                 self.booking_date,
                 self.booking_time,
@@ -185,7 +266,7 @@ class Booking(models.Model):
                 exclude_booking_id=self.pk,
                 booking_status=self.status,
             ):
-                raise ValidationError({'booking_time': 'Intervalul ales nu mai este disponibil pentru garajul selectat.'})
+                raise ValidationError({'booking_time': 'Prima preferinta nu mai este disponibila pentru garajul selectat.'})
 
         if self.mechanic_id and self.booking_date and self.booking_time:
             if not self.mechanic.is_time_available(
@@ -266,8 +347,8 @@ class BookingAttachment(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Atasament programare'
-        verbose_name_plural = 'Atasamente programari'
+        verbose_name = 'Atasament cerere/lucrare'
+        verbose_name_plural = 'Atasamente cereri/lucrari'
         ordering = ['uploaded_at']
 
     def __str__(self):
@@ -287,7 +368,7 @@ class BookingNotification(models.Model):
     KIND_STATUS_UPDATE = 'status_update'
 
     KIND_CHOICES = [
-        (KIND_BOOKING_NEW, 'Programare noua'),
+        (KIND_BOOKING_NEW, 'Cerere noua'),
         (KIND_STATUS_UPDATE, 'Actualizare status'),
     ]
 
@@ -304,8 +385,8 @@ class BookingNotification(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Notificare programare'
-        verbose_name_plural = 'Notificari programari'
+        verbose_name = 'Notificare cerere'
+        verbose_name_plural = 'Notificari cereri'
         ordering = ['-created_at']
 
     def __str__(self):

@@ -31,6 +31,7 @@ urlpatterns = [
     path('services/', include('services.urls', namespace='services')),
     path('bookings/', include('bookings.urls', namespace='bookings')),
     path('facturi/', include('invoices.urls', namespace='invoices')),
+    path('api/auth/', include('accounts.api_urls', namespace='accounts_api')),
     path('api/', include('services.api_urls')),
 ]
 

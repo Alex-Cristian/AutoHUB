@@ -1,59 +1,77 @@
-{% extends "base.html" %}
-{% block title %}Programările mele | AutoHub{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}Cererile si lucrarile mele | AutoEMG{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('[data-reschedule-picker]').forEach(function (picker) {
+    const dateInput = picker.querySelector('[data-reschedule-date]');
+    const timeInput = picker.querySelector('[data-reschedule-time]');
+    const timeGrid = picker.querySelector('[data-reschedule-times]');
+    const hint = picker.querySelector('[data-reschedule-hint]');
+    const submit = picker.querySelector('[data-reschedule-submit]');
+    const slotsUrl = picker.dataset.slotsUrl;
+    const garagesUrl = picker.dataset.garagesUrl;
+    const garageId = picker.dataset.garageId || '';
+    const duration = picker.dataset.duration || '60';
 
-{% block extra_css %}
-<style>
-  .myb-summary-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.25rem;
-  }
-  .myb-card {
-    background: var(--ah-dark2);
-    border: 1px solid var(--ah-border);
-    border-radius: 24px;
-    padding: 1.2rem;
-    box-shadow: 0 18px 42px rgba(0,0,0,.16);
-  }
-  .myb-detail-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-  }
-  .myb-detail-box {
-    background: var(--ah-dark3);
-    border: 1px solid var(--ah-border);
-    border-radius: 18px;
-    padding: .95rem;
-  }
-  .myb-label {
-    color: var(--ah-muted);
-    font-size: .76rem;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    margin-bottom: .3rem;
-  }
-  .myb-gallery {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .6rem;
-  }
-  .myb-gallery img {
-    width: 88px;
-    height: 88px;
-    object-fit: cover;
-    border-radius: 12px;
-    border: 1px solid var(--ah-border);
-    cursor: zoom-in;
-  }
-  @media (max-width: 991.98px) {
-    .myb-summary-grid,
-    .myb-detail-grid {
-      grid-template-columns: 1fr;
+    function syncSubmit() {
+      if (submit) submit.disabled = !(dateInput.value && timeInput.value);
     }
-  }
-</style>
+
+    async function loadSlots() {
+      timeInput.value = '';
+      timeGrid.innerHTML = '';
+      syncSubmit();
+      if (!dateInput.value) {
+        hint.textContent = 'Alege ziua, apoi incarcam orele disponibile.';
+        return;
+      }
+      hint.textContent = 'Se verifica disponibilitatea pentru durata reala a lucrarii...';
+      const params = new URLSearchParams({ date: dateInput.value, duration: duration });
+      if (garageId) params.set('garage', garageId);
+      const url = (garageId ? slotsUrl : garagesUrl) + '?' + params.toString();
+      try {
+        const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!response.ok) throw new Error('slots_failed');
+        const data = await response.json();
+        let slots = data.slots || [];
+        if (!garageId) {
+          const slotSet = new Set();
+          (data.garages || []).forEach(function (garage) {
+            (garage.slots || []).forEach(function (slot) { slotSet.add(slot); });
+          });
+          slots = Array.from(slotSet).sort();
+        }
+        if (!slots.length) {
+          hint.textContent = 'Nu exista ore disponibile pentru ziua aleasa. Incearca alta zi.';
+          return;
+        }
+        hint.textContent = 'Alege una dintre orele disponibile.';
+        slots.forEach(function (slot) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'btn btn-sm btn-outline-light';
+          button.textContent = slot;
+          button.addEventListener('click', function () {
+            timeInput.value = slot;
+            timeGrid.querySelectorAll('button').forEach(function (item) {
+              item.classList.toggle('btn-success', item === button);
+              item.classList.toggle('btn-outline-light', item !== button);
+            });
+            syncSubmit();
+          });
+          timeGrid.appendChild(button);
+        });
+      } catch (error) {
+        hint.textContent = 'Nu am putut incarca sloturile acum. Reincearca sau alege alta zi.';
+      }
+    }
+
+    dateInput.addEventListener('change', loadSlots);
+    syncSubmit();
+  });
+});
+</script>
 {% endblock %}
 
 {% block content %}
@@ -61,135 +79,128 @@
   <section class="ah-page-header">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
       <div>
-        <div class="ah-page-eyebrow"><i class="bi bi-calendar-check"></i>Cont client</div>
-        <h1 class="section-title mb-1">Programările mele</h1>
-        <p class="ah-page-subtitle">Vezi rapid ce ai trimis, ce a fost confirmat, cât costă și ce documente sau recomandări ai primit după intervenție.</p>
+        <div class="ah-page-eyebrow"><i class="bi bi-car-front"></i>Portal client</div>
+        <h1 class="section-title mb-1">Cererile si lucrarile mele</h1>
+        <p class="ah-page-subtitle">Vezi usor ce ai trimis catre service, ce a fost confirmat si cum avanseaza lucrarea documentata cu poze, statusuri si recomandari.</p>
       </div>
-      <a href="{% url 'services:list' %}" class="btn btn-nav-cta"><i class="bi bi-search me-1"></i>Caută un service</a>
+      <a href="{% url 'services:list' %}" class="btn btn-nav-cta"><i class="bi bi-search me-1"></i>Cauta un service</a>
     </div>
   </section>
 
-  <div class="myb-summary-grid">
-    <div class="ah-stat-card">
-      <div class="ah-stat-label">Total programări</div>
-      <div class="ah-stat-value">{{ bookings|length }}</div>
-    </div>
-    <div class="ah-stat-card">
-      <div class="ah-stat-label">În lucru sau în așteptare</div>
-      <div class="ah-stat-value">{{ bookings|length }}</div>
-      <div class="small text-muted-custom mt-1">Urmărește statusurile direct din această pagină.</div>
-    </div>
-    <div class="ah-stat-card">
-      <div class="ah-stat-label">Acces rapid</div>
-      <div class="small text-muted-custom mt-1">Status, cost estimat/final, poze, recomandări și documente.</div>
-    </div>
+  <div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="ah-stat-card"><div class="ah-stat-label">Total</div><div class="ah-stat-value">{{ bookings|length }}</div></div></div>
+    <div class="col-md-4"><div class="ah-stat-card"><div class="ah-stat-label">Cereri si lucrari</div><div class="ah-stat-value">{{ bookings|length }}</div><div class="small text-muted-custom mt-1">AutoEMG ramane front-office si portal de transparenta.</div></div></div>
+    <div class="col-md-4"><div class="ah-stat-card"><div class="ah-stat-label">Istoric vizibil</div><div class="small text-muted-custom mt-1">Poze, update-uri si recomandari in acelasi loc.</div></div></div>
   </div>
 
   {% if bookings %}
   <div class="d-grid gap-3">
     {% for booking in bookings %}
-    <article class="myb-card" data-testid="client-booking-card">
-      <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+    <article class="ah-section-card" data-testid="client-booking-card">
+      <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
         <div>
           <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
             <h2 class="h4 mb-0">{{ booking.center.name }}</h2>
             <span class="ah-status-pill {{ booking.status }}" data-testid="client-booking-status">{{ booking.get_status_icon }} {{ booking.get_status_display }}</span>
           </div>
-          <div class="text-muted-custom small">
-            {{ booking.booking_date|date:"d.m.Y" }} la {{ booking.booking_time|time:"H:i" }}
-            · {{ booking.car_brand }} {{ booking.car_model }} · {{ booking.car_plate }}
-          </div>
+          <div class="small text-muted-custom">{{ booking.car_brand }} {{ booking.car_model }} - {{ booking.car_plate }}</div>
         </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <a href="{{ booking.center.get_absolute_url }}" class="btn btn-sm btn-outline-light">Vezi service</a>
-          <a href="{% url 'bookings:create' booking.center.slug %}" class="btn btn-sm btn-outline-warning">Programare nouă</a>
+        <div class="small text-muted-custom text-lg-end">
+          <div>Faza cerere: <strong>{{ booking.request_status_label }}</strong></div>
+          <div>Faza lucrare: <strong>{{ booking.work_status_label }}</strong></div>
         </div>
       </div>
 
-      <div class="myb-detail-grid mt-3">
-        <div class="myb-detail-box">
-          <div class="myb-label">Următorul pas</div>
-          {% if booking.status == 'pending' %}
-          <div class="fw-semibold">Service-ul analizează cererea și te poate contacta pentru confirmare sau ofertă.</div>
-          {% elif booking.status == 'quoted' %}
-          <div class="fw-semibold">Ai primit o ofertă. O poți accepta sau refuza chiar de aici.</div>
-          {% elif booking.status == 'confirmed' %}
-          <div class="fw-semibold">Programarea este confirmată. Mergi la service la intervalul rezervat.</div>
-          {% elif booking.status == 'in_progress' %}
-          <div class="fw-semibold">Mașina este în lucru. Service-ul poate adăuga poze, costuri și actualizări.</div>
-          {% elif booking.status == 'waiting_parts' %}
-          <div class="fw-semibold">Lucrarea așteaptă piese. Vei vedea aici când intervenția este reluată.</div>
-          {% elif booking.status == 'done' %}
-          <div class="fw-semibold">Lucrarea este finalizată. Verifică sumarul și recomandările rămase.</div>
-          {% else %}
-          <div class="fw-semibold">Programarea este închisă.</div>
-          {% endif %}
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <div class="myb-detail-box h-100">
+            <div class="myb-label">Intervale trimise</div>
+            {% for slot in booking.preferred_slots %}
+            <div>{{ slot.label }}</div>
+            {% empty %}
+            <div>-</div>
+            {% endfor %}
+          </div>
         </div>
-
-        <div class="myb-detail-box">
-          <div class="myb-label">Costuri</div>
-          <div>Estimare: {% if booking.estimated_price %}{{ booking.estimated_price }} RON{% elif booking.job_card_obj and booking.job_card_obj.estimated_cost %}{{ booking.job_card_obj.estimated_cost }} RON{% else %}-{% endif %}</div>
-          <div class="mt-2">Final: {% if booking.job_card_obj and booking.job_card_obj.final_cost %}{{ booking.job_card_obj.final_cost }} RON{% else %}-{% endif %}</div>
+        <div class="col-lg-4">
+          <div class="myb-detail-box h-100">
+            <div class="myb-label">Urmatorul pas</div>
+            {% if booking.status == 'pending' %}
+            <div class="fw-semibold">Service-ul analizeaza cererea si poate confirma sau propune alt interval.</div>
+            {% elif booking.status == 'quoted' %}
+            <div class="fw-semibold">Service-ul a trimis o propunere actualizata. O poti accepta sau refuza.</div>
+            {% elif booking.status == 'confirmed' %}
+            <div class="fw-semibold">Cererea este confirmata. Service-ul poate prelua programarea si in sistemul lui intern.</div>
+            {% elif booking.status == 'in_progress' %}
+            <div class="fw-semibold">Lucrarea este activa. Verifica pozele si update-urile adaugate de service.</div>
+            {% elif booking.status == 'waiting_parts' %}
+            <div class="fw-semibold">Service-ul asteapta aprobare sau clarificare din partea ta.</div>
+            {% elif booking.status == 'done' %}
+            <div class="fw-semibold">Lucrarea este finalizata. Verifica documentarea si recomandarile finale.</div>
+            {% else %}
+            <div class="fw-semibold">Cererea a fost inchisa.</div>
+            {% endif %}
+          </div>
         </div>
-
-        <div class="myb-detail-box">
-          <div class="myb-label">Documente și media</div>
-          <div>{{ booking.attachments.count }} atașamente</div>
-          <div class="mt-2">{{ booking.invoices.count }} facturi / documente</div>
+        <div class="col-lg-4">
+          <div class="myb-detail-box h-100">
+            <div class="myb-label">Costuri</div>
+            <div>Estimare: {% if booking.estimated_price %}{{ booking.estimated_price }} RON{% elif booking.job_card_obj and booking.job_card_obj.estimated_cost %}{{ booking.job_card_obj.estimated_cost }} RON{% else %}-{% endif %}</div>
+            <div class="mt-2">Final: {% if booking.job_card_obj and booking.job_card_obj.final_cost %}{{ booking.job_card_obj.final_cost }} RON{% else %}-{% endif %}</div>
+            <div class="mt-2">{{ booking.invoices.count }} facturi / documente</div>
+          </div>
         </div>
       </div>
 
       {% if booking.status == 'quoted' %}
-      <div class="d-flex flex-wrap gap-2 mt-3">
-        <form method="post" action="{% url 'bookings:accept_quote' booking.pk %}">
+        {% if booking.needs_client_reschedule %}
+        <div class="alert alert-warning mt-3 mb-3" data-testid="client-reschedule-required-message">
+          Durata reala estimata de service este mai mare decat estimarea initiala, iar intervalul ales initial nu mai este disponibil. Te rugam sa alegi o noua zi si ora pentru aceasta lucrare.
+        </div>
+        <form method="post" action="{% url 'bookings:reschedule_quote' booking.pk %}" class="myb-detail-box mt-3" data-reschedule-picker data-slots-url="{% url 'bookings:garage_slots' booking.center.slug %}" data-garages-url="{% url 'bookings:garaje_disponibile' booking.center.slug %}" data-garage-id="{% if booking.garage_id %}{{ booking.garage_id }}{% endif %}" data-duration="{{ booking.duration_minutes|default:60 }}" data-testid="client-reschedule-form">
           {% csrf_token %}
-          <button class="btn btn-success" data-testid="client-accept-quote-button" type="submit">Acceptă oferta</button>
+          <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label">Noua zi</label>
+              <input type="date" name="booking_date" class="form-control" data-reschedule-date required>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Ore disponibile</label>
+              <input type="hidden" name="booking_time" data-reschedule-time>
+              <div class="d-flex flex-wrap gap-2" data-reschedule-times></div>
+              <div class="small text-muted-custom mt-2" data-reschedule-hint>Alege ziua, apoi incarcam orele disponibile.</div>
+            </div>
+          </div>
+          <button class="btn btn-success mt-3" data-reschedule-submit data-testid="client-reschedule-submit" type="submit" disabled>Salveaza noul interval</button>
         </form>
-        <form method="post" action="{% url 'bookings:reject_quote' booking.pk %}">
-          {% csrf_token %}
-          <button class="btn btn-outline-danger" data-testid="client-reject-quote-button" type="submit">Refuză oferta</button>
-        </form>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <form method="post" action="{% url 'bookings:reject_quote' booking.pk %}">{% csrf_token %}<button class="btn btn-outline-danger" data-testid="client-reject-quote-button" type="submit">Refuza propunerea</button></form>
+        </div>
+        {% else %}
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <form method="post" action="{% url 'bookings:accept_quote' booking.pk %}">{% csrf_token %}<button class="btn btn-success" data-testid="client-accept-quote-button" type="submit">Accepta propunerea</button></form>
+          <form method="post" action="{% url 'bookings:reject_quote' booking.pk %}">{% csrf_token %}<button class="btn btn-outline-danger" data-testid="client-reject-quote-button" type="submit">Refuza propunerea</button></form>
+        </div>
+        {% endif %}
+      {% endif %}
+
+      {% if booking.mechanic_work_log and booking.mechanic_work_log.photos.all %}
+      <div class="mt-3">
+        <div class="small text-muted-custom mb-2">Poze din lucrare</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for photo in booking.mechanic_work_log.photos.all %}
+          <img src="{{ photo.photo.url }}" alt="Foto lucrare" style="width:92px;height:92px;object-fit:cover;border-radius:12px;border:1px solid var(--ah-border);">
+          {% endfor %}
+        </div>
       </div>
       {% endif %}
 
       {% if booking.job_card_obj and booking.job_card_obj.recommendations.all %}
       <div class="mt-3">
-        <div class="small text-muted-custom mb-2">Recomandări tehnice</div>
+        <div class="small text-muted-custom mb-2">Recomandari finale</div>
         <div class="ah-chip-list">
           {% for recommendation in booking.job_card_obj.recommendations.all %}
-            {% if not recommendation.is_resolved and recommendation.is_visible_to_customer %}
-            <span class="ah-chip"><i class="bi bi-clipboard-pulse"></i>{{ recommendation.title }}</span>
-            {% endif %}
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
-      {% if booking.mechanic_work_log and booking.mechanic_work_log.photos.all %}
-      <div class="mt-3">
-        <div class="small text-muted-custom mb-2">Poze de la lucrare</div>
-        <div class="myb-gallery">
-          {% for photo in booking.mechanic_work_log.photos.all %}
-          <img src="{{ photo.photo.url }}" alt="Foto lucrare" onclick="openLightbox('{{ photo.photo.url }}')">
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
-      {% if booking.attachments.all %}
-      <div class="mt-3">
-        <div class="small text-muted-custom mb-2">Fișierele tale</div>
-        <div class="myb-gallery">
-          {% for attachment in booking.attachments.all %}
-            {% if attachment.is_image %}
-            <div style="position:relative;">
-              <img src="{% url 'bookings:attachment_file' attachment.pk %}" alt="Atașament" onclick="openLightbox('{% url 'bookings:attachment_file' attachment.pk %}')">
-              <form method="post" action="{% url 'bookings:attachment_delete' attachment.pk %}" style="position:absolute;top:4px;right:4px;">
-                {% csrf_token %}
-                <button class="btn btn-sm btn-outline-danger" type="submit">×</button>
-              </form>
-            </div>
-            {% endif %}
+            {% if recommendation.is_visible_to_customer %}<span class="ah-chip"><i class="bi bi-clipboard-pulse"></i>{{ recommendation.title }}</span>{% endif %}
           {% endfor %}
         </div>
       </div>
@@ -198,28 +209,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="ah-empty-state">
-    <strong>Nu ai programări încă</strong>
-    Găsește un service potrivit și fă prima programare online.
-  </div>
+  <div class="ah-empty-state"><strong>Nu ai trimis nicio cerere inca</strong>AutoEMG te ajuta sa trimiti solicitari si sa urmaresti transparent lucrarea dupa receptie.</div>
   {% endif %}
 </div>
-
-<div id="lightbox" onclick="closeLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
-  <img id="lb-img" style="max-width:92vw;max-height:92vh;border-radius:14px;">
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-function openLightbox(src) {
-  document.getElementById('lb-img').src = src;
-  document.getElementById('lightbox').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-}
-function closeLightbox() {
-  document.getElementById('lightbox').style.display = 'none';
-  document.body.style.overflow = '';
-}
-</script>
 {% endblock %}

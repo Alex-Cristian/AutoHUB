@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -10,10 +11,11 @@ from django.views.decorators.http import require_GET, require_POST
 from accounts.models import Car
 from services.business import transition_booking_status
 from services.models import ServiceCenter, ServiceGarage, ServiceItem, ServiceCategory
-from .ai import estimate_booking_duration, normalize_duration_minutes
-from .forms import BookingForm
+from .ai import estimate_booking_duration, heuristic_duration_estimate, normalize_duration_minutes
+from .forms import BookingForm, WEEKDAY_LABELS
 from .models import Booking, BookingAttachment, BookingNotification
 from .activity import log_booking_activity
+from .availability import booking_slot_is_available
 from .files import (
     attachment_content_type,
     attachment_display_name,
@@ -103,6 +105,29 @@ def _get_duration_estimate_from_request(center, request):
     return estimate
 
 
+def _safe_duration_estimate(center, request):
+    try:
+        return _get_duration_estimate_from_request(center, request)
+    except Exception:
+        service_item = None
+        service_id = (request.GET.get('service_item') or request.POST.get('service_item') or '').strip()
+        if service_id.isdigit():
+            service_item = ServiceItem.objects.filter(center=center, pk=service_id).first()
+        description = (request.GET.get('problem_description') or request.POST.get('problem_description') or '').strip()
+        car_data = _extract_car_data(request)
+        estimate = heuristic_duration_estimate(
+            description,
+            service_name=getattr(service_item, 'name', ''),
+            car_data=car_data,
+            center_name=getattr(center, 'name', ''),
+        )
+        estimate['minutes'] = normalize_duration_minutes(estimate.get('minutes'))
+        estimate['service_name'] = getattr(service_item, 'name', '')
+        estimate['car'] = car_data
+        estimate['source'] = estimate.get('source', 'catalog')
+        return estimate
+
+
 def booking_create(request, slug):
     center = get_object_or_404(
         ServiceCenter.objects.prefetch_related('garages', 'garages__category', 'categories'),
@@ -114,13 +139,18 @@ def booking_create(request, slug):
         if form.is_valid():
             booking = form.save(commit=False)
             booking.center = center
-            booking.duration_minutes = _get_duration_estimate_from_request(center, request).get('minutes')
+            estimate = _get_duration_estimate_from_request(center, request)
+            booking.duration_minutes = estimate.get('minutes')
+            booking.estimated_operation_slug = estimate.get('operation_slug', '')
+            booking.estimated_operation_label = estimate.get('operation_label', '')
+            booking.duration_estimate_source = estimate.get('source', '')
+            booking.duration_estimate_confidence = estimate.get('confidence')
             booking.wants_offer = request.POST.get('wants_offer') == '1'
             if request.user.is_authenticated:
                 booking.user = request.user
             booking.full_clean()
             booking.save()
-            log_booking_activity(booking, 'schedule_changed', 'Programarea a fost creata de client.', actor=request.user if request.user.is_authenticated else None)
+            log_booking_activity(booking, 'schedule_changed', 'Cererea a fost trimisa de client.', actor=request.user if request.user.is_authenticated else None)
 
             added_count = 0
             image_count = 0
@@ -168,10 +198,10 @@ def booking_create(request, slug):
                     )
                     messages.info(request, f'🚗 Mașina {booking.car_brand} {booking.car_model} a fost salvată în contul tău.')
 
-            garage_label = f' în {booking.garage.name}' if booking.garage_id else ''
+            garage_label = f' pentru postul preferat {booking.garage.name}' if booking.garage_id else ''
             messages.success(
                 request,
-                f'✅ Programare trimisă{garage_label}! Vă așteptăm pe {booking.booking_date.strftime("%d %B %Y")} la ora {booking.booking_time.strftime("%H:%M")}.',
+                f'Cererea a fost trimisa{garage_label}. Service-ul va confirma, va propune alt interval sau va respinge solicitarea dupa analiza.',
             )
             return redirect('bookings:success', pk=booking.pk)
     else:
@@ -191,6 +221,8 @@ def booking_create(request, slug):
         'form': form,
         'cars': cars,
         'categories': categories,
+        'allowed_weekdays': sorted(getattr(form, 'allowed_weekdays', {0, 1, 2, 3, 4})),
+        'allowed_weekday_labels': [WEEKDAY_LABELS[idx] for idx in sorted(getattr(form, 'allowed_weekdays', {0, 1, 2, 3, 4}))],
     }
     return render(request, 'bookings/booking_create.html', context)
 
@@ -278,7 +310,7 @@ def attachment_file(request, pk):
 @require_GET
 def booking_duration_estimate(request, slug):
     center = get_object_or_404(ServiceCenter, slug=slug, is_active=True)
-    estimate = _get_duration_estimate_from_request(center, request)
+    estimate = _safe_duration_estimate(center, request)
     return JsonResponse(estimate)
 
 
@@ -296,7 +328,7 @@ def garage_slots(request, slug):
     except ValueError:
         return JsonResponse({'slots': [], 'error': 'Data nu este validă.'}, status=400)
 
-    estimate = _get_duration_estimate_from_request(center, request)
+    estimate = _safe_duration_estimate(center, request)
     duration_minutes = normalize_duration_minutes(estimate.get('minutes'))
     slots = garage.available_slots_for_date(booking_date, duration_minutes=duration_minutes)
     return JsonResponse({
@@ -330,7 +362,7 @@ def garaje_disponibile(request, slug):
     except ValueError:
         return JsonResponse({'garages': [], 'error': 'Format dată invalid.'}, status=400)
 
-    estimate = _get_duration_estimate_from_request(center, request)
+    estimate = _safe_duration_estimate(center, request)
     duration_minutes = normalize_duration_minutes(estimate.get('minutes'))
 
     garages_qs = center.garages.select_related('category')
@@ -368,6 +400,10 @@ def booking_accept_quote(request, pk):
         messages.info(request, 'Această ofertă nu mai așteaptă răspunsul tău.')
         return redirect('bookings:my_bookings')
 
+    if booking.needs_client_reschedule:
+        messages.error(request, 'Alege un nou interval disponibil inainte sa accepti oferta.')
+        return redirect('bookings:my_bookings')
+
     if booking.garage_id and not booking.garage.is_time_available(
         booking.booking_date,
         booking.booking_time,
@@ -392,14 +428,65 @@ def booking_accept_quote(request, pk):
             recipient=booking.center.owner,
             booking=booking,
             kind=BookingNotification.KIND_STATUS_UPDATE,
-            title=f'Clientul a confirmat programarea #{booking.pk} ✅',
+            title=f'Clientul a confirmat propunerea pentru cererea #{booking.pk} ✅',
             message=(
-                f'{booking.client_name} a acceptat oferta pentru {booking.booking_date} la '
+                f'{booking.client_name} a acceptat propunerea pentru {booking.booking_date} la '
                 f"{booking.booking_time.strftime('%H:%M')} ({booking.get_duration_display()})."
             ),
         )
     send_quote_accepted_to_service_email(booking)
-    messages.success(request, 'Ai confirmat programarea. Service-ul a rezervat intervalul pentru tine.')
+    messages.success(request, 'Ai confirmat propunerea service-ului. Programarea poate fi preluata acum si in sistemul intern al service-ului.')
+    return redirect('bookings:my_bookings')
+
+
+@login_required
+@require_POST
+def booking_reschedule_quote(request, pk):
+    booking = get_object_or_404(Booking.objects.select_related('garage', 'mechanic', 'center'), pk=pk, user=request.user)
+    if booking.status != Booking.STATUS_QUOTED or not booking.needs_client_reschedule:
+        messages.info(request, 'Aceasta oferta nu necesita alegerea unui nou interval.')
+        return redirect('bookings:my_bookings')
+
+    date_str = (request.POST.get('booking_date') or '').strip()
+    time_str = (request.POST.get('booking_time') or '').strip()
+    try:
+        booking_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        booking_time = datetime.strptime(time_str, '%H:%M').time()
+    except ValueError:
+        messages.error(request, 'Alege o data si o ora valida pentru reprogramare.')
+        return redirect('bookings:my_bookings')
+
+    duration_minutes = booking.effective_duration_minutes()
+    if not booking_slot_is_available(booking, booking_date, booking_time, duration_minutes):
+        messages.error(request, 'Intervalul ales nu mai este disponibil. Te rugam sa alegi alta zi sau ora.')
+        return redirect('bookings:my_bookings')
+
+    old_date = booking.booking_date
+    old_time = booking.booking_time
+    booking.booking_date = booking_date
+    booking.booking_time = booking_time
+    booking.needs_client_reschedule = False
+    try:
+        booking.full_clean()
+        booking.save(update_fields=['booking_date', 'booking_time', 'needs_client_reschedule', 'updated_at'])
+    except ValidationError as exc:
+        messages.error(request, '; '.join(exc.messages))
+        return redirect('bookings:my_bookings')
+
+    log_booking_activity(
+        booking,
+        'schedule_changed',
+        'Clientul a ales un nou interval pentru oferta service-ului.',
+        actor=request.user,
+        metadata={
+            'old_date': old_date.isoformat() if old_date else '',
+            'old_time': old_time.strftime('%H:%M') if old_time else '',
+            'new_date': booking.booking_date.isoformat(),
+            'new_time': booking.booking_time.strftime('%H:%M'),
+            'duration_minutes': duration_minutes,
+        },
+    )
+    messages.success(request, 'Noul interval a fost salvat. Acum poti accepta sau refuza oferta.')
     return redirect('bookings:my_bookings')
 
 
@@ -424,8 +511,8 @@ def booking_reject_quote(request, pk):
             recipient=booking.center.owner,
             booking=booking,
             kind=BookingNotification.KIND_STATUS_UPDATE,
-            title=f'Clientul a refuzat oferta pentru programarea #{booking.pk}',
+            title=f'Clientul a refuzat propunerea pentru cererea #{booking.pk}',
             message=f'{booking.client_name} a refuzat oferta trimisă de service.',
         )
-    messages.info(request, 'Ai refuzat oferta pentru această programare.')
+    messages.info(request, 'Ai refuzat propunerea pentru aceasta cerere.')
     return redirect('bookings:my_bookings')

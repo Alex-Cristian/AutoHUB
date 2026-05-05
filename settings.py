@@ -95,6 +95,8 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+SESSION_ENGINE = os.getenv('SESSION_ENGINE', 'django.contrib.sessions.backends.db')
+
 LANGUAGE_CODE = 'ro'
 TIME_ZONE = 'Europe/Bucharest'
 USE_I18N = True
@@ -126,6 +128,19 @@ LOGOUT_REDIRECT_URL = '/'
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4.1-mini')
+
+SITE_BASE_URL = os.getenv('SITE_BASE_URL', 'http://127.0.0.1:8000')
+APP_URL = os.getenv('APP_URL', SITE_BASE_URL)
+AUTH_SECRET = os.getenv('AUTH_SECRET', SECRET_KEY)
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
+GOOGLE_REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI', '')
+GOOGLE_AUTHORIZATION_URL = os.getenv('GOOGLE_AUTHORIZATION_URL', 'https://accounts.google.com/o/oauth2/v2/auth')
+GOOGLE_TOKEN_URL = os.getenv('GOOGLE_TOKEN_URL', 'https://oauth2.googleapis.com/token')
+GOOGLE_USERINFO_URL = os.getenv('GOOGLE_USERINFO_URL', 'https://openidconnect.googleapis.com/v1/userinfo')
+GOOGLE_JWKS_URL = os.getenv('GOOGLE_JWKS_URL', 'https://www.googleapis.com/oauth2/v3/certs')
+GOOGLE_DISCOVERY_URL = os.getenv('GOOGLE_DISCOVERY_URL', 'https://accounts.google.com/.well-known/openid-configuration')
+OAUTH_DEBUG_ERRORS = os.getenv('OAUTH_DEBUG_ERRORS', str(DEBUG)).strip().lower() in {'1', 'true', 'yes', 'on'}
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB

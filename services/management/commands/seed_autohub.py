@@ -14,6 +14,7 @@ from django.conf import settings
 from django.core.files import File
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
+from django.test.utils import override_settings
 from django.utils import timezone
 from PIL import Image, ImageDraw
 from datetime import timedelta
@@ -534,7 +535,25 @@ class Command(BaseCommand):
         img.save(image_path)
         return image_path
 
+    def _make_output_safe(self, stream):
+        original_write = stream.write
+        encoding = getattr(getattr(stream, '_out', None), 'encoding', None) or 'utf-8'
+
+        def safe_write(msg='', style_func=None, ending=None):
+            if isinstance(msg, str):
+                msg = msg.encode(encoding, errors='replace').decode(encoding, errors='replace')
+            return original_write(msg, style_func=style_func, ending=ending)
+
+        return safe_write
+
     def handle(self, *args, **options):
+        self.stdout.write = self._make_output_safe(self.stdout)
+        self.stderr.write = self._make_output_safe(self.stderr)
+
+        with override_settings(DISABLE_TRANSACTIONAL_EMAILS=True):
+            return self._handle(*args, **options)
+
+    def _handle(self, *args, **options):
         from services.business import create_job_part_usage, ensure_job_card, sync_booking_from_job_card
         from services.models import (
             JobCard,

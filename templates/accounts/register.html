@@ -71,6 +71,12 @@
           </button>
         </form>
 
+        <div class="d-grid gap-2 mt-3">
+          <a class="btn btn-outline-light w-100" data-testid="register-google-button" href="{% url 'accounts_api:google' %}?next={{ request.GET.next|urlencode }}">
+            <i class="bi bi-google me-2"></i>Continuă cu Google
+          </a>
+        </div>
+
         <hr style="border-color:var(--ah-border);margin:1.5rem 0;">
         <p class="text-center text-muted-custom small mb-0">
           Ai deja cont?

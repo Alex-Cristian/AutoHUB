@@ -48,8 +48,8 @@ class LegalAcceptanceRequiredMiddleware:
 
         path = request.path
 
-        # Bypass rapid pentru static/admin/media
-        if path.startswith('/admin/') or path.startswith('/media/'):
+        # Bypass rapid pentru static/admin/media/API auth
+        if path.startswith('/admin/') or path.startswith('/media/') or path.startswith('/api/auth/'):
             return None
         static_url = settings.STATIC_URL
         if static_url and path.startswith(static_url):

@@ -196,6 +196,42 @@ class EmailVerificationToken(models.Model):
         return self.created_at + timezone.timedelta(hours=expiry_hours) < timezone.now()
 
 
+class OAuthAccount(models.Model):
+    PROVIDER_GOOGLE = 'google'
+    PROVIDER_CREDENTIALS = 'credentials'
+
+    PROVIDER_CHOICES = [
+        (PROVIDER_GOOGLE, 'Google'),
+        (PROVIDER_CREDENTIALS, 'Email si parola'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='oauth_accounts',
+        verbose_name='Utilizator',
+    )
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, verbose_name='Provider')
+    provider_user_id = models.CharField(max_length=255, verbose_name='ID utilizator provider')
+    provider_email = models.EmailField(blank=True, verbose_name='Email provider')
+    email_verified = models.BooleanField(default=False, verbose_name='Email verificat de provider')
+    name = models.CharField(max_length=255, blank=True, verbose_name='Nume provider')
+    avatar_url = models.URLField(blank=True, verbose_name='Avatar provider')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Cont autentificare externa'
+        verbose_name_plural = 'Conturi autentificare externa'
+        unique_together = ('provider', 'provider_user_id')
+        indexes = [
+            models.Index(fields=['provider', 'provider_email']),
+        ]
+
+    def __str__(self):
+        return f"{self.provider}:{self.provider_user_id} -> {self.user_id}"
+
+
 class CarExpiryReminderLog(models.Model):
     car = models.ForeignKey(
         Car,
