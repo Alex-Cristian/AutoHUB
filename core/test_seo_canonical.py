@@ -7,7 +7,7 @@ SEO_SETTINGS = {
     "CANONICAL_SITE_URL": "https://autoemg.com",
     "CANONICAL_REDIRECT_HOSTS": ["autoemg.com", "www.autoemg.com"],
     "SECURE_PROXY_SSL_HEADER": ("HTTP_X_FORWARDED_PROTO", "https"),
-    "SECURE_SSL_REDIRECT": True,
+    "SECURE_SSL_REDIRECT": False,
 }
 
 
@@ -38,9 +38,8 @@ class SeoCanonicalTests(TestCase):
         self.assertEqual(response.redirect_chain, [("https://autoemg.com/", 301)])
         self.assertEqual(response.status_code, 200)
 
-    def test_public_variants_redirect_directly_to_canonical_homepage(self):
+    def test_www_variants_redirect_directly_to_canonical_homepage(self):
         cases = [
-            ("autoemg.com", "http", "https://autoemg.com/"),
             ("www.autoemg.com", "http", "https://autoemg.com/"),
             ("www.autoemg.com", "https", "https://autoemg.com/"),
         ]
@@ -55,6 +54,15 @@ class SeoCanonicalTests(TestCase):
 
                 self.assertEqual(response.status_code, 301)
                 self.assertEqual(response["Location"], expected_location)
+
+    def test_apex_host_does_not_self_redirect_when_proxy_scheme_is_unclear(self):
+        response = self.client.get(
+            "/",
+            HTTP_HOST="autoemg.com",
+            HTTP_X_FORWARDED_PROTO="http",
+        )
+
+        self.assertEqual(response.status_code, 200)
 
     def test_canonical_https_homepage_returns_200(self):
         response = self.client.get(
