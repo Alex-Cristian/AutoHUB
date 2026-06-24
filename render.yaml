@@ -32,7 +32,7 @@ services:
       - key: CANONICAL_REDIRECT_HOSTS
         value: autoemg.com,www.autoemg.com
       - key: SECURE_SSL_REDIRECT
-        value: True
+        value: False
       - key: USE_CLOUDINARY
         value: True
       - key: CLOUDINARY_CLOUD_NAME

@@ -19,10 +19,9 @@ class CanonicalHostMiddleware:
         host = request.get_host().split(':', 1)[0].lower()
 
         if canonical_host and host in redirect_hosts:
-            needs_https = not request.is_secure()
             needs_host = host != canonical_host.lower()
 
-            if needs_https or needs_host:
+            if needs_host:
                 return HttpResponsePermanentRedirect(
                     f'https://{canonical_host}{request.get_full_path()}'
                 )
