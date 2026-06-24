@@ -1,6 +1,33 @@
 from django.conf import settings
+from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
+
+
+class CanonicalHostMiddleware:
+    """Redirect public AutoEMG hosts directly to the canonical HTTPS host."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        canonical_host = getattr(settings, 'CANONICAL_HOST', '').strip()
+        redirect_hosts = {
+            item.lower()
+            for item in getattr(settings, 'CANONICAL_REDIRECT_HOSTS', ())
+        }
+        host = request.get_host().split(':', 1)[0].lower()
+
+        if canonical_host and host in redirect_hosts:
+            needs_https = not request.is_secure()
+            needs_host = host != canonical_host.lower()
+
+            if needs_https or needs_host:
+                return HttpResponsePermanentRedirect(
+                    f'https://{canonical_host}{request.get_full_path()}'
+                )
+
+        return self.get_response(request)
 
 
 class LegalAcceptanceRequiredMiddleware:

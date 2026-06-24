@@ -11,7 +11,17 @@ SECRET_KEY = 'django-insecure-autohub-marketplace-change-in-production-2024-xyz'
 
 DEBUG = False
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
+def env_bool(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def env_list(name, default=''):
+    return [item.strip() for item in os.getenv(name, default).split(',') if item.strip()]
+
+
+RUNNING_ON_RENDER = env_bool('RENDER', False)
+
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', '127.0.0.1,localhost,autoemg.com,www.autoemg.com,.onrender.com')
 
 # ===== CSRF & SESSION — fix mobil =====
 CSRF_COOKIE_AGE = 31449600          # 1 an — token nu mai expiră între page load și submit
@@ -20,7 +30,12 @@ CSRF_COOKIE_SAMESITE = 'Lax'        # compatibil cu redirect-uri și browsere mo
 SESSION_COOKIE_AGE = 2592000        # 30 zile — userii rămân logați
 SESSION_SAVE_EVERY_REQUEST = True   # resetează timer-ul la fiecare request
 SESSION_COOKIE_SAMESITE = 'Lax'     # compatibil cu browsere mobile
-CSRF_TRUSTED_ORIGINS = [h.strip() for h in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if h.strip()]
+CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS', 'https://autoemg.com,https://www.autoemg.com')
+USE_X_FORWARDED_HOST = env_bool('USE_X_FORWARDED_HOST', True)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CANONICAL_HOST = os.getenv('CANONICAL_HOST', 'autoemg.com').strip()
+CANONICAL_SITE_URL = os.getenv('CANONICAL_SITE_URL', f'https://{CANONICAL_HOST}').rstrip('/')
+CANONICAL_REDIRECT_HOSTS = env_list('CANONICAL_REDIRECT_HOSTS', f'{CANONICAL_HOST},www.{CANONICAL_HOST}')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -43,6 +58,7 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
+    'core.middleware.CanonicalHostMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -129,7 +145,7 @@ LOGOUT_REDIRECT_URL = '/'
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4.1-mini')
 
-SITE_BASE_URL = os.getenv('SITE_BASE_URL', 'http://127.0.0.1:8000')
+SITE_BASE_URL = os.getenv('SITE_BASE_URL', CANONICAL_SITE_URL if RUNNING_ON_RENDER else 'http://127.0.0.1:8000')
 APP_URL = os.getenv('APP_URL', SITE_BASE_URL)
 AUTH_SECRET = os.getenv('AUTH_SECRET', SECRET_KEY)
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
@@ -144,6 +160,8 @@ OAUTH_DEBUG_ERRORS = os.getenv('OAUTH_DEBUG_ERRORS', str(DEBUG)).strip().lower()
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
+
+SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', RUNNING_ON_RENDER)
 
 if USE_CLOUDINARY and all([
     os.getenv('CLOUDINARY_CLOUD_NAME'),

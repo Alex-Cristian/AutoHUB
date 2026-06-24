@@ -1,10 +1,20 @@
+from urllib.parse import urlparse
+
+from django.conf import settings
 from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
 
 from services.models import ServiceCenter
 
 
-class StaticPagesSitemap(Sitemap):
+class CanonicalDomainSitemap(Sitemap):
+    protocol = "https"
+
+    def get_domain(self, site=None):
+        return urlparse(settings.CANONICAL_SITE_URL).netloc or settings.CANONICAL_HOST
+
+
+class StaticPagesSitemap(CanonicalDomainSitemap):
     changefreq = "weekly"
     priority = 0.8
 
@@ -23,7 +33,7 @@ class StaticPagesSitemap(Sitemap):
         return reverse(item)
 
 
-class ServiceSitemap(Sitemap):
+class ServiceSitemap(CanonicalDomainSitemap):
     changefreq = "daily"
     priority = 0.9
 

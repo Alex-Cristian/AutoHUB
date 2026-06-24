@@ -20,11 +20,19 @@ services:
           name: autohub-db
           property: connectionString
       - key: ALLOWED_HOSTS
-        value: autoemg.com,www.autoemg.com
+        value: autoemg.com,www.autoemg.com,.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
         value: https://autoemg.com,https://www.autoemg.com
       - key: SITE_BASE_URL
-        value: https://www.autoemg.com
+        value: https://autoemg.com
+      - key: CANONICAL_HOST
+        value: autoemg.com
+      - key: CANONICAL_SITE_URL
+        value: https://autoemg.com
+      - key: CANONICAL_REDIRECT_HOSTS
+        value: autoemg.com,www.autoemg.com
+      - key: SECURE_SSL_REDIRECT
+        value: True
       - key: USE_CLOUDINARY
         value: True
       - key: CLOUDINARY_CLOUD_NAME
@@ -53,9 +61,15 @@ services:
           name: autohub-db
           property: connectionString
       - key: ALLOWED_HOSTS
-        value: autoemg.com,www.autoemg.com
+        value: autoemg.com,www.autoemg.com,.onrender.com
       - key: SITE_BASE_URL
-        value: https://www.autoemg.com
+        value: https://autoemg.com
+      - key: CANONICAL_HOST
+        value: autoemg.com
+      - key: CANONICAL_SITE_URL
+        value: https://autoemg.com
+      - key: CANONICAL_REDIRECT_HOSTS
+        value: autoemg.com,www.autoemg.com
       - key: USE_CLOUDINARY
         value: True
       - key: CLOUDINARY_CLOUD_NAME
