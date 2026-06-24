@@ -20,11 +20,15 @@ def env_list(name, default=''):
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-autohub-marketplace-dev-only')
 
 DEBUG = env_bool('DEBUG', False)
+RUNNING_ON_RENDER = env_bool('RENDER', False)
 
-ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', '127.0.0.1,localhost')
-CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS', '')
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', '127.0.0.1,localhost,autoemg.com,www.autoemg.com,.onrender.com')
+CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS', 'https://autoemg.com,https://www.autoemg.com')
 USE_X_FORWARDED_HOST = env_bool('USE_X_FORWARDED_HOST', True)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CANONICAL_HOST = os.getenv('CANONICAL_HOST', 'autoemg.com').strip()
+CANONICAL_SITE_URL = os.getenv('CANONICAL_SITE_URL', f'https://{CANONICAL_HOST}').rstrip('/')
+CANONICAL_REDIRECT_HOSTS = env_list('CANONICAL_REDIRECT_HOSTS', f'{CANONICAL_HOST},www.{CANONICAL_HOST}')
 
 LOGGING = {
     'version': 1,
@@ -63,6 +67,7 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
+    'core.middleware.CanonicalHostMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -95,7 +100,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'autohub.wsgi.application'
 
-RUNNING_ON_RENDER = env_bool('RENDER', False)
 USE_LOCAL_SQLITE = env_bool('USE_LOCAL_SQLITE', False) and not RUNNING_ON_RENDER
 
 DATABASE_URL = '' if USE_LOCAL_SQLITE else os.getenv('DATABASE_URL', '').strip()
@@ -208,7 +212,7 @@ else:
 LEGAL_DOCUMENTS_VERSION = os.getenv('LEGAL_DOCUMENTS_VERSION', '2026-03-19')
 
 
-SITE_BASE_URL = os.getenv('SITE_BASE_URL', 'http://127.0.0.1:8000')
+SITE_BASE_URL = os.getenv('SITE_BASE_URL', CANONICAL_SITE_URL if RUNNING_ON_RENDER else 'http://127.0.0.1:8000')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'AutoEMG <admin@autoemg.com>')
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
@@ -244,7 +248,7 @@ CSRF_COOKIE_SECURE = env_bool('CSRF_COOKIE_SECURE', not DEBUG)
 SESSION_COOKIE_SAMESITE = os.getenv('SESSION_COOKIE_SAMESITE', 'Lax')
 CSRF_COOKIE_SAMESITE = os.getenv('CSRF_COOKIE_SAMESITE', 'Lax')
 
-SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', False)
+SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', RUNNING_ON_RENDER)
 SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0'))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', False)
 SECURE_HSTS_PRELOAD = env_bool('SECURE_HSTS_PRELOAD', False)
