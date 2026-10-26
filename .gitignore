@@ -13,6 +13,7 @@ yarn-error.log*
 .mypy_cache/
 .ruff_cache/
 .cache/
+.uv-cache/
 htmlcov/
 
 .env

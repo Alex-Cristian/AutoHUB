@@ -25,12 +25,14 @@ services:
         value: https://autoemg.com,https://www.autoemg.com
       - key: SITE_BASE_URL
         value: https://autoemg.com
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
       - key: CANONICAL_HOST
         value: autoemg.com
       - key: CANONICAL_SITE_URL
         value: https://autoemg.com
       - key: CANONICAL_REDIRECT_HOSTS
-        value: autoemg.com,www.autoemg.com
+        value: ""
       - key: SECURE_SSL_REDIRECT
         value: False
       - key: USE_CLOUDINARY
@@ -69,7 +71,7 @@ services:
       - key: CANONICAL_SITE_URL
         value: https://autoemg.com
       - key: CANONICAL_REDIRECT_HOSTS
-        value: autoemg.com,www.autoemg.com
+        value: ""
       - key: USE_CLOUDINARY
         value: True
       - key: CLOUDINARY_CLOUD_NAME

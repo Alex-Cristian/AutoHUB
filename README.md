@@ -160,12 +160,18 @@ DEFAULT_FROM_EMAIL=AutoEMG <admin@autoemg.local>
 EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
+GOOGLE_MAPS_API_KEY=
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_PHONE_NUMBER=
 TWILIO_SMS_ENABLED=False
 LEGAL_DOCUMENTS_VERSION=2026-03-19
 ```
+
+`GOOGLE_MAPS_API_KEY` este folosită în browser pentru hărțile service-urilor și
+previzualizarea locației la înregistrare. Restricționează cheia în Google Cloud
+la domeniile aplicației și la Maps JavaScript API. Pentru Render, setează aceeași
+variabilă în Environment; valoarea nu se adaugă în repository.
 
 ### 5. Rulează migrațiile
 
