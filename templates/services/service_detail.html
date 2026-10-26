@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load l10n %}
 {% block title %}{{ center.name }} - AutoEMG{% endblock %}
 {% block content %}
 <div class="container py-4 py-lg-5">
@@ -17,6 +18,27 @@
             <div class="small text-muted-custom">{{ review_count }} recenzii</div>
           </div>
         </div>
+      </section>
+
+      <section class="ah-section-card" aria-labelledby="service-location-title">
+        <h2 id="service-location-title" class="h5 mb-3">Locație și traseu</h2>
+        <p class="small text-muted-custom">{{ center.address }}, {{ center.get_city_display }}</p>
+        {% if center.latitude != None and center.longitude != None %}
+        {% localize off %}
+        <iframe title="Localizarea service-ului {{ center.name }}"
+                src="https://maps.google.com/maps?q={{ center.latitude }},{{ center.longitude }}&amp;z=15&amp;output=embed"
+                width="100%" height="260" style="border:0;border-radius:14px;" loading="lazy" allowfullscreen></iframe>
+        <a href="https://www.google.com/maps/dir/?api=1&amp;destination={{ center.latitude }},{{ center.longitude }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary w-100 mt-3">
+          <i class="bi bi-signpost-2 me-1" aria-hidden="true"></i>Deschide în Google Maps
+        </a>
+        <a href="https://waze.com/ul?ll={{ center.latitude }},{{ center.longitude }}&amp;navigate=yes" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary w-100 mt-2">
+          <i class="bi bi-car-front me-1" aria-hidden="true"></i>Deschide în Waze
+        </a>
+        {% endlocalize %}
+        {% else %}
+        <p class="small text-muted-custom mb-0">Locația exactă a acestui service nu este configurată încă.</p>
+        <a href="https://www.google.com/maps/dir/?api=1&amp;destination={{ center.address|urlencode }}%2C%20{{ center.get_city_display|urlencode }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary w-100 mt-3">Caută adresa în Google Maps</a>
+        {% endif %}
       </section>
 
       <section class="ah-section-card">
@@ -71,6 +93,8 @@
         <a href="{% url 'services:toggle_favorite' center.slug %}" class="btn btn-outline-secondary w-100 mt-2" data-testid="service-detail-favorite-button">{% if is_favorited %}Scoate din favorite{% else %}Adauga la favorite{% endif %}</a>
         {% endif %}
       </section>
+
+
 
       <section class="ah-section-card">
         <h3 class="h5 mb-3">Ce primesti dupa intrarea masinii in service</h3>
