@@ -611,7 +611,8 @@
                       {% if user.is_authenticated %}
                         <span class="flex-shrink-0"
                               data-testid="service-list-favorite-button"
-                              onclick="event.preventDefault(); window.location='{% url 'services:toggle_favorite' center.slug %}'">
+                              data-navigation-url="{% url 'services:toggle_favorite' center.slug %}"
+                              onclick="event.preventDefault(); window.location=this.dataset.navigationUrl">
                           <i class="bi bi-heart{% if user in center.favorites.all %}-fill text-red{% endif %} fs-5"></i>
                         </span>
                       {% endif %}
@@ -640,7 +641,8 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                      <span onclick="event.preventDefault(); window.location='{% url 'bookings:create' center.slug %}'"
+                      <span data-navigation-url="{% url 'bookings:create' center.slug %}"
+                            onclick="event.preventDefault(); window.location=this.dataset.navigationUrl"
                             class="btn btn-primary btn-sm">
                         <i class="bi bi-calendar-plus me-1"></i>Programează
                       </span>
@@ -679,8 +681,12 @@
       <div id="map" style="height:300px;border-radius:12px;border:1px solid var(--ah-border);overflow:hidden;background:var(--ah-dark3);">
         <div class="d-flex align-items-center justify-content-center h-100 text-muted-custom flex-column">
           <div style="font-size:2rem;opacity:0.3">🗺️</div>
+          {% if not google_maps_api_key %}
+          <p class="small mt-2 mb-0">Configurează GOOGLE_MAPS_API_KEY pentru a activa harta Google.</p>
+          {% else %}
           <p class="small mt-2 mb-0">Apasă "Locația mea"</p>
           <p class="small">pentru a vedea harta</p>
+          {% endif %}
         </div>
       </div>
 
@@ -717,12 +723,18 @@
 {% endblock content %}
 
 {% block extra_js %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+{{ map_services|json_script:"service-map-data" }}
 <script>
   let map = null, userMarker = null, serviceMarkers = [], mapInitialized = false;
+  let userRadiusCircle = null;
   let razaActiva = parseInt(localStorage.getItem("dist_radius") || "0");
+  let resolveGoogleMapsReady;
+  const googleMapsConfigured = Boolean('{{ google_maps_api_key|escapejs }}');
+  const googleMapsReady = new Promise(resolve => {
+    resolveGoogleMapsReady = resolve;
+  });
+  window.initGoogleMaps = () => resolveGoogleMapsReady(true);
+  window.googleMapsLoadFailed = () => resolveGoogleMapsReady(false);
 
   // ===== DRAWER =====
   function deschideFiltre() {
@@ -967,43 +979,47 @@
   }
 
   // ===== HARTA =====
-  const SERVICES = [
-    {% for c in centers %}{% if c.latitude and c.longitude %}{
-      name: "{{ c.name|escapejs }}",
-      city: "{{ c.get_city_display|escapejs }}",
-      category: "{{ c.category.name|escapejs }}",
-      icon: "{% if 'detailing' in c.category.slug %}✨{% elif 'mecanica' in c.category.slug %}🔧{% elif 'electrica' in c.category.slug %}⚡{% elif 'tractari' in c.category.slug %}🚛{% elif 'vulcanizari' in c.category.slug %}🔴{% elif 'tinichigerie' in c.category.slug %}🔨{% else %}🚗{% endif %}",
-      rating: {% if c.avg_rating %}{{ c.avg_rating|floatformat:1|cut:"," }}{% else %}0{% endif %},
-      lat: {{ c.latitude|stringformat:'f' }},
-      lng: {{ c.longitude|stringformat:'f' }},
-      url: "{{ c.get_absolute_url }}",
-      booking_url: "{% url 'bookings:create' c.slug %}",
-      price: "{% if c.min_price %}de la {{ c.min_price|floatformat:0 }} RON{% else %}La cerere{% endif %}"
-    },{% endif %}{% endfor %}
-  ];
+  const SERVICES = JSON.parse(document.getElementById('service-map-data').textContent);
 
   function initMap(lat, lng, zoom) {
-    if (mapInitialized) { map.setView([lat, lng], zoom); return; }
+    if (!googleMapsConfigured) return;
+    if (mapInitialized) {
+      map.setCenter({ lat, lng });
+      map.setZoom(zoom);
+      return;
+    }
     document.getElementById('map').innerHTML = '';
-    map = L.map('map', { zoomControl: true }).setView([lat, lng], zoom);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
-    }).addTo(map);
+    map = new google.maps.Map(document.getElementById('map'), {
+      center: { lat, lng },
+      zoom,
+      mapTypeControl: false,
+      streetViewControl: false,
+    });
     mapInitialized = true;
   }
 
   function addServiceMarkers(services) {
-    if (!map) return;
-    serviceMarkers.forEach(m => map.removeLayer(m));
+    if (!map || !googleMapsConfigured) return;
+    serviceMarkers.forEach(marker => marker.setMap(null));
     serviceMarkers = [];
     services.forEach(s => {
       if (typeof s.lat !== "number" || typeof s.lng !== "number") return;
-      const icon = L.divIcon({
-        html: `<div style="background:#e63946;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.5);border:2px solid white;">${s.icon}</div>`,
-        className: '', iconSize:[32,32], iconAnchor:[16,32], popupAnchor:[0,-32]
+      const marker = new google.maps.Marker({
+        position: { lat: s.lat, lng: s.lng },
+        map,
+        title: s.name,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 16,
+          fillColor: '#e63946',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+        },
+        label: { text: s.icon, fontSize: '14px' },
       });
       const distText = s.distance_km ? `<br>📍 <strong>${s.distance_km} km</strong>` : '';
-      const m = L.marker([s.lat, s.lng], { icon }).addTo(map).bindPopup(`
+      const infoWindow = new google.maps.InfoWindow({ content: `
         <div style="min-width:200px;font-family:sans-serif;">
           <strong>${s.icon} ${s.name}</strong><br>
           <span style="color:#888;font-size:0.8rem;">${s.city} · ${s.category}</span><br>
@@ -1013,8 +1029,53 @@
             <a href="${s.booking_url}" style="background:#e63946;color:white;padding:4px 10px;border-radius:6px;text-decoration:none;font-size:0.8rem;">📅 Programează</a>
             <a href="${s.url}" style="background:#333;color:white;padding:4px 10px;border-radius:6px;text-decoration:none;font-size:0.8rem;">👁 Detalii</a>
           </div>
-        </div>`);
-      serviceMarkers.push(m);
+        </div>` });
+      marker.addListener('click', () => infoWindow.open({ map, anchor: marker }));
+      serviceMarkers.push(marker);
+    });
+  }
+
+  function placeUserMarker(lat, lng) {
+    if (userMarker) userMarker.setMap(null);
+    userMarker = new google.maps.Marker({
+      position: { lat, lng },
+      map,
+      draggable: true,
+      title: 'Trage pentru a corecta locația',
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 18,
+        fillColor: '#4cc9f0',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 3,
+      },
+      label: { text: '📍', fontSize: '16px' },
+      zIndex: 1000,
+    });
+    const infoWindow = new google.maps.InfoWindow({
+      content: '<strong>Locația ta</strong><br><small>Trage marker-ul pentru a corecta</small>',
+    });
+    infoWindow.open({ map, anchor: userMarker });
+    userMarker.addListener('click', () => infoWindow.open({ map, anchor: userMarker }));
+    userMarker.addListener('dragstart', () => infoWindow.close());
+    userMarker.addListener('drag', () => {
+      const position = userMarker.getPosition();
+      afiseazaDistanteCarduri(position.lat(), position.lng());
+      if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(position.lat(), position.lng());
+      if (razaActiva > 0) filtreazaDupaRaza(position.lat(), position.lng(), razaActiva);
+    });
+    userMarker.addListener('dragend', () => {
+      const position = userMarker.getPosition();
+      const positionLat = position.lat();
+      const positionLng = position.lng();
+      salveazaLocatia(positionLat, positionLng);
+      document.getElementById('locatieStatus').innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>Localizat (corectat manual)';
+      infoWindow.setContent('<strong>Locația ta</strong><br><small style="color:#4cc9f0;">✓ Poziție corectată</small>');
+      infoWindow.open({ map, anchor: userMarker });
+      afiseazaDistanteCarduri(positionLat, positionLng);
+      if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(positionLat, positionLng);
+      if (razaActiva > 0) filtreazaDupaRaza(positionLat, positionLng, razaActiva);
     });
   }
 
@@ -1032,35 +1093,25 @@
       document.getElementById('btnResetMap').style.display = 'inline-block';
       status.style.display = 'block';
       status.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (±${Math.round(pos.coords.accuracy)}m)`;
-      initMap(lat, lng, 12);
-      if (userMarker) map.removeLayer(userMarker);
-      userMarker = L.marker([lat, lng], {
-        draggable: true,
-        icon: L.divIcon({
-          html: `<div title="Trage pentru a corecta locația" style="background:#4cc9f0;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 12px rgba(76,201,240,0.6);border:3px solid white;cursor:grab;">📍</div>`,
-          className:'', iconSize:[36,36], iconAnchor:[18,36]
-        })
-      }).addTo(map).bindPopup('<strong>Locația ta</strong><br><small class="text-muted">Trage marker-ul pentru a corecta</small>').openPopup();
-      userMarker.on('dragstart', () => {
-        userMarker.closePopup();
-      });
-      userMarker.on('drag', e => {
-        const pos = e.latlng;
-        afiseazaDistanteCarduri(pos.lat, pos.lng);
-        if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(pos.lat, pos.lng);
-        if (razaActiva > 0) filtreazaDupaRaza(pos.lat, pos.lng, razaActiva);
-      });
-      userMarker.on('dragend', e => {
-        const pos = e.target.getLatLng();
-        salveazaLocatia(pos.lat, pos.lng);
-        const status = document.getElementById('locatieStatus');
-        status.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (corectat manual)`;
-        userMarker.bindPopup('<strong>Locația ta</strong><br><small style="color:#4cc9f0;">✓ Poziție corectată</small>').openPopup();
-        afiseazaDistanteCarduri(pos.lat, pos.lng);
-        if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(pos.lat, pos.lng);
-        if (razaActiva > 0) filtreazaDupaRaza(pos.lat, pos.lng, razaActiva);
-      });
-      L.circle([lat, lng], { radius:25000, color:'#e63946', fillColor:'#e63946', fillOpacity:0.05, weight:1, dashArray:'5,5' }).addTo(map);
+      if (googleMapsConfigured && await googleMapsReady) {
+        initMap(lat, lng, 12);
+        placeUserMarker(lat, lng);
+        if (userRadiusCircle) userRadiusCircle.setMap(null);
+        userRadiusCircle = new google.maps.Circle({
+          map,
+          center: { lat, lng },
+          radius: 25000,
+          strokeColor: '#e63946',
+          strokeOpacity: 0.6,
+          strokeWeight: 1,
+          fillColor: '#e63946',
+          fillOpacity: 0.05,
+        });
+      } else {
+        status.innerHTML += googleMapsConfigured
+          ? ' Harta Google nu s-a putut încărca. Verifică cheia și configurația API.'
+          : ' Configurează GOOGLE_MAPS_API_KEY pentru afișarea hărții.';
+      }
       if (sortDupa) aplicaSortareDupaDistanta(lat, lng);
       try {
         const resp = await fetch(`/api/services/nearby/?lat=${lat}&lng=${lng}&radius=50&limit=20`);
@@ -1072,14 +1123,16 @@
           if (t5) t5.style.display = 'none';
         } else { addServiceMarkers(SERVICES); }
       } catch { addServiceMarkers(SERVICES); }
-    }, err => {
+    }, async err => {
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-geo-alt-fill me-1"></i>Locația mea';
       status.style.display = 'block';
       const msgs = {1:'Accesul la locație refuzat.',2:'Locația nu poate fi determinată.',3:'Timeout.'};
       status.innerHTML = `<i class="bi bi-x-circle text-danger me-1"></i>${msgs[err.code]||'Eroare.'}`;
-      initMap(45.9432, 24.9668, 7);
-      addServiceMarkers(SERVICES);
+      if (googleMapsConfigured && await googleMapsReady) {
+        initMap(45.9432, 24.9668, 7);
+        addServiceMarkers(SERVICES);
+      }
     }, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
   }
 
@@ -1116,10 +1169,16 @@
     document.querySelectorAll('#servicesContainer .col-12[data-lat]').forEach(c => c.style.display = '');
     const t5 = document.getElementById('top5List');
     if (t5) t5.style.display = 'block';
-    if (map) { map.remove(); map = null; mapInitialized = false; }
+    if (userMarker) { userMarker.setMap(null); userMarker = null; }
+    if (userRadiusCircle) { userRadiusCircle.setMap(null); userRadiusCircle = null; }
+    serviceMarkers.forEach(marker => marker.setMap(null));
+    serviceMarkers = [];
+    map = null;
+    mapInitialized = false;
     document.getElementById('map').innerHTML = `
       <div class="d-flex align-items-center justify-content-center h-100 text-muted-custom flex-column">
         <div style="font-size:2rem;opacity:0.3;">🗺️</div>
+        ${googleMapsConfigured ? '' : '<p class="small mt-2 mb-0">Configurează GOOGLE_MAPS_API_KEY pentru a activa harta Google.</p>'}
         <p class="small mt-2 mb-0">Apasă "Locația mea"</p>
         <p class="small">pentru a vedea harta</p>
       </div>`;
@@ -1131,13 +1190,16 @@
   }
 
   // ===== LA INCARCARE =====
-  window.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('DOMContentLoaded', async () => {
     updateBadge();
 
     const loc = getLocatieSalvata();
     if (loc) {
+      const googleMapsLoaded = googleMapsConfigured && await googleMapsReady;
       document.getElementById('locatieStatus').style.display = 'block';
-      document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-geo-alt text-warning me-1"></i>Se actualizează locația...`;
+      document.getElementById('locatieStatus').innerHTML = googleMapsLoaded
+        ? '<i class="bi bi-geo-alt text-warning me-1"></i>Se actualizează locația...'
+        : `<i class="bi bi-geo-alt text-warning me-1"></i>Locația e salvată. ${googleMapsConfigured ? 'Harta Google nu s-a putut încărca.' : 'Configurează GOOGLE_MAPS_API_KEY pentru afișarea hărții.'}`;
       document.getElementById('btnResetMap').style.display = 'inline-block';
       // Cere GPS proaspat in fundal - actualizeaza silentios fara a bloca UI
       if (navigator.geolocation) {
@@ -1145,7 +1207,7 @@
           const newLat = pos.coords.latitude, newLng = pos.coords.longitude;
           salveazaLocatia(newLat, newLng);
           document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (±${Math.round(pos.coords.accuracy)}m)`;
-          if (userMarker) userMarker.setLatLng([newLat, newLng]);
+          if (userMarker) userMarker.setPosition({ lat: newLat, lng: newLng });
           afiseazaDistanteCarduri(newLat, newLng);
           if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(newLat, newLng);
           if (razaActiva > 0) filtreazaDupaRaza(newLat, newLng, razaActiva);
@@ -1155,30 +1217,11 @@
       } else {
         document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (din memorie)`;
       }
-      initMap(loc.lat, loc.lng, 12);
-      userMarker = L.marker([loc.lat, loc.lng], {
-        draggable: true,
-        icon: L.divIcon({
-          html: `<div title="Trage pentru a corecta locația" style="background:#4cc9f0;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 12px rgba(76,201,240,0.6);border:3px solid white;cursor:grab;">📍</div>`,
-          className:'', iconSize:[36,36], iconAnchor:[18,36]
-        })
-      }).addTo(map).bindPopup('<strong>Locația ta</strong><br><small class="text-muted">Trage marker-ul pentru a corecta</small>');
-      userMarker.on('drag', e => {
-        const pos = e.latlng;
-        afiseazaDistanteCarduri(pos.lat, pos.lng);
-        if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(pos.lat, pos.lng);
-        if (razaActiva > 0) filtreazaDupaRaza(pos.lat, pos.lng, razaActiva);
-      });
-      userMarker.on('dragend', e => {
-        const pos = e.target.getLatLng();
-        salveazaLocatia(pos.lat, pos.lng);
-        document.getElementById('locatieStatus').innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Localizat (corectat manual)`;
-        userMarker.bindPopup('<strong>Locația ta</strong><br><small style="color:#4cc9f0;">✓ Poziție corectată</small>').openPopup();
-        afiseazaDistanteCarduri(pos.lat, pos.lng);
-        if (localStorage.getItem("sort_dist_activ") === "true") aplicaSortareDupaDistanta(pos.lat, pos.lng);
-        if (razaActiva > 0) filtreazaDupaRaza(pos.lat, pos.lng, razaActiva);
-      });
-      addServiceMarkers(SERVICES);
+      if (googleMapsLoaded) {
+        initMap(loc.lat, loc.lng, 12);
+        placeUserMarker(loc.lat, loc.lng);
+        addServiceMarkers(SERVICES);
+      }
       afiseazaDistanteCarduri(loc.lat, loc.lng);
     }
 
@@ -1204,4 +1247,7 @@
     }
   });
 </script>
+{% if google_maps_api_key %}
+<script async src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key|urlencode }}&amp;loading=async&amp;callback=initGoogleMaps" onerror="window.googleMapsLoadFailed()"></script>
+{% endif %}
 {% endblock extra_js %}

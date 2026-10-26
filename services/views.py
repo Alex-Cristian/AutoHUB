@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError
+from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -471,9 +472,37 @@ def service_list(request):
 
     categories = ServiceCategory.objects.all()
     from .models import CITY_CHOICES
+    map_services = []
+    category_icons = {
+        'detailing': '✨',
+        'mecanica': '🔧',
+        'electrica': '⚡',
+        'tractari': '🚛',
+        'vulcanizari': '🔴',
+        'tinichigerie': '🔨',
+    }
+    for center in qs.filter(latitude__isnull=False, longitude__isnull=False).select_related('category'):
+        category_slug_for_icon = center.category.slug
+        icon = next(
+            (value for key, value in category_icons.items() if key in category_slug_for_icon),
+            '🚗',
+        )
+        map_services.append({
+            'name': center.name,
+            'city': center.get_city_display(),
+            'category': center.category.name,
+            'icon': icon,
+            'rating': round(center.avg_rating, 1) if center.avg_rating else 0,
+            'lat': float(center.latitude),
+            'lng': float(center.longitude),
+            'url': center.get_absolute_url(),
+            'booking_url': reverse('bookings:create', args=[center.slug]),
+            'price': f'de la {center.min_price:.0f} RON' if center.min_price else 'La cerere',
+        })
     context = {
         'centers': qs,
         'top5': qs[:5],
+        'map_services': map_services,
         'categories': categories,
         'cities': CITY_CHOICES,
         'selected_category': category_slug,
@@ -484,6 +513,7 @@ def service_list(request):
         'selected_sort': sort_by,
         'search_q': search_q,
         'total_count': qs.count(),
+        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY,
     }
     return render(request, 'services/service_list.html', context)
 
@@ -621,6 +651,7 @@ def service_register(request):
     return render(request, 'services/service_register.html', {
         'form': form,
         'existing_centers': ServiceCenter.objects.filter(owner=request.user).prefetch_related('categories').order_by('-created_at'),
+        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY,
     })
 
 

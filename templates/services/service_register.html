@@ -2,7 +2,6 @@
 {% block title %}Înregistrare firmă/service — AutoEMG{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   #mapPreview {
     height: 260px;
@@ -119,12 +118,18 @@
   #id_categories label {display:flex;align-items:center;gap:.45rem;color:var(--ah-text);}
 </style>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
   let previewMap = null;
   let previewMarker = null;
   let geocodeTimer = null;
+  let resolveGoogleMapsReady;
+  const googleMapsConfigured = Boolean('{{ google_maps_api_key|escapejs }}');
+  const googleMapsReady = new Promise(resolve => {
+    resolveGoogleMapsReady = resolve;
+  });
+  window.initGoogleMaps = () => resolveGoogleMapsReady(true);
+  window.googleMapsLoadFailed = () => resolveGoogleMapsReady(false);
 
   const addrInput  = document.getElementById('id_address');
   const citySelect = document.getElementById('id_city');
@@ -133,11 +138,6 @@
   const statusEl   = document.getElementById('geocodeStatus');
   const mapEl      = document.getElementById('mapPreview');
   const hintEl     = document.getElementById('mapHint');
-
-  const markerIcon = L.divIcon({
-    html: `<div style="background:#e63946;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 12px rgba(230,57,70,0.6);border:3px solid white;cursor:grab;">📍</div>`,
-    className: '', iconSize: [36,36], iconAnchor: [18,36], popupAnchor: [0,-36]
-  });
 
   function getCityText() {
     if (!citySelect) return '';
@@ -158,26 +158,40 @@
   }
 
   function plasezaMarker(lat, lng) {
-    if (previewMarker) previewMap.removeLayer(previewMarker);
+    if (previewMarker) previewMarker.setMap(null);
 
-    previewMarker = L.marker([lat, lng], {
-      icon: markerIcon,
-      draggable: true  // ← DRAG ACTIVAT
-    }).addTo(previewMap);
+    previewMarker = new google.maps.Marker({
+      position: { lat, lng },
+      map: previewMap,
+      draggable: true,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 14,
+        fillColor: '#e63946',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 3,
+      },
+      label: { text: '📍', fontSize: '16px' },
+    });
+    const infoWindow = new google.maps.InfoWindow({
+      content: '<div style="text-align:center"><strong>📍 Locația service-ului</strong><br><small style="color:#888">Trage-mă pe clădirea exactă</small></div>',
+    });
+    previewMarker.addListener('click', () => infoWindow.open({ map: previewMap, anchor: previewMarker }));
+    infoWindow.open({ map: previewMap, anchor: previewMarker });
 
-    previewMarker.bindPopup(
-      '<div style="text-align:center"><strong>📍 Locația service-ului</strong><br><small style="color:#888">Trage-mă pe clădirea exactă</small></div>'
-    ).openPopup();
-
-    previewMarker.on('drag', function(e) {
-      salveazaCoordonate(e.target.getLatLng().lat, e.target.getLatLng().lng);
+    previewMarker.addListener('drag', () => {
+      const position = previewMarker.getPosition();
+      salveazaCoordonate(position.lat(), position.lng());
     });
 
-    previewMarker.on('dragend', function(e) {
-      const { lat, lng } = e.target.getLatLng();
+    previewMarker.addListener('dragend', () => {
+      const position = previewMarker.getPosition();
+      const lat = position.lat();
+      const lng = position.lng();
       salveazaCoordonate(lat, lng);
       updateStatus(lat, lng);
-      previewMarker.openPopup();
+      infoWindow.open({ map: previewMap, anchor: previewMarker });
     });
 
     salveazaCoordonate(lat, lng);
@@ -188,23 +202,23 @@
     if (hintEl) hintEl.style.display = 'block';
 
     if (!previewMap) {
-      previewMap = L.map('mapPreview', { zoomControl: true, scrollWheelZoom: true })
-        .setView([lat, lng], 17);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
-      }).addTo(previewMap);
-
-      // Click pe hartă = mută markerul
-      previewMap.on('click', function(e) {
-        plasezaMarker(e.latlng.lat, e.latlng.lng);
-        updateStatus(e.latlng.lat, e.latlng.lng);
+      previewMap = new google.maps.Map(mapEl, {
+        center: { lat, lng },
+        zoom: 17,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+      });
+      previewMap.addListener('click', event => {
+        plasezaMarker(event.latLng.lat(), event.latLng.lng());
+        updateStatus(event.latLng.lat(), event.latLng.lng());
       });
     } else {
-      previewMap.setView([lat, lng], 17);
+      previewMap.setCenter({ lat, lng });
+      previewMap.setZoom(17);
     }
 
     plasezaMarker(lat, lng);
-    setTimeout(() => { if (previewMap) previewMap.invalidateSize(); }, 100);
   }
 
   async function geocodeaza() {
@@ -235,11 +249,21 @@
       if (results && results.length > 0) {
         const lat = parseFloat(results[0].lat);
         const lng = parseFloat(results[0].lon);
+        salveazaCoordonate(lat, lng);
         if (statusEl) {
-          statusEl.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Locație găsită — <strong>trage markerul</strong> exact pe clădire dacă poziția nu e precisă`;
+          statusEl.innerHTML = googleMapsConfigured
+            ? '<i class="bi bi-check-circle text-success me-1"></i>Locație găsită — <strong>trage markerul</strong> exact pe clădire dacă poziția nu e precisă'
+            : '<i class="bi bi-check-circle text-success me-1"></i>Coordonate găsite. Configurează GOOGLE_MAPS_API_KEY pentru a afișa harta și a ajusta markerul.';
           statusEl.className = '';
         }
-        initPreviewMap(lat, lng);
+        if (googleMapsConfigured) {
+          if (await googleMapsReady) {
+            initPreviewMap(lat, lng);
+          } else if (statusEl) {
+            statusEl.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Coordonate găsite, dar harta Google nu s-a putut încărca. Verifică cheia și configurația API.';
+            statusEl.className = 'text-warning';
+          }
+        }
       } else {
         if (latInput) latInput.value = '';
         if (lngInput) lngInput.value = '';
@@ -266,16 +290,28 @@
   if (addrInput) addrInput.addEventListener('input', scheduleGeocode);
   if (citySelect) citySelect.addEventListener('change', scheduleGeocode);
 
-  window.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('DOMContentLoaded', async () => {
     const existingLat = latInput ? parseFloat(latInput.value) : null;
     const existingLng = lngInput ? parseFloat(lngInput.value) : null;
     if (existingLat && existingLng && !isNaN(existingLat) && !isNaN(existingLng)) {
       if (statusEl) {
-        statusEl.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Locație salvată — trage markerul pentru a ajusta.`;
+        statusEl.innerHTML = googleMapsConfigured
+          ? '<i class="bi bi-check-circle text-success me-1"></i>Locație salvată — trage markerul pentru a ajusta.'
+          : '<i class="bi bi-check-circle text-success me-1"></i>Locație salvată. Configurează GOOGLE_MAPS_API_KEY pentru a afișa harta și a ajusta markerul.';
       }
-      initPreviewMap(existingLat, existingLng);
+      if (googleMapsConfigured) {
+        if (await googleMapsReady) {
+          initPreviewMap(existingLat, existingLng);
+        } else if (statusEl) {
+          statusEl.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Harta Google nu s-a putut încărca. Verifică cheia și configurația API.';
+          statusEl.className = 'text-warning';
+        }
+      }
     }
   });
 })();
 </script>
+{% if google_maps_api_key %}
+<script async src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key|urlencode }}&amp;loading=async&amp;callback=initGoogleMaps" onerror="window.googleMapsLoadFailed()"></script>
+{% endif %}
 {% endblock %}
